@@ -26,13 +26,13 @@ With DTMCs, statistical model checking is well-supported by PRISM as "Simulation
 ### MDPs 
 There can be true non-deterministic choice, in the sense of multiple transitions from a state without weights, as well as probabilistic choice as defined for DTMCs. This arguably represents a more realistic model of packet arrivals (if we don't want to commit to particular probability distributions), and the queries are then of the form `Pmax=?` and `Pmin=?` rather than `P=?`, as nondeterministic choice is expanded into branching paths (each with its own probability distribution). Simialrly for `Rmin=?` and `Rmax=?`. 
 
-_MDPs let you avoid distribution on inputs and instead have distributions on outputs; ex. windows w/ categorical dist. for probabilistic writes._
+__MDPs let you avoid distribution on inputs and instead have distributions on outputs; ex. windows w/ categorical dist. for probabilistic writes.__
 
-_Explain nondeterministic choice vs probabilistic choice, add a diagram and explain why Pmax & Pmin are often 1 and 0, which collapses the probabilistic analysis back to traditional verification._
+__Explain nondeterministic choice vs probabilistic choice, add a diagram and explain why Pmax & Pmin are often 1 and 0, which collapses the probabilistic analysis back to traditional verification.__
 
 There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
 
-__add a pundit square for DTMC/MDP and exact/approx__
+__add a Punnet square for DTMC/MDP and exact/approx__
 
 ## Progress
 My recent efforts have gone in several directions:
