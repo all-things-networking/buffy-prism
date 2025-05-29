@@ -5,6 +5,10 @@ This repo contains my work in progress on a probabilistic verification/analysis 
 ## Overview
 The general idea is to define discrete-time Markov chains (DTMCs) and Markov decision processes (MDPs) that model the actions of queueing modules over streams of (possibly typed) packets. Packet arrivals (input) and dequeues (output) are represented as actions in these Markovian systems. Vectors of input buffers and control variables are the internal state. There are also rewards that can be associated with a subset of actions or predicates over states.
 
+__Rewards are metrics that can accumulate (monotonically), whereas metrics that can reset or go up and down are better modelled as a state variable.__
+
+__renaming modules to build contention points, add example__
+
 See [NetAutomataSMC.pptx](/NetAutomataSMC.pptx) for some slides with examples of this construction.
 
 ## Probabilistic Model Checking with PRISM
@@ -22,7 +26,13 @@ With DTMCs, statistical model checking is well-supported by PRISM as "Simulation
 ### MDPs 
 There can be true non-deterministic choice, in the sense of multiple transitions from a state without weights, as well as probabilistic choice as defined for DTMCs. This arguably represents a more realistic model of packet arrivals (if we don't want to commit to particular probability distributions), and the queries are then of the form `Pmax=?` and `Pmin=?` rather than `P=?`, as nondeterministic choice is expanded into branching paths (each with its own probability distribution). Simialrly for `Rmin=?` and `Rmax=?`. 
 
+_MDPs let you avoid distribution on inputs and instead have distributions on outputs; ex. windows w/ categorical dist. for probabilistic writes._
+
+_Explain nondeterministic choice vs probabilistic choice, add a diagram and explain why Pmax & Pmin are often 1 and 0, which collapses the probabilistic analysis back to traditional verification._
+
 There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
+
+__add a pundit square for DTMC/MDP and exact/approx__
 
 ## Progress
 My recent efforts have gone in several directions:
@@ -32,6 +42,8 @@ So far, we have estimated that statistical model checking is an effective means 
 
 Another area that I feel is promising is in quantifying the likelihood of constraint violations or counterexamples. It is not straightfoward with traditional verification to estimate how typical or rare a counterexample might be.
 
+__numerical methods__
+
 ### Using probabilities to reduce state space due to orderings
 I am trying to model buffers as counters for packet types, and the type of each dequeue coming from the categorical distribution associated with the current counts. This means that ordering of packets in a buffer is not modelled, which reduces the state space significantly. 
 
@@ -40,7 +52,8 @@ For example, with packet types `p1, p2, p3` and a buffer state `{p1: 9, p2: 6, p
 We also thinking about defining multiple windows (fractions of the total buffer size) to enforce partial orderings and ensure that properties like starvation are not only a result of the lack of explicit ordering in the model, but correspond to likelihood of genuine starvation in the network algorithms.
 
 ### Conditional probabilities in queries
-PRISM has the basic ability to calculate conditional probabilities by dividing probabilities of multiple (ex. `[P=? (P & Q)] / [P=? Q]`, where `P` and `Q` are path conditions).
+PRISM has the basic ability to calculate conditional probabilities by dividing probabilities of multiple 
+(ex. `[P=? (A & B)] / [P=? B]`, where `A` and `B` are path conditions).
 
 This isn't as flexible as having an unconditioned Markovian process, so I am trying to model conditional probabilities as transformations of Markovian processes that prune paths violating the conditional assumption, and reweigh the remaining transitions accordingly. 
 
