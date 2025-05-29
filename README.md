@@ -3,26 +3,33 @@
 This repo contains my work in progress on a probabilistic verification/analysis backend for the Buffy project.
 
 ## Overview
-The general idea is to define discrete-time Markov chains (DTMCs) and Markov decision processes (MDPs) that model the actions of queueing modules over streams of (possibly typed) packets. Packet arrivals (input) and dequeues (output) are represented as actions in these Markovian systems. Vectors of input buffers and control variables are the internal state. There are also rewards that can be associated with a subset of actions or predicates over states.
+The general idea is to define _discrete-time Markov chains_ (DTMCs) and _Markov decision processes_ (MDPs) that model the actions of queueing modules over streams of (possibly typed) packets. (I will use the term _Markovian system_ to refer to either a DTMC or an MDP) Packet arrivals (input) and dequeues (output) are represented as actions in these Markovian systems. Vectors of input buffers and control variables are the internal state. There are also rewards that can be associated with a subset of actions or predicates over states.
 
 See [NetAutomataSMC.pptx](/NetAutomataSMC.pptx) for some slides with examples of this construction.
 
 ## Probabilistic Model Checking with PRISM
-Probabilistic model checkers can determine two basic kinds of queries, expressed as path properties in Probabilistic Computation Tree Logic (PCTL) [8, 5]:
+
+I am currently using the [PRISM Model Checker](https://www.prismmodelchecker.org/) to test properties of these queueing modules. I have also looked into the [UPPAAL](https://uppaal.org/) and [COSMOS](https://cosmos.lacl.fr/) tools for probabilistic model checking.
+
+PRISM can determine two basic kinds of queries, expressed as path properties in Probabilistic Computation Tree Logic (PCTL) [8, 5]:
 - Probability of a path property being satisfied, which can be specified within a bounded number of time steps, an exact number of time steps, an interval of time, or (for DTMCs only) in the long run. Probability queries can test a particular probability, eg. `P<=0.98` (true/false), or solve the probability, eg. `P=?` (value in `[0,1]`), with no real difference in performance.
 - Expected value of (accumulated) reward for all paths satisfying a path property. This can also take the form `R<=5.5` (true/false) or `R=?` (value in [0, inf]).
+
+There are two main types of probabilistic model checking: _exact_ (i.e., verification) which calculates the precise probability (up to a user-configured tolerance level) through sparse matrix computations, and _approximate solutions (statistical model checking, SMC)_ ([link](https://www.prismmodelchecker.org/manual/RunningPRISM/StatisticalModelChecking)) which runs a number of "experiments" that runs individual simulations (trials) of the system and reports statistics about the number of satisfying/failing trials that were observed. The SMC approach is generally orders of magnitude faster, and in theory will converge to the exact solution.
+
+A nice feature of PRISM is that you can copy a module by defining substitutions for the names of all of its variables ([link](https://www.prismmodelchecker.org/manual/ThePRISMLanguage/ModuleRenaming)). This carries over to renaming the variables in any formulas that have been defined on the states of the original module to the new names in the copied module. Also, a module can contain a formula that references the variables of another module. This should, in principle, allow for the creation of _contention points_ by renaming the I/O variables of one module to the I/O variables of others to create links.
 
 The main difference between DTMCs and MDPs: 
 
 ### DTMCs
 There can be multiple transitions from a state, but each transition must be weighted, and these weights must sum to 1. I have mainly used this to model packet arrival actions (we can assume uniform likelihood for any arrival event, or define any discrete distribution). 
 
-With DTMCs, statistical model checking is well-supported by PRISM as "Simulation" in Experiments.
+Statistical model checking on DTMCs is well-supported by PRISM as "Simulation" in Experiments.
 
 ### MDPs 
 There can be true non-deterministic choice, in the sense of multiple transitions from a state without weights, as well as probabilistic choice as defined for DTMCs. This arguably represents a more realistic model of packet arrivals (if we don't want to commit to particular probability distributions), and the queries are then of the form `Pmax=?` and `Pmin=?` rather than `P=?`, as nondeterministic choice is expanded into branching paths (each with its own probability distribution). Simialrly for `Rmin=?` and `Rmax=?`. 
 
-There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
+PRISM does not allow for true statistical model checking for MDPs. It simply chooses a non-deterministic branch uniformly at random, and displays a warning. There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
 
 ## Progress
 My recent efforts have gone in several directions:
@@ -50,7 +57,6 @@ A detailed strategy is given in [2], which I believe corresponds quite directly 
 
 See [models/](/models/). I've included a comment block in each file that explains the general strategy and properties under test.
 
-These are written for the [PRISM Model Checker](https://www.prismmodelchecker.org/). I have also looked into the [UPPAAL](https://uppaal.org/) and [COSMOS](https://cosmos.lacl.fr/) tools for probabilistic model checking.
 
 ## References
 
