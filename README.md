@@ -9,7 +9,7 @@ See [NetAutomataSMC.pptx](/NetAutomataSMC.pptx) for some slides with examples of
 
 ## Probabilistic Model Checking with PRISM
 Probabilistic model checkers can determine two basic kinds of queries, expressed as path properties in Probabilistic Computation Tree Logic (PCTL) [8, 5]:
-- Probability of a path property being satisfied, in a bounded sense or (for DTMCs only) in the long run. Probability queries can test a particular probability, eg. `P<=0.98` (true/false), or solve the probability, eg. `P=?` (value in `[0,1]`), with no real difference in performance.
+- Probability of a path property being satisfied, which can be specified within a bounded number of time steps, an exact number of time steps, an interval of time, or (for DTMCs only) in the long run. Probability queries can test a particular probability, eg. `P<=0.98` (true/false), or solve the probability, eg. `P=?` (value in `[0,1]`), with no real difference in performance.
 - Expected value of (accumulated) reward for all paths satisfying a path property. This can also take the form `R<=5.5` (true/false) or `R=?` (value in [0, inf]).
 
 The main difference between DTMCs and MDPs: 
