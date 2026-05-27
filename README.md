@@ -9,7 +9,7 @@ __Rewards are metrics that can accumulate (monotonically), whereas metrics that 
 
 __renaming modules to build contention points, add example__
 
-See [NetAutomataSMC.pptx](/NetAutomataSMC.pptx) for some slides with examples of this construction.
+See [NetAutomataSMC.pptx](/docs/NetAutomataSMC.pptx) for some slides with examples of this construction.
 
 ## Probabilistic Model Checking with PRISM
 Probabilistic model checkers can determine two basic kinds of queries, expressed as path properties in Probabilistic Computation Tree Logic (PCTL) [8, 5]:
@@ -57,17 +57,17 @@ PRISM has the basic ability to calculate conditional probabilities by dividing p
 
 This isn't as flexible as having an unconditioned Markovian process, so I am trying to model conditional probabilities as transformations of Markovian processes that prune paths violating the conditional assumption, and reweigh the remaining transitions accordingly. 
 
-A detailed strategy is given in [2], which I believe corresponds quite directly to the "on-demand" construction algorithm I explain in [NetAutomataSMC.pptx](/NetAutomataSMC.pptx) (which I haven't really formalized yet). I estimate that my "on-demand" algorithm suffices in simple cases, but that in the general case, it will be necessary to actually use PRISM to guide the transformation (by searching paths for non-zero probabilities of violating constraints to determine when to prune), which is what [2] seems to suggest doing.
+A detailed strategy is given in [2], which I believe corresponds quite directly to the "on-demand" construction algorithm I explain in [NetAutomataSMC.pptx](/docs/NetAutomataSMC.pptx) (which I haven't really formalized yet). I estimate that my "on-demand" algorithm suffices in simple cases, but that in the general case, it will be necessary to actually use PRISM to guide the transformation (by searching paths for non-zero probabilities of violating constraints to determine when to prune), which is what [2] seems to suggest doing.
 
 ## PRISM Models
 
-See [models/](/models/). I've included a comment block in each file that explains the general strategy and properties under test.
+See [models/](/tests/models/). I've included a comment block in each file that explains the general strategy and properties under test.
 
 These are written for the [PRISM Model Checker](https://www.prismmodelchecker.org/). I have also looked into the [UPPAAL](https://uppaal.org/) and [COSMOS](https://cosmos.lacl.fr/) tools for probabilistic model checking.
 
 ## References
 
-See also [refs-SMC.bib](/refs-SMC.bib) for BibTeX.
+See also [refs-SMC.bib](/docs/refs-SMC.bib) for BibTeX.
 
 This is a slight overapproximation of the relevant papers to this project; I've added everything that I've come across and deemed possibly useful. In particular [2], [4], [8] and [10] have been important for my work so far.
 
