@@ -2,8 +2,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from src.smc.hyptest.hyptest import ErrTols, HypResult
-from src.smc.hyptest.wald_sprt import WaldSprt
+from src.netmdp.hyptest.hyptest import ErrTols, HypResult
+from src.netmdp.hyptest.wald_sprt import WaldSprt
 
 SPRTTwoHypParams = namedtuple('SPRTTwoHypParams',
                 [

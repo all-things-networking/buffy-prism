@@ -1,7 +1,7 @@
 import stormpy
 
-from src.smc.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
-from tests.prism_examples.importance_die import ImportanceDieOneRedundant
+from src.netmdp.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
+from tests.models.importance_die import ImportanceDieOneRedundant
 
 
 def example_expected_splitting_run():

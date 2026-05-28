@@ -2,8 +2,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from src.smc.hyptest.chow_robbins import ChowRobbins
-from src.smc.hyptest.hyptest import ErrTols, HypResult
+from src.netmdp.hyptest.chow_robbins import ChowRobbins
+from src.netmdp.hyptest.hyptest import ErrTols, HypResult
 
 CRTwoHypParams = namedtuple('CRTwoHypParams',
                 [

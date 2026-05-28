@@ -1,4 +1,4 @@
-from src.smc.sampler.bernoulli_sampler import BernoulliSampler
+from src.netmdp.sampler.bernoulli_sampler import BernoulliSampler
 from tests.cr_test_runner import CRTwoHypParams, run_cr_two_hyp, CROneHypParams, run_cr_one_hyp
 from tests.plots import plot_cr_results
 

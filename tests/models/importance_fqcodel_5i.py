@@ -1,7 +1,7 @@
 from stormpy import PrismProgram
 
-from src.smc.sampler.sampler import SamplerError
-from src.smc.sampler.splitting.importance_function import ImportanceFunction
+from src.netmdp.sampler.sampler import SamplerError
+from src.netmdp.sampler.splitting.importance_function import ImportanceFunction
 
 
 class ImportanceFQCodel(ImportanceFunction):

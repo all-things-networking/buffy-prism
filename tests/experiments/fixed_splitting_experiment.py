@@ -6,9 +6,9 @@ import stormpy.examples
 import stormpy.examples.files
 import stormpy.simulator
 
-from src.smc.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
+from src.netmdp.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
 from tests.cr_test_runner import CROneHypParams, run_cr_one_hyp
-from tests.prism_examples.importance_fqcodel_5i import ImportanceFQCodel
+from tests.models.importance_fqcodel_5i import ImportanceFQCodel
 
 
 def fixed_splitting_cr_exp_p3(trial: int):

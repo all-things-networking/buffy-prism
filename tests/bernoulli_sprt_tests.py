@@ -1,4 +1,4 @@
-from src.smc.sampler.bernoulli_sampler import BernoulliSampler
+from src.netmdp.sampler.bernoulli_sampler import BernoulliSampler
 from tests.plots import plot_sprt_results
 from tests.sprt_test_runner import SPRTTwoHypParams, run_sprt_two_hyp, SPRTOneHypParams, run_sprt_one_hyp
 

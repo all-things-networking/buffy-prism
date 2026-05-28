@@ -4,7 +4,7 @@ import stormpy.examples
 import stormpy.examples.files
 import stormpy.simulator
 
-from src.smc.sampler.base_smc_sampler import BaseSMCSampler
+from src.netmdp.sampler.base_smc_sampler import BaseSMCSampler
 from tests.cr_test_runner import CROneHypParams, run_cr_one_hyp
 from tests.sprt_test_runner import SPRTOneHypParams, run_sprt_one_hyp
 

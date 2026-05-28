@@ -1,0 +1,24 @@
+P=? [ G<=(224) (iq5_deqs_bl<4) ]
+
+P=? [ G<=(224) ((iq5_deqs_bl<4)&((time>5)|(iq5_cenq<2))) ]
+
+P=? [ G<=(224) ((time>5)|(iq5_cenq<2)) ]
+
+P=? [ G<=(224) (iq5_deqs_bl<4) ]
+
+P=? [ G<=(224) ((iq5_deqs_bl<4)&((time<12)|(iq5_cenq>4))) ]
+
+P=? [ G<=(224) ((time<12)|(iq5_cenq>4)) ]
+
+P=? [ G<=(224) (iq5_deqs_bl<4) ]
+
+P=? [ G<=(224) ((iq5_deqs_bl<4)&((time<7)|(iq5_aipg>1))) ]
+
+P=? [ G<=(224) ((time<7)|(iq5_aipg>1)) ]
+
+P=? [ G<=(224) (iq5_deqs_bl<4) ]
+
+P=? [ G<=(224) ((iq5_deqs_bl<4)&(((time>5)|(iq5_cenq<2))&(((time<12)|(iq5_cenq>4))&((time<7)|(iq5_aipg>1))))) ]
+
+P=? [ G<=(224) (((time>5)|(iq5_cenq<2))&(((time<12)|(iq5_cenq>4))&((time<7)|(iq5_aipg>1)))) ]
+

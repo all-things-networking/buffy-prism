@@ -6,10 +6,10 @@ import stormpy.examples
 import stormpy.examples.files
 import stormpy.simulator
 
-from src.smc.sampler.base_symbolic_smc_sampler import BaseSymbolicSMCSampler
-from src.smc.sampler.fixed_effort_smc_sampler import FixedEffortSMCSampler
+from src.netmdp.sampler.base_symbolic_smc_sampler import BaseSymbolicSMCSampler
+from src.netmdp.sampler.fixed_effort_smc_sampler import FixedEffortSMCSampler
 from tests.cr_test_runner import CROneHypParams, run_cr_one_hyp
-from tests.prism_examples.importance_fqcodel_5i import ImportanceFQCodel
+from tests.models.importance_fqcodel_5i import ImportanceFQCodel
 
 
 def fixed_effort_cr_exp_p3(trial: int):

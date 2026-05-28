@@ -6,8 +6,8 @@ import stormpy.examples
 import stormpy.examples.files
 import stormpy.simulator
 
-from src.smc.sampler.base_symbolic_smc_sampler import BaseSymbolicSMCSampler
-from src.smc.sampler.bernoulli_sampler import BernoulliSampler
+from src.netmdp.sampler.base_symbolic_smc_sampler import BaseSymbolicSMCSampler
+from src.netmdp.sampler.bernoulli_sampler import BernoulliSampler
 from tests.cr_test_runner import CROneHypParams, run_cr_one_hyp
 
 def bernoulli_cr_exp_p3():

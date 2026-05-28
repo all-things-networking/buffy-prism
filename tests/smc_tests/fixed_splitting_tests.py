@@ -4,9 +4,9 @@ import stormpy.examples
 import stormpy.examples.files
 import stormpy.simulator
 
-from src.smc.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
+from src.netmdp.sampler.fixed_splitting_smc_sampler import FixedSplittingSMCSampler
 from tests.cr_test_runner import CROneHypParams, run_cr_one_hyp
-from tests.prism_examples.importance_die import ImportanceDie
+from tests.models.importance_die import ImportanceDie
 
 
 def fixed_splitting_es_cr_test():

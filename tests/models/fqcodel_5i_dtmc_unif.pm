@@ -1,6 +1,6 @@
 // Buggy FQ-CoDel AQM algorithm
 // discrete time, nondeterministic choice (traffic)
-// 4 input, 1 output
+// 5 input, 1 output
 // K=4 (max # of packets arriving at each queue)
 
 dtmc
@@ -110,6 +110,9 @@ module fqcodel
 	iq4_arrivals : [0..5] init 0;
 	iq5_arrivals : [0..5] init 0;
 
+	iq5_cenq : [0..((TIME_STEPS*4)+1)] init 0;
+	iq5_aipg : [0..TIME_STEPS] init 0;
+
 	// stage REC_PKT_GET_IQ1 = 1;
 	// stage REC_PKT_ARR_IQ1 = 2;
 	// stage REC_PKT_GET_IQ2 = 3;
@@ -181,12 +184,12 @@ module fqcodel
 	[REC_UPD_NEW_IQ4_ADD] stage=REC_UPD_NEW_IQ4 &  iq4_add_to_new_list -> (stage'=REC_PKT_GET_IQ5) & (iq4_new_rank'=min(IQS,new_list_len+1)) & (new_list_len'=min(IQS,new_list_len+1));
 
 	// Arrivals to input queue 5
-	[REC_PKT_GET_IQ5] stage=REC_PKT_GET_IQ5 -> 0.2 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=0) + 0.2 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=1) + 0.2 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=2) + 0.2 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=3) + 0.2 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=4);
-	[REC_PKT_ARR_IQ5_K0] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=0 -> (stage'=DEQ);
-	[REC_PKT_ARR_IQ5_K1] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=1 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+1));
-	[REC_PKT_ARR_IQ5_K2] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=2 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+2));
-	[REC_PKT_ARR_IQ5_K3] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=3 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+3));
-	[REC_PKT_ARR_IQ5_K4] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=4 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+4));
+	[REC_PKT_GET_IQ5] stage=REC_PKT_GET_IQ5 -> 0.6 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=0) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=1) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=2) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=3) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=4);
+	[REC_PKT_ARR_IQ5_K0] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=0 -> (stage'=DEQ) & (iq5_aipg'=iq5_aipg+1);
+	[REC_PKT_ARR_IQ5_K1] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=1 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+1)) & (iq5_cenq'=iq5_cenq+1) & (iq5_aipg'=0);
+	[REC_PKT_ARR_IQ5_K2] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=2 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+2)) & (iq5_cenq'=iq5_cenq+2) & (iq5_aipg'=0);
+	[REC_PKT_ARR_IQ5_K3] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=3 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+3)) & (iq5_cenq'=iq5_cenq+3) & (iq5_aipg'=0);
+	[REC_PKT_ARR_IQ5_K4] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=4 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+4)) & (iq5_cenq'=iq5_cenq+4) & (iq5_aipg'=0);
 
 	// If input queue 5 is not in new or old lists, then add to new list 
 	[REC_UPD_NEW_IQ5_NOP] stage=REC_UPD_NEW_IQ5 & !iq5_add_to_new_list -> (stage'=DEQ);
