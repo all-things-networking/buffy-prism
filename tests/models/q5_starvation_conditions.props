@@ -1,0 +1,38 @@
+// Case study: "Q5 starves the others" = iq5_deqs_bl reaches >=4
+//   (IQ5 wins the dequeue slot >=4 times while ALL of IQ1..IQ4 are backlogged).
+// PROBLEM event  P~A  = NOT G(iq5_deqs_bl<4) = F(iq5_deqs_bl>=4).
+// We report P(problem | C) = 1 - P(A & C)/P(C), with
+//   A & C = G((iq5_deqs_bl<4) & c)   [G distributes over &],   C = G(c).
+// All conditions c are on IQ5's INPUT shape (max_arr = biggest burst, aipg = inter-pkt gap,
+// contents = queue depth).  Each block = [ P(A & c) , P(c) ].
+
+// (1) baseline  P(A);   P(problem) = 1 - this
+P=? [ G<=(224) (iq5_deqs_bl<4) ]
+
+// --- nomulti: IQ5 never sends more than 1 packet at once ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & (iq5_max_arr<=1)) ]
+P=? [ G<=(224) (iq5_max_arr<=1) ]
+
+// --- steady2: IQ5 never silent for >2 steps (gap<=2) ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & (iq5_aipg<=2)) ]
+P=? [ G<=(224) (iq5_aipg<=2) ]
+
+// --- steady1: IQ5 sends essentially every step (gap<=1) ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & (iq5_aipg<=1)) ]
+P=? [ G<=(224) (iq5_aipg<=1) ]
+
+// --- trickle = nomulti & steady2: small, steady single-packet sends ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & ((iq5_max_arr<=1) & (iq5_aipg<=2))) ]
+P=? [ G<=(224) ((iq5_max_arr<=1) & (iq5_aipg<=2)) ]
+
+// --- trickle3 = nomulti & steady3 (looser steadiness) ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & ((iq5_max_arr<=1) & (iq5_aipg<=3))) ]
+P=? [ G<=(224) ((iq5_max_arr<=1) & (iq5_aipg<=3)) ]
+
+// --- shallow: IQ5 queue never exceeds 1 packet (stays perpetually "new") ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & (iq5_contents<=1)) ]
+P=? [ G<=(224) (iq5_contents<=1) ]
+
+// --- shallow_steady: shallow queue AND steady arrivals ---
+P=? [ G<=(224) ((iq5_deqs_bl<4) & ((iq5_contents<=1) & (iq5_aipg<=2))) ]
+P=? [ G<=(224) ((iq5_contents<=1) & (iq5_aipg<=2)) ]

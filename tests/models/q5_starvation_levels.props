@@ -1,0 +1,8 @@
+// "Q5 starves the others, at level n" = iq5_deqs_bl reaches >= n
+//   (IQ5 wins the single dequeue slot n times while ALL of IQ1..IQ4 are backlogged).
+// Reported probability of the problem at level n is  1 - P[ G<=224 (iq5_deqs_bl<n) ].
+// Run this against the controlled-input variants from gen_q5_variants.py.
+P=? [ G<=(224) (iq5_deqs_bl<2) ]   // level 2
+P=? [ G<=(224) (iq5_deqs_bl<3) ]   // level 3
+P=? [ G<=(224) (iq5_deqs_bl<4) ]   // level 4  (the student's threshold)
+P=? [ G<=(224) (iq5_deqs_bl<5) ]   // level 5

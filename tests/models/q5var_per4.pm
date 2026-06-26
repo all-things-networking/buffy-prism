@@ -139,6 +139,7 @@ module fqcodel
 	// Pure input observable, used to express traffic-shape conditions:
 	//   iq5_max_arr<=1  <=>  IQ5 only ever sends single packets (never bursts).
 	iq5_max_arr: [0..4] init 0;
+	iq5_clk: [0..3] init 0;
 
 	// Arrivals to input queue 1
 	[REC_PKT_GET_IQ1] stage=REC_PKT_GET_IQ1 -> 0.2 : (stage'=REC_PKT_ARR_IQ1) & (iq1_arrivals'=0) + 0.2 : (stage'=REC_PKT_ARR_IQ1) & (iq1_arrivals'=1) + 0.2 : (stage'=REC_PKT_ARR_IQ1) & (iq1_arrivals'=2) + 0.2 : (stage'=REC_PKT_ARR_IQ1) & (iq1_arrivals'=3) + 0.2 : (stage'=REC_PKT_ARR_IQ1) & (iq1_arrivals'=4);
@@ -189,7 +190,8 @@ module fqcodel
 	[REC_UPD_NEW_IQ4_ADD] stage=REC_UPD_NEW_IQ4 &  iq4_add_to_new_list -> (stage'=REC_PKT_GET_IQ5) & (iq4_new_rank'=min(IQS,new_list_len+1)) & (new_list_len'=min(IQS,new_list_len+1));
 
 	// Arrivals to input queue 5
-	[REC_PKT_GET_IQ5] stage=REC_PKT_GET_IQ5 -> 0.6 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=0) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=1) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=2) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=3) + 0.1 : (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=4);
+	[REC_PKT_GET_IQ5] stage=REC_PKT_GET_IQ5 & mod(iq5_clk,4)=0 -> (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=1) & (iq5_clk'=mod(iq5_clk+1,4));
+	[REC_PKT_GET_IQ5b] stage=REC_PKT_GET_IQ5 & mod(iq5_clk,4)!=0 -> (stage'=REC_PKT_ARR_IQ5) & (iq5_arrivals'=0) & (iq5_clk'=mod(iq5_clk+1,4));
 	[REC_PKT_ARR_IQ5_K0] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=0 -> (stage'=DEQ) & (iq5_aipg'=iq5_aipg+1);
 	[REC_PKT_ARR_IQ5_K1] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=1 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+1)) & (iq5_cenq'=iq5_cenq+1) & (iq5_aipg'=0) & (iq5_max_arr'=max(iq5_max_arr,1));
 	[REC_PKT_ARR_IQ5_K2] stage=REC_PKT_ARR_IQ5 & iq5_arrivals=2 -> (stage'=REC_UPD_NEW_IQ5) & (iq5_contents'=min(SZ,iq5_contents+2)) & (iq5_cenq'=iq5_cenq+2) & (iq5_aipg'=0) & (iq5_max_arr'=max(iq5_max_arr,2));
