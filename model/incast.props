@@ -1,0 +1,36 @@
+// =====================================================================
+//  Queries for the ToR incast model  (incast.pm)
+// =====================================================================
+//
+//  Bad event Q : at least THRESH packets dropped at the OUTPUT buffer
+//                (receiver-facing incast loss)   ->  odrops >= THRESH
+//
+//  Each run reaches the absorbing "done" state, where odrops / idrops hold
+//  their final values, so  P[ F (done & X) ]  is the probability that X holds
+//  at the end of the run.  (One run is N+1 substages per slot for HORIZON
+//  slots; set the simulation path length a bit above (N+1)*HORIZON, e.g. 900.)
+//
+//  The "condition / assumption" A is a RANGE of the input-describing
+//  parameters (the fan-out FANOUT and the synchronization window WIN, plus
+//  SLEN, BUF, THRESH).  We answer "how probable is Q under assumption A" by
+//  evaluating the query below over that range of constants -- i.e. P[Q | A]
+//  is read off the swept surface.  Example invocations:
+//
+//    # receiver-loss probability over the (fan-out, window) plane:
+//    prism incast.pm incast.props -prop 1 \
+//          -const SLEN=3,BUF=5,THRESH=3,FANOUT=0:1:4,WIN=2:2:30
+//
+//    # the same, asking instead about the input-buffer loss:
+//    prism incast.pm incast.props -prop 2 -const SLEN=3,BUF=5,THRESH=3,FANOUT=4,WIN=2:2:30
+//
+//  As a true/false check of an assumption (is Q likely under A?):
+//    prism incast.pm incast.props -prop 3 -const SLEN=3,BUF=5,THRESH=3,FANOUT=3,WIN=12
+
+// (1) probability of receiver-facing incast loss  =  P[Q]
+P=? [ F ("done" & odrops>=THRESH) ]
+
+// (2) probability of loss at the input ports (for contrast / the relocation story)
+P=? [ F ("done" & idrops>=THRESH) ]
+
+// (3) is the bad event more likely than not under the current assumption?
+P>=0.5 [ F ("done" & odrops>=THRESH) ]
