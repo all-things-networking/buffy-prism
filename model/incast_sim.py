@@ -19,8 +19,9 @@ Per slot (store-and-forward, output-queued; matches incast.pm):
 The run continues until all packets have drained (output drains 1/slot), so
 loss that happens during the post-arrival drain is counted (this matters!).
 
-incast.pm uses D=2 servers, U=4 uplink ports of which FANOUT are active,
-m=2 flows per uplink:  simulate(2, FANOUT, 2, S, W, B).
+incast.pm uses all-uplink ports, MPP=2 flows per uplink, and a single
+input-traffic knob M = total senders (so the number of active uplinks is M/2):
+    simulate(0, M//2, 2, SLEN, WIN, BUF).
 """
 import numpy as np
 
@@ -70,17 +71,34 @@ def Pin(D, U, m, S, W, B, p, n=120_000, seed=1):
     return float(np.mean(simulate(D, U, m, S, W, B, n, seed)["in_drop"] >= p))
 
 
+def pq(M, WIN, SLEN, BUF, THRESH, n=120_000, seed=0):
+    """P[Q] for the incast.pm regime: all uplinks, MPP=2 flows each, M senders."""
+    return Pout(0, M // 2, 2, SLEN, WIN, BUF, THRESH, n, seed)
+
+
+def certify_box(name, Mr, Wr, Sr, BUF, THRESH):
+    """P[Q] is monotone (up in M & SLEN, down in WIN), so the box minimum is at
+    (M_lo, WIN_hi, SLEN_lo) and the maximum at (M_hi, WIN_lo, SLEN_hi)."""
+    mn = pq(Mr[0], Wr[1], Sr[0], BUF, THRESH)
+    mx = pq(Mr[1], Wr[0], Sr[1], BUF, THRESH)
+    print(f"\n{name}   (BUF={BUF}, THRESH={THRESH})")
+    print(f"  A = (M in [{Mr[0]},{Mr[1]}]) & (WIN in [{Wr[0]},{Wr[1]}]) "
+          f"& (SLEN in [{Sr[0]},{Sr[1]}])")
+    print(f"  least-favorable corner (M={Mr[0]},WIN={Wr[1]},SLEN={Sr[0]}): "
+          f"P[Q] = {mn:.3f}   <- holds for ALL of A")
+    print(f"  most-severe     corner (M={Mr[1]},WIN={Wr[0]},SLEN={Sr[1]}): "
+          f"P[Q] = {mx:.3f}")
+
+
 if __name__ == "__main__":
-    S, B, p = 3, 5, 3
-    Ws = [2, 4, 8, 12, 16, 22, 30]
-    print(f"# incast.pm regime: 2 servers + FANOUT uplinks (2 flows each), "
-          f"S={S} B={B} THRESH={p}")
-    print("# P[receiver loss] over the (fan-out, window) plane:")
-    print("        " + "  ".join(f"W={w:<2}" for w in Ws))
-    for G in range(0, 5):
-        row = [Pout(2, G, 2, S, w, B, p) for w in Ws]
-        print(f"FANOUT={G} " + "  ".join(f"{x:4.2f}" for x in row))
-    print("\n# every input port stays healthy in this regime (max P[input loss]):")
-    for G in range(0, 5):
-        mx = max(Pin(2, G, 2, S, w, B, p) for w in Ws)
-        print(f"FANOUT={G}: max P[input loss] = {mx:.3f}")
+    BUF, THRESH = 32, 8
+    # the robust box assumption used in NOTES.md
+    certify_box("ROBUST box A", (6, 12), (0, 48), (16, 24), BUF, THRESH)
+    # a box that is SKEWED by its synced/high-M corner (what to avoid): including
+    # M=2 (a single uplink, which can never overflow the output) drops the
+    # least-favorable corner to ~0 even though the severe corner is ~1.
+    certify_box("SKEWED box (avoid)", (2, 12), (0, 64), (24, 24), BUF, THRESH)
+    print("\n# input buffers stay healthy across box A (max P[input loss]):")
+    mx = max(Pin(0, M // 2, 2, S, W, BUF, THRESH)
+             for M in (6, 12) for W in (0, 48) for S in (16, 24))
+    print(f"  max P[input loss] over the corners of A = {mx:.3f}")

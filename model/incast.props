@@ -5,32 +5,38 @@
 //  Bad event Q : at least THRESH packets dropped at the OUTPUT buffer
 //                (receiver-facing incast loss)   ->  odrops >= THRESH
 //
-//  Each run reaches the absorbing "done" state, where odrops / idrops hold
-//  their final values, so  P[ F (done & X) ]  is the probability that X holds
-//  at the end of the run.  (One run is N+1 substages per slot for HORIZON
-//  slots; set the simulation path length a bit above (N+1)*HORIZON, e.g. 900.)
+//  Each run reaches the absorbing "done" state, where odrops/idrops hold their
+//  final values, so  P[ F (done & X) ]  is the probability that X holds at the
+//  end of the run. (A run is (MMAX+1) substages per slot for HORIZON slots; set
+//  the simulation path length above (MMAX+1)*HORIZON, e.g. 5200 for the ranges
+//  used here.)
 //
-//  The "condition / assumption" A is a RANGE of the input-describing
-//  parameters (the fan-out FANOUT and the synchronization window WIN, plus
-//  SLEN, BUF, THRESH).  We answer "how probable is Q under assumption A" by
-//  evaluating the query below over that range of constants -- i.e. P[Q | A]
-//  is read off the swept surface.  Example invocations:
+//  The ASSUMPTION A is a RANGE (a box) over the input-traffic parameters
+//  M (total senders), WIN (sync window), SLEN (burst length); BUF and THRESH
+//  are held fixed. We answer "how probable is Q under A" by evaluating prop (1)
+//  over that box of constants. Because P[Q] is monotone (increasing in M and
+//  SLEN, decreasing in WIN), the box's WORST case sits at the corner
+//  (M_lo, WIN_hi, SLEN_lo): if Q is likely there, it is likely for ALL of A.
 //
-//    # receiver-loss probability over the (fan-out, window) plane:
+//  Robust box used in NOTES.md  (P[Q] >= 0.64 everywhere inside):
+//      A = (M in [6..12]) & (WIN in [0..48]) & (SLEN in [16..24]),  BUF=32, THRESH=8
+//
+//  Evaluate the whole box:
 //    prism incast.pm incast.props -prop 1 \
-//          -const SLEN=3,BUF=5,THRESH=3,FANOUT=0:1:4,WIN=2:2:30
+//      -const BUF=32,THRESH=8,M=6:2:12,WIN=0:8:48,SLEN=16:4:24 \
+//      -sim -simmethod ci -simwidth 1e-3 -simconf 0.01 -simpathlen 5200
 //
-//    # the same, asking instead about the input-buffer loss:
-//    prism incast.pm incast.props -prop 2 -const SLEN=3,BUF=5,THRESH=3,FANOUT=4,WIN=2:2:30
+//  Certify the box by its least-favorable corner alone:
+//    prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=6,WIN=48,SLEN=16 ...
 //
-//  As a true/false check of an assumption (is Q likely under A?):
-//    prism incast.pm incast.props -prop 3 -const SLEN=3,BUF=5,THRESH=3,FANOUT=3,WIN=12
+//  M is even (= 2 * number of active uplinks); WIN >= 0 is fine.
 
 // (1) probability of receiver-facing incast loss  =  P[Q]
 P=? [ F ("done" & odrops>=THRESH) ]
 
-// (2) probability of loss at the input ports (for contrast / the relocation story)
+// (2) probability of loss at the input ports (stays ~0 in the regime of interest:
+//     every uplink buffer is healthy while the receiver overflows)
 P=? [ F ("done" & idrops>=THRESH) ]
 
-// (3) is the bad event more likely than not under the current assumption?
+// (3) is the bad event likely under the current (point) assumption?
 P>=0.5 [ F ("done" & odrops>=THRESH) ]
