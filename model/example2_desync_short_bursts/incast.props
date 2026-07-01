@@ -1,0 +1,35 @@
+// =====================================================================
+//  Queries for the ToR incast model  (incast.pm) -- example 2
+// =====================================================================
+//
+//  Bad event Q : at least THRESH packets dropped at the OUTPUT buffer
+//                (receiver-facing incast loss)   ->  odrops >= THRESH
+//
+//  Assumption A (a box over the input-traffic parameters):
+//      A = (16 <= M <= 20) & (48 <= WIN <= 96) & (8 <= SLEN <= 12),   BUF=32, THRESH=8
+//
+//  P[Q] is monotone (up in M and SLEN, down in WIN), so the box minimum is at
+//  the corner (M_lo, WIN_hi, SLEN_lo) = (16, 96, 8): if Q is likely there, it
+//  is likely for ALL of A. That corner has WIN/SLEN = 12 -- senders spread over
+//  twelve flow-lengths (genuinely de-synchronised) -- yet P[Q] ~ 0.54.
+//
+//  A run is (MMAX+1) substages per slot for HORIZON slots; set the path length
+//  above (MMAX+1)*HORIZON. For this box HORIZON <= 96+20*12+12 = 348, so ~8000.
+//
+//  Evaluate the whole box:
+//    prism incast.pm incast.props -prop 1 \
+//      -const BUF=32,THRESH=8,M=16:2:20,WIN=48:8:96,SLEN=8:2:12 \
+//      -sim -simmethod ci -simwidth 1e-3 -simconf 0.01 -simpathlen 8000
+//
+//  Certify the box by its least-favorable corner alone:
+//    prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=16,WIN=96,SLEN=8 ...
+
+// (1) probability of receiver-facing incast loss  =  P[Q]
+P=? [ F ("done" & odrops>=THRESH) ]
+
+// (2) probability of loss at the input ports (stays 0 here: every uplink buffer
+//     is healthy while the receiver overflows)
+P=? [ F ("done" & idrops>=THRESH) ]
+
+// (3) is the bad event likely under the current (point) assumption?
+P>=0.5 [ F ("done" & odrops>=THRESH) ]

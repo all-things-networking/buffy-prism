@@ -24,6 +24,11 @@ assumption box.
   input port's buffer stays healthy. Assumption box
   `A = (M in [6..12]) & (WIN in [0..48]) & (SLEN in [16..24])`, `BUF=32`,
   `THRESH=8`; `P[Q] ≥ 0.64` throughout.
+- **`example2_desync_short_bursts/`** — the *less obvious* one: short, realistic
+  flows (`SLEN in [8..12]` ≈ 12–18 KB) spread over a window up to **12× the flow
+  length** (senders genuinely de-synchronised), with a fan-in of `M in [16..20]`
+  (8–10 uplinks). Receiver loss stays likely (`P[Q] ≥ 0.54`) with every input
+  buffer healthy — incast without synchronisation. `BUF=32`, `THRESH=8`.
 
 ## Quick start (example 1)
 ```
