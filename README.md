@@ -1,93 +1,86 @@
-# buffy-prism
+# buffy-prism — Case study: the LLM inference batch scheduler
 
-This repo contains my work in progress on a probabilistic verification/analysis backend for the Buffy project.
+This branch (`llm-batch-scheduler-case-study`) develops the **third motivating case
+study** for probabilistic reasoning about *contention points* in networks and systems.
+The goal, shared across all three case studies, is to show the value of a tool that —
+given a description of a **bad event** and a **condition** over the parameters that
+describe the input to a contended component — reports **how probable that bad event is
+under that condition**, and in particular can surface a **non-obvious, "mild" assumption
+about the input pattern** that makes something undesirable surprisingly likely.
 
-## Overview
-The general idea is to define _discrete-time Markov chains_ (DTMCs) and _Markov decision processes_ (MDPs) that model the actions of queueing modules over streams of (possibly typed) packets. (I will use the term _Markovian system_ to refer to either a DTMC or an MDP) Packet arrivals (input) and dequeues (output) are represented as actions in these Markovian systems. Vectors of input buffers and control variables are the internal state. There are also rewards that can be associated with a subset of actions or predicates over states.
+The contention point here is the **batch scheduler of a GPU worker in LLM inference
+serving**: requests of different shapes (prompt length, output length, arrival timing)
+arrive and must be batched while balancing prefill vs. decode work and a shared,
+finite KV-cache memory pool.
 
-__Rewards are metrics that can accumulate (monotonically), whereas metrics that can reset or go up and down are better modelled as a state variable.__
+> New to LLM serving? Start with **[SCHEDULING_PRIMER.md](model/llm_batch_scheduler/SCHEDULING_PRIMER.md)** —
+> a ground-up, cited walkthrough of how state-of-the-art scheduling works (prefill/decode,
+> continuous batching, PagedAttention, chunked prefill, preemption, FCFS vs. sophisticated
+> policies, SLO metrics, and real request-pattern inputs).
 
-__renaming modules to build contention points, add example__
+## The reusable methodology (from the FQ-CoDel and incast case studies)
 
-See [NetAutomataSMC.pptx](/docs/NetAutomataSMC.pptx) for some slides with examples of this construction.
+Each case study follows the same template:
 
-## Probabilistic Model Checking with PRISM
+**probabilistic input stage → deterministic contention point → monotone "bad-event"
+counter → conditions expressed over input-describing variables.**
 
-I am currently using the [PRISM Model Checker](https://www.prismmodelchecker.org/) to test properties of these queueing modules. I have also looked into the [UPPAAL](https://uppaal.org/) and [COSMOS](https://cosmos.lacl.fr/) tools for probabilistic model checking.
+The payoff is an assumption `C` about the input that is **mild** (non-trivial
+probability / broad range) yet **informative** (strongly raises `P(bad)`), and whose
+danger is typically **invisible at any single component** — something a single
+counterexample cannot reveal. Two complementary ways to express the assumption:
 
-PRISM can determine two basic kinds of queries, expressed as path properties in Probabilistic Computation Tree Logic (PCTL) [8, 5]:
-- Probability of a path property being satisfied, which can be specified within a bounded number of time steps, an exact number of time steps, an interval of time, or (for DTMCs only) in the long run. Probability queries can test a particular probability, eg. `P<=0.98` (true/false), or solve the probability, eg. `P=?` (value in `[0,1]`), with no real difference in performance.
-- Expected value of (accumulated) reward for all paths satisfying a path property. This can also take the form `R<=5.5` (true/false) or `R=?` (value in [0, inf]).
+- **Flavor A — conditional queries.** Track an input-feature state variable, then compute
+  `P(bad | C) = P(bad & C) / P(C)` and compare against the baseline `P(bad)`. This matches
+  the tool's framing directly.
+- **Flavor B — parameter box + monotonicity.** Leave the input-shape parameters as
+  undefined constants; the assumption is a *box* (range) over them, certified cheaply at
+  its least-favorable corner. Robust against the "corner-skewed assumption" trap.
 
-There are two main types of probabilistic model checking: _exact_ (i.e., verification) which calculates the precise probability (up to a user-configured tolerance level) through sparse matrix computations, and _approximate solutions (statistical model checking, SMC)_ ([link](https://www.prismmodelchecker.org/manual/RunningPRISM/StatisticalModelChecking)) which runs a number of "experiments" that runs individual simulations (trials) of the system and reports statistics about the number of satisfying/failing trials that were observed. The SMC approach is generally orders of magnitude faster, and in theory will converge to the exact solution.
+This branch uses **conditional queries as the primary flavor, complemented by a
+request-shape sweep** (fixing the input shape and measuring `P(bad)` directly, which
+avoids the noisy statistical-model-checking ratios that arise when conditioning on rare
+predicates).
 
-A nice feature of PRISM is that you can copy a module by defining substitutions for the names of all of its variables ([link](https://www.prismmodelchecker.org/manual/ThePRISMLanguage/ModuleRenaming)). This carries over to renaming the variables in any formulas that have been defined on the states of the original module to the new names in the copied module. Also, a module can contain a formula that references the variables of another module. This should, in principle, allow for the creation of _contention points_ by renaming the I/O variables of one module to the I/O variables of others to create links.
+## Probabilistic model checking with PRISM
 
-The main difference between DTMCs and MDPs: 
+Models are **discrete-time Markov chains (DTMCs)**: multiple transitions per state, each
+weighted, weights summing to 1 — used here to model random request arrivals and their
+sampled characteristics. One DTMC step corresponds to one scheduler iteration.
 
-### DTMCs
-There can be multiple transitions from a state, but each transition must be weighted, and these weights must sum to 1. I have mainly used this to model packet arrival actions (we can assume uniform likelihood for any arrival event, or define any discrete distribution). 
+Properties are path properties in PCTL. PRISM supports two evaluation modes with no
+change to the model:
+- **Exact (verification)** — precise probabilities via sparse-matrix computation; feasible
+  only for small state spaces.
+- **Statistical model checking (SMC / "Simulation")** — Monte-Carlo trials with confidence
+  intervals; orders of magnitude faster, converges to the exact value. Needed for large
+  models. Caveat: conditional probabilities computed as a **ratio** of two rare-event
+  estimates can be noisy under SMC, so we keep the model small enough for exact
+  verification where possible and complement ratios with direct `P(bad)` measurements.
 
-Statistical model checking on DTMCs is well-supported by PRISM as "Simulation" in Experiments.
+PRISM computes conditional probabilities by division: `P(A | C) = P=?[A & C] / P=?[C]`,
+where `A` and `C` are path conditions (see reference [2] for a more efficient
+model-transformation approach).
 
-### MDPs 
-There can be true non-deterministic choice, in the sense of multiple transitions from a state without weights, as well as probabilistic choice as defined for DTMCs. This arguably represents a more realistic model of packet arrivals (if we don't want to commit to particular probability distributions), and the queries are then of the form `Pmax=?` and `Pmin=?` rather than `P=?`, as nondeterministic choice is expanded into branching paths (each with its own probability distribution). Simialrly for `Rmin=?` and `Rmax=?`. 
+## Repository layout (this branch)
 
-__MDPs let you avoid distribution on inputs and instead have distributions on outputs; ex. windows w/ categorical dist. for probabilistic writes.__
+- [`model/llm_batch_scheduler/`](model/llm_batch_scheduler/) — the case study.
+  - [`SCHEDULING_PRIMER.md`](model/llm_batch_scheduler/SCHEDULING_PRIMER.md) — domain primer.
+  - *(PRISM model, queries, Python oracle, and notes — added as the study is built.)*
 
-__Explain nondeterministic choice vs probabilistic choice, add a diagram and explain why Pmax & Pmin are often 1 and 0, which collapses the probabilistic analysis back to traditional verification.__
+The general SMC framework and the earlier FQ-CoDel / priority-queue models live on the
+`main` branch; this branch is intentionally stripped to the case study, mirroring the
+`incast-buffer-case-study` branch.
 
-There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
+## Selected references
 
-PRISM does not allow for true statistical model checking for MDPs. It simply chooses a non-deterministic branch uniformly at random, and displays a warning. There has been some research on statistical model checking with MDPs that produces an counterexample scheduler in the event that the queries are unsatisfiable [6], however as far as I can tell, this is not a feature in any standard SMC tool.
+1. G. Agha and K. Palmskog, "A Survey of Statistical Model Checking," *ACM TOMACS*, 28(1), 2018. doi:10.1145/3158668.
+2. C. Baier, J. Klein, S. Klüppelholz, and S. Märcker, "Computing Conditional Probabilities in Markovian Models Efficiently," in *TACAS 2014*, Springer, pp. 515–530. doi:10.1007/978-3-642-54862-8_43.
+3. M. E. Andrés and P. van Rossum, "Conditional Probabilities over Probabilistic and Nondeterministic Systems," in *TACAS 2008*, Springer, pp. 157–172. doi:10.1007/978-3-540-78800-3_12.
+4. M. Kwiatkowska, G. Norman, and D. Parker, "PRISM 4.0: Verification of Probabilistic Real-time Systems," in *CAV 2011*, LNCS 6806, Springer, pp. 585–591.
+5. M. Kwiatkowska, G. Norman, and D. Parker, "Stochastic Model Checking," in *SFM 2007*, LNCS 4486, Springer, pp. 220–270.
+6. M. Ji, D. Wu, and Z. Chen, "Verification Method of Conditional Probability Based on Automaton," *J. Networks*, 8(6), 2013, pp. 1329–1335. doi:10.4304/JNW.8.6.1329-1335.
 
-__add a Punnet square for DTMC/MDP and exact/approx__
-
-## Progress
-My recent efforts have gone in several directions:
-
-### What capabilities are gained by choosing probabilistic verification over traditional (deterministic) verification?
-So far, we have estimated that statistical model checking is an effective means of rapidly locating problematic traffic conditions or out-of-spec behaviours in a large network model, that can then be solved with exact (probabilistic or deterministic) techniques. The main advantage that tools like PRISM seem to have in this regard is the ability to switch between approximate and exact methods without needing to re-encode the model.
-
-Another area that I feel is promising is in quantifying the likelihood of constraint violations or counterexamples. It is not straightfoward with traditional verification to estimate how typical or rare a counterexample might be.
-
-__numerical methods__
-
-### Using probabilities to reduce state space due to orderings
-I am trying to model buffers as counters for packet types, and the type of each dequeue coming from the categorical distribution associated with the current counts. This means that ordering of packets in a buffer is not modelled, which reduces the state space significantly. 
-
-For example, with packet types `p1, p2, p3` and a buffer state `{p1: 9, p2: 6, p3: 5}`, a dequeue action could produce packet `D` where `P(D:p1)=9/20`, `P(D:p2)=6/20`, and `P(D:p3)=5/20`. Then `D:p1` means the new buffer state is `{p1: 8, p2: 6, p3: 5}`, and so on.
-
-We also thinking about defining multiple windows (fractions of the total buffer size) to enforce partial orderings and ensure that properties like starvation are not only a result of the lack of explicit ordering in the model, but correspond to likelihood of genuine starvation in the network algorithms.
-
-### Conditional probabilities in queries
-PRISM has the basic ability to calculate conditional probabilities by dividing probabilities of multiple 
-(ex. `[P=? (A & B)] / [P=? B]`, where `A` and `B` are path conditions).
-
-This isn't as flexible as having an unconditioned Markovian process, so I am trying to model conditional probabilities as transformations of Markovian processes that prune paths violating the conditional assumption, and reweigh the remaining transitions accordingly. 
-
-A detailed strategy is given in [2], which I believe corresponds quite directly to the "on-demand" construction algorithm I explain in [NetAutomataSMC.pptx](/docs/NetAutomataSMC.pptx) (which I haven't really formalized yet). I estimate that my "on-demand" algorithm suffices in simple cases, but that in the general case, it will be necessary to actually use PRISM to guide the transformation (by searching paths for non-zero probabilities of violating constraints to determine when to prune), which is what [2] seems to suggest doing.
-
-## PRISM Models
-
-See [models/](/tests/models/). I've included a comment block in each file that explains the general strategy and properties under test.
-
-
-## References
-
-See also [refs-SMC.bib](/docs/refs-SMC.bib) for BibTeX.
-
-This is a slight overapproximation of the relevant papers to this project; I've added everything that I've come across and deemed possibly useful. In particular [2], [4], [8] and [10] have been important for my work so far.
-
-I have included the PDF for [9] in this repo as J. Networks is defunct and I had to hunt this down on the Internet Archive.
-
-1. G. Agha and K. Palmskog, “A Survey of Statistical Model Checking,” ACM Trans. Model. Comput. Simul., vol. 28, no. 1, p. 6:1-6:39, Jan. 2018, doi: 10.1145/3158668.
-2. C. Baier, J. Klein, S. Klüppelholz, and S. Märcker, “Computing Conditional Probabilities in Markovian Models Efficiently,” in Tools and Algorithms for the Construction and Analysis of Systems, E. Ábrahám and K. Havelund, Eds., Berlin, Heidelberg: Springer, 2014, pp. 515–530. doi: 10.1007/978-3-642-54862-8_43.
-3. M. E. Andrés and P. van Rossum, “Conditional Probabilities over Probabilistic and Nondeterministic Systems,” in Tools and Algorithms for the Construction and Analysis of Systems, C. R. Ramakrishnan and J. Rehof, Eds., Berlin, Heidelberg: Springer, 2008, pp. 157–172. doi: 10.1007/978-3-540-78800-3_12.
-4. C. Baier, M. Größer, and F. Ciesinski, “Model Checking Linear-Time Properties of Probabilistic Systems,” in Handbook of Weighted Automata, M. Droste, W. Kuich, and H. Vogler, Eds., Berlin, Heidelberg: Springer, 2009, pp. 519–570. doi: 10.1007/978-3-642-01492-5_13.
-5. M. Kwiatkowska, G. Norman, and D. Parker, “PRISM 4.0: Verification of Probabilistic Real-time Systems,” in Proc. 23rd International Conference on Computer Aided Verification (CAV’11), G. Gopalakrishnan and S. Qadeer, Eds., in LNCS, vol. 6806. Springer, 2011, pp. 585–591.
-6. M. Y. Vardi, “Probabilistic Linear-Time Model Checking: An Overview of the Automata-Theoretic Approach,” in Proceedings of the 5th International AMAST Workshop on Formal Methods for Real-Time and Probabilistic Systems, in ARTS ’99. Berlin, Heidelberg: Springer-Verlag, May 1999, pp. 265–276.
-7. D. Henriques, J. G. Martins, P. Zuliani, A. Platzer, and E. M. Clarke, “Statistical Model Checking for Markov Decision Processes,” in 2012 Ninth International Conference on Quantitative Evaluation of Systems, Sep. 2012, pp. 84–93. doi: 10.1109/QEST.2012.19.
-8. M. Kwiatkowska, G. Norman, and D. Parker, “Stochastic Model Checking,” in Formal Methods for the Design of Computer, Communication and Software Systems: Performance Evaluation (SFM’07), M. Bernardo and J. Hillston, Eds., in LNCS (Tutorial Volume), vol. 4486. Springer, 2007, pp. 220–270.
-9. M. Ji, D. Wu, and Z. Chen, “Verification Method of Conditional Probability Based on Automaton,” J. Networks, vol. 8, no. 6, pp. 1329–1335, 2013, doi: 10.4304/JNW.8.6.1329-1335.
-10. M. Mohri, “Weighted Automata Algorithms,” in Handbook of Weighted Automata, M. Droste, W. Kuich, and H. Vogler, Eds., Berlin, Heidelberg: Springer, 2009, pp. 213–254. doi: 10.1007/978-3-642-01492-5_6.
+Domain references for the LLM-serving model (Orca, PagedAttention, Sarathi-Serve,
+DistServe, and others) are cited in
+[SCHEDULING_PRIMER.md](model/llm_batch_scheduler/SCHEDULING_PRIMER.md).
