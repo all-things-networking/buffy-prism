@@ -15,7 +15,7 @@ for TV in 2 3 4; do
   for PLP in 0.3 0.5; do
    for POL in 0.3 0.5; do
      res=$($PRISM scheduler_queue.pm scheduler_queue.props \
-             -const "T_V=$TV,POLICY=0,p_arr=$PA,p_lp=$PLP,p_ol=$POL" 2>/dev/null \
+             -const "T_V=$TV,POLICY=0,ADM_POLICY=0,N_SLOTS=2,KV_CAP=8,CHUNK_BLK=3,p_arr=$PA,p_lp=$PLP,p_ol_sp=$POL,p_ol_lp=$POL" 2>/dev/null \
            | grep -E "Result:" | sed 's/.*Result: //; s/ (exact.*//' | tr '\n' ' ')
      echo "$TV $PA $PLP $POL $res" >> "$OUT"
    done

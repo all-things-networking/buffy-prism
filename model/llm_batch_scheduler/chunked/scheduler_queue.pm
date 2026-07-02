@@ -33,11 +33,13 @@ dtmc
 
 const int T        = 10;   // horizon (iterations)
 const int T_V;             // victim arrival iteration (input assumption; sweepable via -const)
-const int N_SLOTS  = 2;    // batch width (max concurrently running)  [max_num_seqs]
-const int KV_CAP   = 8;    // shared KV pool, blocks                  [PagedAttention]
-const int CHUNK_BLK= 1;    // prefill blocks computed per iteration   [chunked prefill]
+const int N_SLOTS;         // batch width (max concurrently running)  [max_num_seqs] (sweepable)
+const int KV_CAP;          // shared KV pool, blocks                  [PagedAttention] (sweepable)
+const int CHUNK_BLK;       // prefill blocks computed per iteration [chunked prefill] (sweepable)
+                           // =1: slow prefill (prompt spans many iters); >=LP: realistic fast prefill (~1 iter)
 
-const int POLICY;          // 0 = fcfs (LIFO evict) ; 1 = priority (protect victim)
+const int POLICY;          // eviction/priority: 0 = fcfs (LIFO evict) ; 1 = priority (protect victim)
+const int ADM_POLICY;      // admission order: 0 = FCFS (by arrival) ; 1 = SJF (by prompt length)
 
 // request shapes (blocks) -- prompt and output are INDEPENDENT (Q6)
 const int SP = 1;  const int LP = 3;   // prompt: short / long
@@ -47,7 +49,10 @@ const int VP = 1;  const int VO = 2;   // victim: short prompt, modest output
 // input pattern (sweepable; left undefined)
 const double p_arr;        // P(a background request arrives in an iteration)
 const double p_lp;         // P(arriving bg has a LONG prompt)
-const double p_ol;         // P(arriving bg has a LONG output)  (independent of p_lp)
+// output-long probability, CONDITIONED on prompt class (enables a correlation knob):
+const double p_ol_sp;      //   P(long output | SHORT prompt)
+const double p_ol_lp;      //   P(long output | LONG  prompt)
+// independent workload: p_ol_sp = p_ol_lp ; positive corr: p_ol_lp>p_ol_sp ; negative: <
 
 const int SLO_TBT = 3;     // victim inter-token gap >= this = TBT-SLO violation
 const int K_CASC  = 2;     // preemption cascade threshold
@@ -74,11 +79,16 @@ formula ch_v  = min(pp_v,  CHUNK_BLK);
 formula ch_b1 = min(pp_b1, CHUNK_BLK);
 formula ch_b2 = min(pp_b2, CHUNK_BLK);
 
-// FCFS admission: promote the waiting record with the smallest arrival order
-// (ties broken v < b1 < b2). Only when a slot is free.
-formula adm_v  = wait_v  & nrun<N_SLOTS & (!wait_b1 | ad_v<=ad_b1) & (!wait_b2 | ad_v<=ad_b2);
-formula adm_b1 = wait_b1 & nrun<N_SLOTS & (!wait_v | ad_b1<ad_v)  & (!wait_b2 | ad_b1<=ad_b2);
-formula adm_b2 = wait_b2 & nrun<N_SLOTS & (!wait_v | ad_b2<ad_v)  & (!wait_b1 | ad_b2<ad_b1);
+// Admission key (promote the waiting record with the SMALLEST key; a slot must be free):
+//   ADM_POLICY=0 FCFS  -> key = arrival order (ad)
+//   ADM_POLICY=1 SJF   -> key = prompt/work-left estimate (pp)   [SJF-by-prompt]
+// Ties broken v < b1 < b2.
+formula key_v  = ADM_POLICY=1 ? pp_v  : ad_v;
+formula key_b1 = ADM_POLICY=1 ? pp_b1 : ad_b1;
+formula key_b2 = ADM_POLICY=1 ? pp_b2 : ad_b2;
+formula adm_v  = wait_v  & nrun<N_SLOTS & (!wait_b1 | key_v<=key_b1) & (!wait_b2 | key_v<=key_b2);
+formula adm_b1 = wait_b1 & nrun<N_SLOTS & (!wait_v | key_b1<key_v)  & (!wait_b2 | key_b1<=key_b2);
+formula adm_b2 = wait_b2 & nrun<N_SLOTS & (!wait_v | key_b2<key_v)  & (!wait_b1 | key_b2<key_b1);
 
 // LIFO eviction score (highest evicted first). priority => victim protected.
 formula sc_v  = run_v  ? (ad_v  + (POLICY=1 ? -100 : 0)) : -1;
@@ -125,20 +135,20 @@ module worker
     //      drawn INDEPENDENTLY (4 shape combos). Target: b1 if empty else b2.
     [] stage=ARRIVE & emp_b1 ->
           (1-p_arr)                : (stage'=ADMIT)
-        + p_arr*(1-p_lp)*(1-p_ol)  : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=SO)&(ad_b1'=t)&(stage'=ADMIT)
-        + p_arr*(1-p_lp)*p_ol      : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
-        + p_arr*p_lp*(1-p_ol)      : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=SO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))
+        + p_arr*(1-p_lp)*(1-p_ol_sp)  : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=SO)&(ad_b1'=t)&(stage'=ADMIT)
+        + p_arr*(1-p_lp)*p_ol_sp     : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
+        + p_arr*p_lp*(1-p_ol_lp)      : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=SO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
-        + p_arr*p_lp*p_ol          : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
+        + p_arr*p_lp*p_ol_lp         : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
                                      &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
     [] stage=ARRIVE & !emp_b1 & emp_b2 ->
           (1-p_arr)                : (stage'=ADMIT)
-        + p_arr*(1-p_lp)*(1-p_ol)  : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=SO)&(ad_b2'=t)&(stage'=ADMIT)
-        + p_arr*(1-p_lp)*p_ol      : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
-        + p_arr*p_lp*(1-p_ol)      : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=SO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))
+        + p_arr*(1-p_lp)*(1-p_ol_sp)  : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=SO)&(ad_b2'=t)&(stage'=ADMIT)
+        + p_arr*(1-p_lp)*p_ol_sp     : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
+        + p_arr*p_lp*(1-p_ol_lp)      : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=SO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
-        + p_arr*p_lp*p_ol          : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
+        + p_arr*p_lp*p_ol_lp         : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
                                      &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
     [] stage=ARRIVE & !emp_b1 & !emp_b2 -> (stage'=ADMIT);   // no room -> dropped

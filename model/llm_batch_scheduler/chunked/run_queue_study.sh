@@ -9,8 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PRISM="${PRISM:-$HOME/buffy-prism-tools/prism-4.10.1-linux64-x86/bin/prism}"
 
-TV=${TV:-3}; PA=${PA:-0.5}; PLP=${PLP:-0.4}; POL=${POL:-0.4}; POLICY=${POLICY:-0}
-CONST="T_V=$TV,POLICY=$POLICY,p_arr=$PA,p_lp=$PLP,p_ol=$POL"
+# realistic defaults: CHUNK_BLK>=LP (prompt prefills in ~1 iter), FCFS admit, 2 slots, KV=8
+TV=${TV:-3}; PA=${PA:-0.7}; PLP=${PLP:-0.4}; POL=${POL:-0.4}; POLICY=${POLICY:-0}
+NS=${NS:-2}; KV=${KV:-8}; CB=${CB:-3}; ADM=${ADM:-0}
+CONST="T_V=$TV,POLICY=$POLICY,ADM_POLICY=$ADM,N_SLOTS=$NS,KV_CAP=$KV,CHUNK_BLK=$CB,p_arr=$PA,p_lp=$PLP,p_ol_sp=$POL,p_ol_lp=$POL"
 
 ratio(){ python3 -c "print('n/a' if $2==0 else f'{$1/$2:.4f}')"; }
 

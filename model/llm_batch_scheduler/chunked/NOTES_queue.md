@@ -81,6 +81,71 @@ mechanism illustration but does not become a clean monotone box, because the tim
 handle `T_V` is non-monotone under a finite horizon. The composition box above is the
 stronger, paper-ready form.)
 
+## THE non-obvious finding — long prompts are irrelevant; long OUTPUTS starve interactive requests
+
+An expert rightly finds "long-heavy mix hurts interactive latency" *obvious* (it is the
+founding motivation of the whole subfield). Searching four candidate non-obvious
+directions (below) surfaced one sharp, counterintuitive, and actionable result — after
+fixing a realism bug in the prefill chunk size.
+
+**The realism fix.** With `CHUNK_BLK=1` a long prompt (3 blocks) takes 3 iterations to
+prefill, so prompt length inflates slot-occupancy time. Realistically a chunk is ~512
+tokens ≫ a prompt, so **a prompt prefills in ~1 iteration** (`CHUNK_BLK ≥ LP`). Under that
+realistic setting:
+
+`P(victim stall)` over a `p_lp × p_ol` grid (realistic prefill, `N_SLOTS=1`, `p_arr=0.8`):
+
+|          | p_ol=0.0 | p_ol=0.5 | p_ol=1.0 |
+|---|---|---|---|
+| **p_lp=0.0** | 0.640 | 0.864 | 0.960 |
+| **p_lp=0.5** | 0.640 | 0.864 | 0.960 |
+| **p_lp=1.0** | 0.640 | 0.864 | 0.960 |
+
+**`P(interactive stall)` is EXACTLY invariant to the long-*prompt* fraction (spread 0.000)
+and monotone in the long-*output* fraction.** (Holds at `N_SLOTS=2` too: `p_lp` 0.2→0.8 gives
+0.017→0.017; `p_ol` 0.2→0.8 gives 0.017→0.138.)
+
+**Why (mechanism):** chunked prefill collapses any prompt into ~1 iteration, so prompt
+length no longer affects how long a request holds a slot — only its *output* length does
+(one decode iteration per output block). The interactive request's queueing delay is set
+purely by how long incumbents hold slots = their **output** length.
+
+**Paper-ready assumption (Flavor B, monotone box over the OUTPUT-length parameter):**
+> Under realistic chunked prefill, `P(interactive stall)` is **invariant to the long-prompt
+> fraction `p_lp ∈ [0,1]`** and monotone ↑ in the long-output fraction. For `p_ol ≥ 0.5`
+> (at this load) `P(stall) ≥ 0.86`, *regardless of prompt lengths*.
+
+**Why it's non-obvious & actionable:**
+- Contradicts the standard worry that **long-context (long-prompt) requests** threaten
+  interactive latency — chunked prefill *fully neutralizes* prompt length for this bad event.
+- The residual danger is **output length** — which is exactly the quantity the scheduler
+  **cannot observe at admission** (see the primer's known/unknown asymmetry). So
+  prompt-length-based admission / routing / prioritization (all using the *visible* feature)
+  is useless for protecting interactive latency; you need *output* prediction.
+- It is a "the SOTA mitigation moved the bottleneck" result: pre-chunking, long prompts
+  hogged iterations (the classic stall); post-chunking, prompt length is irrelevant and
+  output-driven slot-occupancy is the sole driver.
+
+### The four explored directions (honest outcomes)
+
+1. **Sneaky-cheap / SJF-by-prompt backfire — refuted (for the interactive victim).** With a
+   forced queue, SJF-by-prompt *helps* the short victim (0.857→0.380), as SJF should; it does
+   not backfire on it. (A backfire would hit a *long-prompt* victim / system metric.)
+2. **Adding capacity backfires — partial / a real tradeoff.** More `KV_CAP` monotonically
+   *reduces* stalls; but at *fixed* KV, raising batch width `N_SLOTS` sharply *increases*
+   preemption (e.g. `KV_CAP=8`: `N_SLOTS` 1→2→3 gives P(preempt) 0→0.11→0.27). Adding batch
+   slots trades queueing-stall for preemption/recompute thrash unless KV scales too.
+3. **Priority blind spot — confirmed.** In the queueing regime (`N_SLOTS=2`), priority-as-
+   eviction-policy gives *identical* `P(stall)` (0.335) to FCFS: protecting the victim from
+   *eviction* does nothing for its *queueing* delay. "Priority tiers" don't help interactive
+   latency when the bottleneck is admission, not eviction.
+4. **Correlation / structure beats averages — refuted.** At equal marginals, prompt↔output
+   correlation barely moves `P(stall)` (independent 0.231, positive 0.236, negative 0.198);
+   the small effect is in the *obvious* direction (long-in-both marginally worst).
+
+The strongest, genuinely non-obvious result is the **prompt-invariance / output-dominance**
+finding above; #2 and #3 are secondary, mild, real effects.
+
 ## Caveats / next steps
 
 - At this tiny scale, `preempts` never reaches 2 (only 2 slots → no in-iteration cascade)
