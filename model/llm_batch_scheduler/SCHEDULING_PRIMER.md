@@ -72,6 +72,16 @@ everything fights over.
 finite memory pool*, and you don't know when it will stop (you don't know how long its
 answer will be until it emits a stop token).
 
+> **What the scheduler knows — and what it doesn't (the crucial asymmetry).**
+> When a request arrives, its **prompt is in hand**, so the **prefill cost is known
+> exactly** (you can count the prompt tokens). But the **output length is unknown** — the
+> request finishes only when the model *happens* to emit a stop/EOS token, discovered one
+> token at a time. A request in progress might stop after 3 more tokens or run for
+> another 2,000; the scheduler cannot tell. This single fact drives most of the field: it
+> is why you can't simply run "shortest job first" (you don't know the job lengths), why
+> output-length *prediction* is an active research area, and — in our case study — why
+> output length is modelled as a **random draw the scheduler cannot observe**.
+
 ---
 
 ## 2. Batching: why you can't serve requests one at a time
@@ -106,6 +116,12 @@ step the scheduler regains control: it **evicts requests that just finished** an
 **admits waiting requests into the freed slots**, then runs the next step. No slot is
 ever stuck waiting for a straggler. [Orca OSDI'22; Anyscale 2023]
 
+> **Terminology: "iteration" = "step" = one forward pass.** Throughout this primer these
+> three are the same thing — a single forward pass through the model for the current
+> batch, which emits exactly one new token for every decode request in that batch. The
+> scheduler re-decides the batch composition before *every* forward pass; that is what
+> "iteration-level" means.
+
 ```
 Continuous batching — the batch is recomposed EVERY step.
   step:   1 2 3 4 5 6 7 8 9 ...
@@ -130,15 +146,40 @@ batching in a public benchmark [Anyscale].
 ## 3. The two things requests contend for
 
 With continuous batching in place, on each iteration the scheduler faces two hard
-limits:
+limits. **They are different resources with different consequences** — keeping them
+separate is the key to understanding everything below:
+
+| Resource | The limit | What happens when it's tight |
+|---|---|---|
+| **Compute per iteration** | token budget (`max_num_batched_tokens`) | work is **deferred** — a request isn't advanced this iteration, but stays admitted, KV retained (§4) |
+| **KV-cache memory** | the block pool | a request is **evicted** — its KV is freed and it's removed until later resumed (§5) |
+
+The token-budget limit causes *stalls* (a request waits its turn for compute); the
+memory limit causes *preemption* (a request is thrown out). Conflating the two is the
+most common source of confusion.
 
 ### (a) A per-iteration compute/token budget
 
-Each iteration can only process so many tokens of work before it becomes too slow.
-Servers expose this as a **token budget per iteration** (in vLLM, `max_num_batched_tokens`;
-also a cap on concurrent sequences, `max_num_seqs`). A batch of 30 decodes is 30 tokens
-of work; a single 2,000-token prefill is 2,000 tokens of work and blows the budget by
-itself. [vLLM docs]
+`max_num_batched_tokens` is the cap on the **total number of tokens processed in one
+iteration** (one forward pass). Each request in that iteration's batch contributes some
+tokens toward the cap:
+
+- a **decode** request contributes **exactly 1 token** — it generates one new token this
+  iteration; its prior context already sits in the KV cache and is *not* re-counted;
+- a **prefill** request contributes **however many prompt tokens you process for it this
+  iteration** — the whole prompt in one-shot prefill, or just the chunk size under
+  chunked prefill (§4).
+
+The scheduler builds each batch so that `Σ (tokens contributed) ≤ max_num_batched_tokens`
+(there is also `max_num_seqs`, a separate cap on the *number* of sequences). [vLLM docs]
+
+> **This budget is per-iteration and resets every iteration — it is not a cumulative
+> "capacity until the running requests finish."** Decodes are *cheap*: 10 running decodes
+> cost 10 tokens *per iteration*, and the same 10 next iteration, forever. They never
+> "use up" the budget and there is no horizon of "until they complete." The only large
+> thing is a prefill, and **how much of it to process this iteration is the scheduler's
+> choice**. A 2,000-token prompt is only "too big for one iteration" if you insist on
+> doing all of it at once — which is exactly the choice §4 is about.
 
 ### (b) The shared KV-cache memory pool
 
@@ -165,21 +206,84 @@ frames). Waste drops below 4%, so **2–4× more requests** fit at once. [PagedA
 Here is the pathology that most modern scheduling work is about.
 
 Prefill is a big compute burst; decode is a stream of cheap steps. **What happens when a
-long prompt arrives while other requests are happily decoding?**
+long prompt arrives while other requests are happily decoding?** The scheduler has
+**three** choices, and each hurts *someone*:
 
-If the scheduler eagerly runs the newcomer's prefill (the default, FCFS behavior), that
-one prefill can **consume the entire iteration's compute budget**. For that iteration —
-and, for a very long prompt, for *several seconds* — **none of the decoding requests
-produce a token**. Every user mid-answer sees their output **freeze**. This is a
-**generation stall**, and it is a **head-of-line blocking** problem: one heavy item at
-the front stalls everyone behind it. [Sarathi-Serve OSDI'24 §1, §3.2]
+1. **Defer the prefill** — keep decoding, don't admit the newcomer yet. Protects the
+   incumbents' smooth streaming, but the newcomer *waits* → its **time-to-first-token**
+   suffers, and the GPU does less useful work.
+2. **One-shot the prefill** — spend a whole iteration processing the entire prompt.
+   The newcomer starts fast and the GPU runs one big efficient matmul, but the incumbent
+   decodes produce **no token** that iteration.
+3. **Chunk the prefill** — slice it so a piece rides *alongside* the decodes within the
+   token budget. Nobody freezes (but it isn't free either — see below).
 
-> **Worked example.** Ten users are streaming answers (decoding, one token every ~30 ms
-> — smooth). An eleventh user submits a 4,000-token document to summarize. Under naive
-> FCFS the server spends the next several iterations doing only that prefill. The ten
-> streaming users' text **stops** for that whole window. Measured impact: naively mixing
-> a full prefill into a decode batch inflated the time-between-tokens by up to **28.3×**
-> vs. a decode-only batch. [Sarathi-Serve §4.2]
+Naive FCFS takes option 2: it eagerly runs the newcomer's prefill. For a very long
+prompt that can mean *several seconds* in which **none of the decoding requests produce a
+token** — every user mid-answer sees their output **freeze**. This is a **generation
+stall**, a **head-of-line blocking** problem: one heavy item at the front stalls everyone
+behind it. [Sarathi-Serve OSDI'24 §1, §3.2]
+
+**Two things to be precise about, because they are the usual points of confusion:**
+
+*(i) "Stalled" means deferred, not removed.* The frozen decodes are **still admitted and
+their KV cache is retained** — they simply are not *advanced* during the prefill
+iteration(s). Their token streams pause and then resume. This is completely different
+from **preemption** (§5), where a request's KV is actually *freed* and the request is
+evicted. Deferral is a *compute*-budget effect; eviction is a *memory* effect.
+
+*(ii) The stall is a batching-policy choice, not budget arithmetic.* It is tempting to
+think "the prefill + the decodes don't fit in the budget, so the decodes can't run." Not
+so — the decodes cost only 1 token each, so they'd fit trivially. What actually happened
+historically is that **vLLM V0 did not put prefill and decode in the same batch at all**:
+an iteration was *either* a prefill-only batch *or* a decode-only batch, and the scheduler
+prioritized prefills. So running the newcomer's prefill meant a prefill-only iteration, in
+which the decodes were simply not scheduled. [Sarathi-Serve §3.2]
+
+> **Worked example (budget = 2048 tokens; 10 decodes running; a 4,000-token prompt arrives).**
+>
+> | | one-shot prefill (naive, vLLM V0) | chunked prefill (vLLM V1 default) |
+> |---|---|---|
+> | iter N | prefill-only: 4,000-token prompt → decodes **frozen** | `10 decodes + min(4000, 2048−10)=2038 prefill` = 2048 ✓ |
+> | iter N+1 | decode: 11 decodes advance | `10 decodes + remaining 1962 prefill` = 1972 ✓ |
+> | incumbents | froze for a whole iteration | advanced **every** iteration |
+>
+> Note the one-shot column doesn't "overflow the budget" — the scheduler *sizes that
+> iteration's batch to be the prefill*, consuming the whole forward pass by design.
+> Measured impact of naively mixing a full prefill into a decode batch: time-between-tokens
+> inflated by up to **28.3×** vs. a decode-only batch. [Sarathi-Serve §4.2]
+
+### Why would anyone ever one-shot the prefill? (It wasn't a mistake.)
+
+Option 2 looks obviously bad once you care about smooth streaming — but it was the
+sensible default for years, for concrete reasons:
+
+- **One-shot prefill is throughput-optimal.** Prefill is a big matrix-matrix multiply;
+  running all 4,000 tokens as one fat GEMM saturates the GPU near peak FLOPs. Chunking is
+  genuinely *less* efficient — each chunk must attend back over all previously-processed
+  prompt tokens (so total attention work rises), plus tile-quantization effects (a
+  257-token chunk can cost ~32% more than a 256-token one). [Sarathi-Serve]
+- **Throughput, not tail latency, was the original target.** Early serving (2022–23)
+  optimized tokens/sec and requests/sec. A one-iteration freeze is a *TBT* (tail-latency)
+  problem that only bites interactive, streaming SLOs — invisible under the original goals.
+- **Mixing prefill and decode in one batch is hard, and the key insight came later.**
+  The two have different tensor shapes, so co-scheduling them needs kernel support that
+  early engines lacked. And the reason chunking is nearly free — that decode is
+  *memory-bound* and leaves compute units idle, so prefill work can piggyback into that
+  idle compute at little latency cost — was **Sarathi-Serve's non-obvious contribution**.
+  Before someone quantified that "decode slack," mixing looked like it would only *slow*
+  the decodes.
+- **The pathology only got severe as workloads changed.** With short prompts a one-shot
+  prefill is one quick iteration — a blink. It becomes a multi-*second* freeze only with
+  **long-context** prompts (RAG, long documents, agents), which became common later. The
+  workload evolved to expose a cost that used to be negligible.
+
+So the honest arc: one-shot prefill was throughput-optimal and simple; the stall was
+invisible under the original goals and workloads; and once interactive SLOs *plus* long
+contexts made it matter, the field found the decode-slack trick and built chunked prefill.
+**Chunked prefill still isn't free** — it trades a little prefill throughput for smooth
+decodes, which is why it's a *knob* and why "throughput vs. tail latency" is the tension
+this whole area keeps circling.
 
 ### The fix in today's default stack: chunked prefill
 
@@ -216,6 +320,10 @@ single-worker case, which is still the common deployment. [DistServe; Splitwise]
 ---
 
 ## 5. What happens when the KV cache fills up: preemption
+
+This is the **other** limit from §3 — memory, not compute — and its consequence is
+harsher than a stall. Where a token-budget squeeze merely *defers* a request (it stays
+admitted, KV retained), running out of KV memory forces the scheduler to *evict* one.
 
 Because answer lengths are unknown, the server can admit "too many" requests and later
 discover it has no free KV blocks for them all. It must then **preempt** a running
@@ -375,6 +483,14 @@ undesirable event surprisingly likely, even on today's state-of-the-art schedule
 
 ## 10. Glossary (quick reference)
 
+- **Iteration / step / forward pass** — the same thing: one pass through the model for
+  the current batch, emitting one new token per decode request. The scheduler re-decides
+  the batch before each one.
+- **Token budget (`max_num_batched_tokens`)** — per-iteration cap on total tokens in the
+  forward pass; a decode contributes 1 token, a prefill contributes its chunk/prompt size.
+  Resets every iteration (not a cumulative capacity).
+- **Deferral vs. eviction** — a token-budget squeeze *defers* a request (unadvanced this
+  iteration, KV kept); KV-memory exhaustion *evicts* it (preemption — KV freed).
 - **Prefill** — processing the whole prompt in one pass to produce the first token
   (compute-bound).
 - **Decode** — generating output one token at a time (memory-bandwidth-bound).
