@@ -39,6 +39,48 @@ is exactly the FQ-CoDel-standard critique paying off.)
 - Same "mild but informative, invisible per component" character as FQ-CoDel/incast, now
   via a queueing mechanism rather than eviction.
 
+## Candidate paper assumption — a parameter BOX (Flavor B, monotone-certified)
+
+Assumptions must be *ranges* over input parameters, not points (incast standard).
+Sweeping `P(victim stall)` over `T_V × p_arr × p_lp × p_ol` (exact, `sweep_queue.sh`
+/ experiment mode) gives clean monotonicity:
+
+| input parameter | monotone in `P(stall)`? |
+|---|---|
+| `p_lp` (long-**prompt** fraction) | **yes, ↑** (0/72 grid violations) |
+| `p_ol` (long-**output** fraction) | **yes, ↑** (0/48) |
+| `p_arr` (arrival load) | yes, ↑ (1/64) |
+| `T_V` (victim arrival time) | **no** — finite-horizon artifact (earlier arrival = more exposure); kept OUT of the box as a fixed input assumption |
+
+Because `P(stall)` is monotone ↑ in `p_lp, p_ol, p_arr`, a box over them is certified at
+its **lower corner**. Candidate assumption:
+
+> **A = { p_arr ∈ [0.6,0.8], p_lp ∈ [0.6,0.8], p_ol = 0.6 }** (a long-heavy mix at
+> moderate-to-high load). Across all of A (and all `T_V`), `P(victim stall) ≥ 0.19`
+> (worst corner), typically ~0.36–0.48.
+>
+> **Contrast** (short-mix): `{ p_lp ≤ 0.4, p_ol = 0.3 }` gives `P ≤ 0.12` even at higher load.
+
+**The non-obvious point — composition beats load:**
+
+| regime | `P(stall)` |
+|---|---|
+| moderate load, long-heavy (`p_arr=0.6, p_lp=0.8, p_ol=0.6`) | **0.359** |
+| high load, short mix (`p_arr=0.8, p_lp=0.2, p_ol=0.3`) | **0.101** |
+
+A moderately-loaded worker with a long-heavy request mix starves the interactive request
+**3.5× more** than a heavily-loaded worker with short requests. Per-range sensitivity
+(anchor `T_V=3, p_arr=0.6, p_lp=0.4, p_ol=0.3` → 0.114): varying `p_lp` 0.2→0.8 gives
+×3.6; `p_arr` 0.4→0.8 gives ×2.9; `p_ol` gives ×1.8/step. The **long-request fraction,
+not the arrival rate**, is the dominant driver — the "shape not volume" theme, now as a
+monotone parameter box. This is a naive-capacity-planning trap: keeping *load* moderate is
+not enough if the *mix* is long-heavy.
+
+(The earlier Flavor-A "long arrived before the victim" conditional is a real
+mechanism illustration but does not become a clean monotone box, because the timing
+handle `T_V` is non-monotone under a finite horizon. The composition box above is the
+stronger, paper-ready form.)
+
 ## Caveats / next steps
 
 - At this tiny scale, `preempts` never reaches 2 (only 2 slots → no in-iteration cascade)
