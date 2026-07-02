@@ -25,3 +25,10 @@ echo "-- vary long-PROMPT fraction p_lp (long-output fixed 0.5): expect FLAT --"
 for x in 0.1 0.5 0.9; do printf '   p_lp=%s : %s\n' "$x" "$(smc "$B,CHUNK_BLK=8,p_lp=$x,p_ol_sp=0.5,p_ol_lp=0.5")"; done
 echo "-- vary long-OUTPUT fraction p_ol (long-prompt fixed 0.5): expect STRONG --"
 for x in 0.1 0.5 0.9; do printf '   p_ol=%s : %s\n' "$x" "$(smc "$B,CHUNK_BLK=8,p_lp=0.5,p_ol_sp=$x,p_ol_lp=$x")"; done
+
+echo ""
+echo "### multi-chunk nuance: prompt fraction re-enters as prompt spans more chunks ###"
+for cb in 8 4 2; do
+  echo "-- CHUNK_BLK=$cb (long prompt=8 blocks spans $((8/cb)) chunk(s)): vary p_lp --"
+  for x in 0.1 0.9; do printf '   p_lp=%s : %s\n' "$x" "$(smc "$B,CHUNK_BLK=$cb,p_lp=$x,p_ol_sp=0.5,p_ol_lp=0.5")"; done
+done
