@@ -32,7 +32,7 @@
 dtmc
 
 const int T        = 10;   // horizon (iterations)
-const int T_V      = 3;    // victim arrival iteration (its input assumption)
+const int T_V;             // victim arrival iteration (input assumption; sweepable via -const)
 const int N_SLOTS  = 2;    // batch width (max concurrently running)  [max_num_seqs]
 const int KV_CAP   = 8;    // shared KV pool, blocks                  [PagedAttention]
 const int CHUNK_BLK= 1;    // prefill blocks computed per iteration   [chunked prefill]
@@ -109,6 +109,8 @@ module worker
     n_lo        : [0..NL] init 0;   // # long-OUTPUT bg arrivals
     lp_before_v : bool    init false;  // a long-prompt bg arrived BEFORE the victim
     lp_after_v  : bool    init false;  // a long-prompt bg arrived AFTER  the victim
+    both_before_v: bool   init false;  // a FULLY-long bg (long prompt AND output) arrived BEFORE victim
+    both_after_v: bool    init false;  // a fully-long bg arrived AFTER victim
     peak_conc   : [0..3]  init 0;
 
     // ---- terminal ----
@@ -128,7 +130,8 @@ module worker
         + p_arr*p_lp*(1-p_ol)      : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=SO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
         + p_arr*p_lp*p_ol          : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
-                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT);
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
+                                     &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
     [] stage=ARRIVE & !emp_b1 & emp_b2 ->
           (1-p_arr)                : (stage'=ADMIT)
         + p_arr*(1-p_lp)*(1-p_ol)  : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=SO)&(ad_b2'=t)&(stage'=ADMIT)
@@ -136,7 +139,8 @@ module worker
         + p_arr*p_lp*(1-p_ol)      : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=SO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))
                                      &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
         + p_arr*p_lp*p_ol          : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
-                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT);
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
+                                     &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
     [] stage=ARRIVE & !emp_b1 & !emp_b2 -> (stage'=ADMIT);   // no room -> dropped
 
     // ---- ADMIT: FCFS promote waiting->running while a slot is free (loops) --

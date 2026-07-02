@@ -1,0 +1,39 @@
+// ============================================================================
+//  Conditional-probability queries — v2 queue-based chunked scheduler.
+//  Model: scheduler_queue.pm  (undefined consts: T_V, POLICY, p_arr, p_lp, p_ol)
+//
+//  Bad event here is the victim TBT stall (queueing-induced):  v_maxgap>=SLO_TBT.
+//  (Victim preemption is unreachable at this exploration scale — see NOTES_queue.md;
+//  it needs the larger SMC validation config.)
+//  Each group = [ baseline P(BE) , joint P(BE&C) , P(C) ]; conditional = joint/P(C).
+// ============================================================================
+
+// A — EARLY long-prompt bg (before victim, none after)  — the timing story
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (lp_before_v & !lp_after_v)) ];
+P=? [ F ("done" & (lp_before_v & !lp_after_v)) ];
+
+// B — LATE long-prompt bg (after victim, none before)   — contrast (expect protective)
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (lp_after_v & !lp_before_v)) ];
+P=? [ F ("done" & (lp_after_v & !lp_before_v)) ];
+
+// C — VOLUME: >=2 long-prompt arrivals (a count, not a timing)
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (n_lp>=2)) ];
+P=? [ F ("done" & (n_lp>=2)) ];
+
+// D — CORRELATION volume: >=2 long-prompt AND >=2 long-output
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (n_lp>=2 & n_lo>=2)) ];
+P=? [ F ("done" & (n_lp>=2 & n_lo>=2)) ];
+
+// E — TIMING + CORRELATION: a FULLY-long bg (long prompt AND output) before victim
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (both_before_v & !both_after_v)) ];
+P=? [ F ("done" & (both_before_v & !both_after_v)) ];
+
+// F — contrast: a fully-long bg AFTER victim, none before (expect protective)
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (both_after_v & !both_before_v)) ];
+P=? [ F ("done" & (both_after_v & !both_before_v)) ];
