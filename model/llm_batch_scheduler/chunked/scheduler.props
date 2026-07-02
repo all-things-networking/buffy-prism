@@ -1,13 +1,13 @@
 // ============================================================================
-//  Conditional-probability queries for the LLM batch-scheduler case study.
-//  Model: scheduler.pm  (supply undefined consts: POLICY, CHUNKED, p_arr, p_long)
+//  Conditional-probability queries — CHUNKED-prefill scheduler.
+//  Model: scheduler.pm  (supply undefined consts: POLICY, p_arr, p_long)
 //
 //  Recipe (Flavor A): for a bad event BE and an input condition C,
 //        P(BE | C) = P[ F("done" & BE & C) ]  /  P[ F("done" & C) ]
 //  compared against the baseline  P(BE) = P[ F("done" & BE) ].
 //  Each group below is [ baseline , joint , P(C) ]; run_case_study.sh divides
-//  joint / P(C) to report the conditional. (PRISM reads BE/C at the terminal
-//  "done" state; all bad-event counters are monotone.)
+//  joint / P(C) to report the conditional. (Bad-event counters are monotone,
+//  read at the terminal "done" state.)
 //
 //  Bad events:  v_preempts>=1  (BE1, victim evicted)
 //               v_maxgap>=SLO_TBT (BE2, victim TBT-SLO violation / stall)
@@ -15,20 +15,17 @@
 // ============================================================================
 
 // ---- GROUP A — HEADLINE: victim preemption vs. EARLY long arrival ----------
-// C = "a long request arrived before the victim, and none after"
-// (shape/timing condition; mild probability, large lift under fcfs+chunked)
+// C = "a long request arrived before the victim, and none after" (timing/shape)
 P=? [ F ("done" & v_preempts>=1) ];
 P=? [ F ("done" & v_preempts>=1 & (long_before_v & !long_after_v)) ];
 P=? [ F ("done" & (long_before_v & !long_after_v)) ];
 
 // ---- GROUP B — CONTRAST: the same longs arriving AFTER the victim ----------
-// C = "a long request arrived only after the victim" (expected: ~0 lift)
 P=? [ F ("done" & v_preempts>=1) ];
 P=? [ F ("done" & v_preempts>=1 & (long_after_v & !long_before_v)) ];
 P=? [ F ("done" & (long_after_v & !long_before_v)) ];
 
 // ---- GROUP C — VOLUME baseline: does the *count* of longs explain it? ------
-// C = "at least 2 long requests arrived" (a volume, not a timing, condition)
 P=? [ F ("done" & v_preempts>=1) ];
 P=? [ F ("done" & v_preempts>=1 & (n_long>=2)) ];
 P=? [ F ("done" & (n_long>=2)) ];
