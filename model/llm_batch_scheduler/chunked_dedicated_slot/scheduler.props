@@ -1,0 +1,41 @@
+// ============================================================================
+//  Conditional-probability queries — CHUNKED-prefill scheduler.
+//  Model: scheduler.pm  (supply undefined consts: POLICY, p_arr, p_long)
+//
+//  Recipe (Flavor A): for a bad event BE and an input condition C,
+//        P(BE | C) = P[ F("done" & BE & C) ]  /  P[ F("done" & C) ]
+//  compared against the baseline  P(BE) = P[ F("done" & BE) ].
+//  Each group below is [ baseline , joint , P(C) ]; run_case_study.sh divides
+//  joint / P(C) to report the conditional. (Bad-event counters are monotone,
+//  read at the terminal "done" state.)
+//
+//  Bad events:  v_preempts>=1  (BE1, victim evicted)
+//               v_maxgap>=SLO_TBT (BE2, victim TBT-SLO violation / stall)
+//               preempts>=K_CASC  (BE3, preemption cascade)
+// ============================================================================
+
+// ---- GROUP A — HEADLINE: victim preemption vs. EARLY long arrival ----------
+// C = "a long request arrived before the victim, and none after" (timing/shape)
+P=? [ F ("done" & v_preempts>=1) ];
+P=? [ F ("done" & v_preempts>=1 & (long_before_v & !long_after_v)) ];
+P=? [ F ("done" & (long_before_v & !long_after_v)) ];
+
+// ---- GROUP B — CONTRAST: the same longs arriving AFTER the victim ----------
+P=? [ F ("done" & v_preempts>=1) ];
+P=? [ F ("done" & v_preempts>=1 & (long_after_v & !long_before_v)) ];
+P=? [ F ("done" & (long_after_v & !long_before_v)) ];
+
+// ---- GROUP C — VOLUME baseline: does the *count* of longs explain it? ------
+P=? [ F ("done" & v_preempts>=1) ];
+P=? [ F ("done" & v_preempts>=1 & (n_long>=2)) ];
+P=? [ F ("done" & (n_long>=2)) ];
+
+// ---- GROUP D — BE2 (victim TBT stall) vs. EARLY long arrival ---------------
+P=? [ F ("done" & v_maxgap>=SLO_TBT) ];
+P=? [ F ("done" & v_maxgap>=SLO_TBT & (long_before_v & !long_after_v)) ];
+P=? [ F ("done" & (long_before_v & !long_after_v)) ];
+
+// ---- GROUP E — BE3 (preemption cascade) vs. EARLY long arrival -------------
+P=? [ F ("done" & preempts>=K_CASC) ];
+P=? [ F ("done" & preempts>=K_CASC & (long_before_v & !long_after_v)) ];
+P=? [ F ("done" & (long_before_v & !long_after_v)) ];

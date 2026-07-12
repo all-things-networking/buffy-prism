@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Sweep input regimes for the v2 queue scheduler and rank candidate
+#  Sweep input regimes for the chunked scheduler and rank candidate
 #  assumptions by "mild P(C) x large lift" (the FQ-CoDel/incast sweet spot).
 #  Requires:  source ~/buffy-prism-tools/env.sh
-#  Usage:  ./sweep_queue.sh   (writes rows to /tmp, prints ranked tables)
+#  Usage:  ./sweep.sh   (writes rows to /tmp, prints ranked tables)
 # ============================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -14,7 +14,7 @@ for TV in 2 3 4; do
  for PA in 0.4 0.6 0.8; do
   for PLP in 0.3 0.5; do
    for POL in 0.3 0.5; do
-     res=$($PRISM scheduler_queue.pm scheduler_queue.props \
+     res=$($PRISM scheduler.pm scheduler.props \
              -const "T_V=$TV,POLICY=0,ADM_POLICY=0,N_SLOTS=2,KV_CAP=8,CHUNK_BLK=3,p_arr=$PA,p_lp=$PLP,p_ol_sp=$POL,p_ol_lp=$POL" 2>/dev/null \
            | grep -E "Result:" | sed 's/.*Result: //; s/ (exact.*//' | tr '\n' ' ')
      echo "$TV $PA $PLP $POL $res" >> "$OUT"

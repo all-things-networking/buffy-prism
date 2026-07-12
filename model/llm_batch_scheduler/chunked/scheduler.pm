@@ -1,226 +1,207 @@
 // ============================================================================
-//  LLM inference batch scheduler — CHUNKED-PREFILL variant (vLLM-V1 default)
+//  LLM batch scheduler — CHUNKED PREFILL, with a REAL QUEUE
 //  ---------------------------------------------------------------------------
-//  Contention point: one GPU worker serving LLM requests with:
-//    * continuous (iteration-level) batching  [Orca, OSDI'22]
-//    * a shared, finite KV-cache block pool    [PagedAttention, SOSP'23]
-//    * chunked prefill (ALWAYS ON here)         [Sarathi-Serve, OSDI'24]
-//    * FCFS admission; a POLICY knob for the eviction order (fcfs|priority)
+//  Models a GPU worker running chunked-prefill continuous batching (the vLLM-V1
+//  default). Three unified request records; each record is
+//      empty | waiting | running   (st = 0 | 1 | 2).
+//  Arrival fills an empty record. Admission flips waiting->running while fewer
+//  than N_SLOTS records are running. Preemption flips running->waiting when the
+//  KV pool is over capacity. The "queue" is just the set of waiting records, so
+//  eviction never overflows it (a record only changes status).
 //
-//  This is the chunked variant: each iteration loads only CHUNK_BLK prefill
-//  blocks alongside the running decodes, so a prefill NEVER stalls a decode.
-//  Consequently the victim's ONLY stall source is KV-exhaustion preemption +
-//  recompute -- which is exactly the point: chunked prefill removes the
-//  generation-stall pathology, leaving KV exhaustion as the residual risk.
-//  (The eager/no-chunking variant, where a whole prompt hogs an iteration and
-//  freezes decodes, lives in ../no_chunking/.)
+//  Record 1 (v) is the tracked request. It carries gap counters for its
+//  inter-token latency, but has NO scheduler privilege: it competes for the
+//  N_SLOTS batch slots and is admitted (FCFS or SJF) and evicted (LIFO or
+//  priority) by the same rules as the background records (b1, b2). Only its
+//  input -- a short shape and a fixed arrival time -- is its own; that is the
+//  assumption under study.
 //
-//  One DTMC step = one scheduler sub-stage; one engine ITERATION spans the
-//  fixed stage sequence VINJECT -> ARRIVE -> SETUP -> SVC_V -> SVC_B1 ->
-//  SVC_B2 -> PREEMPT, after which the clock t advances. Continuous batching
-//  advances ALL running requests by one token per iteration.
+//  Prompt and output length are drawn independently (p_lp for a long prompt;
+//  p_ol_sp / p_ol_lp for a long output, conditioned on prompt class so a
+//  correlation between the two can be set).
 //
-//  We track one interactive "victim" request (slot v) whose latency we care
-//  about, plus 2 background slots (b1,b2). KV memory unit = a *block*
-//  (PagedAttention's 16-token block). A request's `*_blk` = its current
-//  sequence length (prompt computed + tokens generated), so it grows during
-//  both prefill and decode.
+//  Chunked prefill: at most CHUNK_BLK prefill blocks are computed per iteration,
+//  so a prefill never stalls a running decode. The tracked request's only stall
+//  sources are queueing delay and KV-exhaustion preemption (recompute).
 //
-//  Abstractions (small & readable; see NOTES.md):
-//    - <=1 background arrival per iteration; if no slot is free it is dropped
-//      (bounded concurrency = 3 slots) -> no admission queue, no TTFT delay.
-//    - an evicted request recomputes IN PLACE in its slot (no waiting queue).
-//    - prompt/output lengths are bundled into a class (short|long): a baked-in
-//      positive prompt<->output correlation. [TODO: decouple to study it]
-//    - preemption recovery = recompute: rebuild ALL held blocks (`*_pre:=*_blk`),
-//      so the stall cost grows with progress (coarse stand-in for O(s^2)).
+//  This model is exact-checkable at the sizes here; for realistic magnitudes use
+//  gen_scheduler.py + statistical model checking (see run_smc_validation.sh and
+//  ../PARAMETERS.md).
 // ============================================================================
 
 dtmc
 
-// ---- horizon & structure --------------------------------------------------
-const int T        = 10;   // number of engine iterations (the time horizon)
-const int T_V      = 3;    // iteration at which the victim request arrives
+const int T        = 10;   // horizon (iterations)
+const int T_V;             // victim arrival iteration (input assumption; sweepable via -const)
+const int N_SLOTS;         // batch width (max concurrently running)  [max_num_seqs] (sweepable)
+const int KV_CAP;          // shared KV pool, blocks                  [PagedAttention] (sweepable)
+const int CHUNK_BLK;       // prefill blocks computed per iteration [chunked prefill] (sweepable)
+                           // =1: slow prefill (prompt spans many iters); >=LP: realistic fast prefill (~1 iter)
 
-// ---- the contended resources ----------------------------------------------
-const int KV_CAP   = 8;    // shared KV-cache capacity, in blocks
-const int CHUNK_BLK= 1;    // prefill blocks computed per iteration (the chunk)
+const int POLICY;          // eviction/priority: 0 = fcfs (LIFO evict) ; 1 = priority (protect victim)
+const int ADM_POLICY;      // admission order: 0 = FCFS (by arrival) ; 1 = SJF (by prompt length)
 
-// ---- scheduler knob (design parameter, not input) --------------------------
-const int POLICY;          // 0 = fcfs   (evict most-recently-admitted, LIFO)
-                           // 1 = priority(victim high-priority: evict bg first)
-                           // (left undefined; supply with -const)
+// request shapes (blocks) -- prompt and output are INDEPENDENT (Q6)
+const int SP = 1;  const int LP = 3;   // prompt: short / long
+const int SO = 1;  const int LO = 3;   // output: short / long
+const int VP = 1;  const int VO = 2;   // victim: short prompt, modest output
 
-// ---- request shapes (blocks) ----------------------------------------------
-const int VPRE     = 1;    // victim prompt (blocks)   — a short interactive req
-const int VDEC     = 3;    // victim output (blocks)
-// background short: prompt 1, output 2 ; background long: prompt 3, output 3
-// (encoded directly in the arrival commands below)
-
-// ---- input pattern (the request-mix "condition" knobs; sweepable) ---------
+// input pattern (sweepable; left undefined)
 const double p_arr;        // P(a background request arrives in an iteration)
-const double p_long;       // P(an arriving background request is "long")
-                           // (input pattern; left undefined, supply with -const)
+const double p_lp;         // P(arriving bg has a LONG prompt)
+// output-long probability, CONDITIONED on prompt class (enables a correlation knob):
+const double p_ol_sp;      //   P(long output | SHORT prompt)
+const double p_ol_lp;      //   P(long output | LONG  prompt)
+// independent workload: p_ol_sp = p_ol_lp ; positive corr: p_ol_lp>p_ol_sp ; negative: <
 
-// ---- bad-event thresholds (SLOs) & counter caps ---------------------------
-const int SLO_TBT  = 3;    // TBT SLO: a victim inter-token gap >= this = stall
-const int K_CASC   = 2;    // "preemption cascade" = this many total preemptions
-const int WIN      = 2;    // window (iters) around T_V for "long arrived near victim"
-const int GAPMAX   = T;    // cap for gap counters
-const int NL       = 4;    // cap for long-arrival counter
-const int PT       = 6;    // cap for total-preemption counter
+const int SLO_TBT = 3;     // victim inter-token gap >= this = TBT-SLO violation
+const int K_CASC  = 2;     // preemption cascade threshold
+const int WIN     = 2;
+const int GAPMAX  = T;
+const int NL      = 4;
+const int PT      = 6;
 
-// ---- stages within one iteration ------------------------------------------
-const int VINJECT = 1;     // inject victim at t=T_V
-const int ARRIVE  = 2;     // probabilistic background arrival
-const int SETUP   = 3;     // update peak-concurrency feature
-const int SVC_V   = 4;     // service victim
-const int SVC_B1  = 5;     // service background slot 1
-const int SVC_B2  = 6;     // service background slot 2
-const int PREEMPT = 7;     // evict until KV pool fits, then advance the clock
+// stages
+const int VINJECT=1; const int ARRIVE=2; const int ADMIT=3;
+const int SVC_V=4;   const int SVC_B1=5; const int SVC_B2=6; const int PREEMPT=7;
 
-// ===========================================================================
-//  Derived state (formulas)
-// ===========================================================================
-// "in system" = occupying a slot (prefilling, decoding, or holding KV)
-formula v_in  = (v_pre>0 | v_dec>0 | v_blk>0);
-formula b1_in = (b1_pre>0 | b1_dec>0 | b1_blk>0);
-formula b2_in = (b2_pre>0 | b2_dec>0 | b2_blk>0);
+// ---- status helpers --------------------------------------------------------
+formula run_v  = st_v=2;  formula wait_v  = st_v=1;  formula emp_v  = st_v=0;
+formula run_b1 = st_b1=2; formula wait_b1 = st_b1=1; formula emp_b1 = st_b1=0;
+formula run_b2 = st_b2=2; formula wait_b2 = st_b2=1; formula emp_b2 = st_b2=0;
 
-// concurrent occupancy and total KV in use
-formula occ = (v_in?1:0) + (b1_in?1:0) + (b2_in?1:0);
-formula kv  = v_blk + b1_blk + b2_blk;
+formula nrun = (run_v?1:0) + (run_b1?1:0) + (run_b2?1:0);
+formula kv   = bk_v + bk_b1 + bk_b2;          // waiting/empty records hold 0 blocks
+formula any_wait = wait_v | wait_b1 | wait_b2;
 
-// which background slot a new arrival takes (lowest free index; 0 = none free)
-formula tgt = !b1_in ? 1 : (!b2_in ? 2 : 0);
+// chunked prefill chunk per record
+formula ch_v  = min(pp_v,  CHUNK_BLK);
+formula ch_b1 = min(pp_b1, CHUNK_BLK);
+formula ch_b2 = min(pp_b2, CHUNK_BLK);
 
-// chunked prefill: each request computes at most CHUNK_BLK prefill blocks/iter
-formula chunk_v  = min(v_pre,  CHUNK_BLK);
-formula chunk_b1 = min(b1_pre, CHUNK_BLK);
-formula chunk_b2 = min(b2_pre, CHUNK_BLK);
+// Admission key (promote the waiting record with the SMALLEST key; a slot must be free):
+//   ADM_POLICY=0 FCFS  -> key = arrival order (ad)
+//   ADM_POLICY=1 SJF   -> key = prompt/work-left estimate (pp)   [SJF-by-prompt]
+// Ties broken v < b1 < b2.
+formula key_v  = ADM_POLICY=1 ? pp_v  : ad_v;
+formula key_b1 = ADM_POLICY=1 ? pp_b1 : ad_b1;
+formula key_b2 = ADM_POLICY=1 ? pp_b2 : ad_b2;
+formula adm_v  = wait_v  & nrun<N_SLOTS & (!wait_b1 | key_v<=key_b1) & (!wait_b2 | key_v<=key_b2);
+formula adm_b1 = wait_b1 & nrun<N_SLOTS & (!wait_v | key_b1<key_v)  & (!wait_b2 | key_b1<=key_b2);
+formula adm_b2 = wait_b2 & nrun<N_SLOTS & (!wait_v | key_b2<key_v)  & (!wait_b1 | key_b2<key_b1);
 
-// eviction "score": highest score is evicted first. FCFS => newest (max adm).
-// priority => backgrounds get +100 so the victim is only evicted as a last
-// resort. A slot holding no KV (blk=0) is never a candidate (score -1).
-formula v_score  = v_blk>0  ? v_adm  : -1;
-formula b1_score = b1_blk>0 ? (b1_adm + (POLICY=1 ? 100 : 0)) : -1;
-formula b2_score = b2_blk>0 ? (b2_adm + (POLICY=1 ? 100 : 0)) : -1;
+// LIFO eviction score (highest evicted first). priority => victim protected.
+formula sc_v  = run_v  ? (ad_v  + (POLICY=1 ? -100 : 0)) : -1;
+formula sc_b1 = run_b1 ? ad_b1 : -1;
+formula sc_b2 = run_b2 ? ad_b2 : -1;
 
-// convenience for the victim gap update (next gap value, capped)
 formula v_gap1 = min(GAPMAX, v_gap+1);
 
 module worker
 
-    // ---- clock & stage ----
     t     : [0..T] init 0;
     stage : [1..7] init VINJECT;
 
-    // ---- victim (slot v) ----
-    v_pre : [0..6] init 0;   // prefill blocks still to compute (prompt, or rebuild on evict)
-    v_dec : [0..3] init 0;   // remaining decode blocks (output) to generate
-    v_blk : [0..6] init 0;   // KV blocks currently held (= current seq length)
-    v_adm : [0..T] init 0;   // admission iteration (for eviction ordering)
+    // records: st (0 empty,1 waiting,2 running), pp prefill-left, oo output-left,
+    //          bk blocks held, ad arrival order
+    st_v : [0..2] init 0; pp_v : [0..6] init 0; oo_v : [0..3] init 0; bk_v : [0..6] init 0; ad_v : [0..T] init 0;
+    st_b1: [0..2] init 0; pp_b1: [0..6] init 0; oo_b1: [0..3] init 0; bk_b1: [0..6] init 0; ad_b1: [0..T] init 0;
+    st_b2: [0..2] init 0; pp_b2: [0..6] init 0; oo_b2: [0..3] init 0; bk_b2: [0..6] init 0; ad_b2: [0..T] init 0;
 
-    // ---- background slots ----
-    b1_pre: [0..6] init 0; b1_dec: [0..3] init 0; b1_blk: [0..6] init 0; b1_adm: [0..T] init 0;
-    b2_pre: [0..6] init 0; b2_dec: [0..3] init 0; b2_blk: [0..6] init 0; b2_adm: [0..T] init 0;
+    // victim instrumentation (NOT a scheduler privilege) + bad-event counters
+    v_gap      : [0..GAPMAX] init 0;
+    v_maxgap   : [0..GAPMAX] init 0;
+    v_preempts : [0..3]      init 0;
+    preempts   : [0..PT]     init 0;
 
-    // ---- bad-event counters (monotone) ----
-    v_gap      : [0..GAPMAX] init 0;  // current consecutive iters victim made no progress
-    v_maxgap   : [0..GAPMAX] init 0;  // worst victim gap so far  (TBT bad event)
-    v_preempts : [0..3]      init 0;  // times the victim was evicted (BE1)
-    preempts   : [0..PT]     init 0;  // total evictions, all requests (BE3 cascade)
+    // input-feature variables for conditions C
+    n_lp        : [0..NL] init 0;   // # long-PROMPT bg arrivals
+    n_lo        : [0..NL] init 0;   // # long-OUTPUT bg arrivals
+    lp_before_v : bool    init false;  // a long-prompt bg arrived BEFORE the victim
+    lp_after_v  : bool    init false;  // a long-prompt bg arrived AFTER  the victim
+    both_before_v: bool   init false;  // a FULLY-long bg (long prompt AND output) arrived BEFORE victim
+    both_after_v: bool    init false;  // a fully-long bg arrived AFTER victim
+    peak_conc   : [0..3]  init 0;
 
-    // ---- input-feature variables (for conditions C) ----
-    n_long      : [0..NL] init 0;     // # long background requests that arrived
-    long_near_v : bool    init false; // a long bg arrived within WIN of the victim
-    long_before_v: bool   init false; // a long bg arrived BEFORE the victim (t<T_V)
-    long_after_v: bool    init false; // a long bg arrived AFTER  the victim (t>T_V)
-    peak_conc   : [0..3]  init 0;     // peak concurrent occupancy
-
-    // == terminal (absorbing) ================================================
+    // ---- terminal ----
     [] stage=VINJECT & t=T -> true;
 
-    // == stage VINJECT: inject the victim at its arrival time ================
-    [] stage=VINJECT & t<T & t=T_V & !v_in ->
-        (v_pre'=VPRE) & (v_dec'=VDEC) & (v_adm'=t) & (stage'=ARRIVE);
-    [] stage=VINJECT & t<T & !(t=T_V & !v_in) ->
-        (stage'=ARRIVE);
+    // ---- VINJECT: victim enters the QUEUE (waiting) at T_V, competes normally
+    [] stage=VINJECT & t<T & t=T_V & emp_v ->
+        (st_v'=1) & (pp_v'=VP) & (oo_v'=VO) & (ad_v'=t) & (stage'=ARRIVE);
+    [] stage=VINJECT & t<T & !(t=T_V & emp_v) -> (stage'=ARRIVE);
 
-    // == stage ARRIVE: <=1 background arrival into the first free slot ========
-    // slot 1 free
-    [] stage=ARRIVE & tgt=1 ->
-          (1-p_arr)          : (stage'=SETUP)
-        + p_arr*(1-p_long)   : (b1_pre'=1) & (b1_dec'=2) & (b1_adm'=t) & (stage'=SETUP)
-        + p_arr*p_long       : (b1_pre'=3) & (b1_dec'=3) & (b1_adm'=t)
-                               & (n_long'=min(NL,n_long+1))
-                               & (long_near_v'=(long_near_v | (t>=T_V-WIN & t<=T_V+WIN)))
-                               & (long_before_v'=(long_before_v | t<T_V))
-                               & (long_after_v'=(long_after_v | t>T_V))
-                               & (stage'=SETUP);
-    // slot 2 free (slot 1 busy)
-    [] stage=ARRIVE & tgt=2 ->
-          (1-p_arr)          : (stage'=SETUP)
-        + p_arr*(1-p_long)   : (b2_pre'=1) & (b2_dec'=2) & (b2_adm'=t) & (stage'=SETUP)
-        + p_arr*p_long       : (b2_pre'=3) & (b2_dec'=3) & (b2_adm'=t)
-                               & (n_long'=min(NL,n_long+1))
-                               & (long_near_v'=(long_near_v | (t>=T_V-WIN & t<=T_V+WIN)))
-                               & (long_before_v'=(long_before_v | t<T_V))
-                               & (long_after_v'=(long_after_v | t>T_V))
-                               & (stage'=SETUP);
-    // no slot free -> arrival dropped (bounded concurrency, no queue)
-    [] stage=ARRIVE & tgt=0 -> (stage'=SETUP);
+    // ---- ARRIVE: <=1 bg request into an empty bg record; prompt & output
+    //      drawn INDEPENDENTLY (4 shape combos). Target: b1 if empty else b2.
+    [] stage=ARRIVE & emp_b1 ->
+          (1-p_arr)                : (stage'=ADMIT)
+        + p_arr*(1-p_lp)*(1-p_ol_sp)  : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=SO)&(ad_b1'=t)&(stage'=ADMIT)
+        + p_arr*(1-p_lp)*p_ol_sp     : (st_b1'=1)&(pp_b1'=SP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
+        + p_arr*p_lp*(1-p_ol_lp)      : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=SO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
+        + p_arr*p_lp*p_ol_lp         : (st_b1'=1)&(pp_b1'=LP)&(oo_b1'=LO)&(ad_b1'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
+                                     &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
+    [] stage=ARRIVE & !emp_b1 & emp_b2 ->
+          (1-p_arr)                : (stage'=ADMIT)
+        + p_arr*(1-p_lp)*(1-p_ol_sp)  : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=SO)&(ad_b2'=t)&(stage'=ADMIT)
+        + p_arr*(1-p_lp)*p_ol_sp     : (st_b2'=1)&(pp_b2'=SP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lo'=min(NL,n_lo+1))&(stage'=ADMIT)
+        + p_arr*p_lp*(1-p_ol_lp)      : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=SO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))&(stage'=ADMIT)
+        + p_arr*p_lp*p_ol_lp         : (st_b2'=1)&(pp_b2'=LP)&(oo_b2'=LO)&(ad_b2'=t)&(n_lp'=min(NL,n_lp+1))&(n_lo'=min(NL,n_lo+1))
+                                     &(lp_before_v'=(lp_before_v|t<T_V))&(lp_after_v'=(lp_after_v|t>T_V))
+                                     &(both_before_v'=(both_before_v|t<T_V))&(both_after_v'=(both_after_v|t>T_V))&(stage'=ADMIT);
+    [] stage=ARRIVE & !emp_b1 & !emp_b2 -> (stage'=ADMIT);   // no room -> dropped
 
-    // == stage SETUP: update the peak-concurrency feature ====================
-    [] stage=SETUP -> (peak_conc'=max(peak_conc,occ)) & (stage'=SVC_V);
+    // ---- ADMIT: FCFS promote waiting->running while a slot is free (loops) --
+    [] stage=ADMIT & adm_v  -> (st_v'=2)  & (peak_conc'=max(peak_conc,nrun+1));
+    [] stage=ADMIT & adm_b1 -> (st_b1'=2) & (peak_conc'=max(peak_conc,nrun+1));
+    [] stage=ADMIT & adm_b2 -> (st_b2'=2) & (peak_conc'=max(peak_conc,nrun+1));
+    [] stage=ADMIT & !adm_v & !adm_b1 & !adm_b2 -> (stage'=SVC_V);
 
-    // == stage SVC_V: service the victim (chunked: prefill never stalls decode)
-    [] stage=SVC_V & !v_in -> (stage'=SVC_B1);                                  // idle
-    [] stage=SVC_V & v_pre>0 ->                                                 // prefill chunk (no token yet)
-        (v_blk'=min(6,v_blk+chunk_v)) & (v_pre'=v_pre-chunk_v)
+    // ---- SVC_V: service victim if running; maintain gap (waiting also stalls)
+    [] stage=SVC_V & emp_v -> (stage'=SVC_B1);
+    [] stage=SVC_V & wait_v ->                                                   // queued/evicted -> no progress
+        (v_gap'=v_gap1) & (v_maxgap'=max(v_maxgap,v_gap1)) & (stage'=SVC_B1);
+    [] stage=SVC_V & run_v & pp_v>0 ->                                           // prefill chunk -> no token
+        (bk_v'=min(6,bk_v+ch_v)) & (pp_v'=pp_v-ch_v)
         & (v_gap'=v_gap1) & (v_maxgap'=max(v_maxgap,v_gap1)) & (stage'=SVC_B1);
-    [] stage=SVC_V & v_pre=0 & v_dec>0 ->                                       // decode: emit a token
-        (v_dec'=v_dec-1) & (v_blk'=(v_dec-1=0 ? 0 : min(6,v_blk+1)))
-        & (v_gap'=0) & (stage'=SVC_B1);
-    [] stage=SVC_V & v_in & v_pre=0 & v_dec=0 -> (v_blk'=0) & (stage'=SVC_B1);  // cleanup (finished)
+    [] stage=SVC_V & run_v & pp_v=0 & oo_v>0 ->                                  // decode -> emit token
+        (oo_v'=oo_v-1) & (bk_v'=(oo_v-1=0 ? 0 : min(6,bk_v+1)))
+        & (st_v'=(oo_v-1=0 ? 0 : 2)) & (v_gap'=0) & (stage'=SVC_B1);
+    [] stage=SVC_V & run_v & pp_v=0 & oo_v=0 -> (st_v'=0) & (bk_v'=0) & (stage'=SVC_B1); // cleanup
 
-    // == stage SVC_B1: service background slot 1 =============================
-    [] stage=SVC_B1 & !b1_in -> (stage'=SVC_B2);
-    [] stage=SVC_B1 & b1_pre>0 ->
-        (b1_blk'=min(6,b1_blk+chunk_b1)) & (b1_pre'=b1_pre-chunk_b1) & (stage'=SVC_B2);
-    [] stage=SVC_B1 & b1_pre=0 & b1_dec>0 ->
-        (b1_dec'=b1_dec-1) & (b1_blk'=(b1_dec-1=0 ? 0 : min(6,b1_blk+1))) & (stage'=SVC_B2);
-    [] stage=SVC_B1 & b1_in & b1_pre=0 & b1_dec=0 -> (b1_blk'=0) & (stage'=SVC_B2);
+    // ---- SVC_B1 ----
+    [] stage=SVC_B1 & !run_b1 -> (stage'=SVC_B2);
+    [] stage=SVC_B1 & run_b1 & pp_b1>0 ->
+        (bk_b1'=min(6,bk_b1+ch_b1)) & (pp_b1'=pp_b1-ch_b1) & (stage'=SVC_B2);
+    [] stage=SVC_B1 & run_b1 & pp_b1=0 & oo_b1>0 ->
+        (oo_b1'=oo_b1-1) & (bk_b1'=(oo_b1-1=0 ? 0 : min(6,bk_b1+1))) & (st_b1'=(oo_b1-1=0 ? 0 : 2)) & (stage'=SVC_B2);
+    [] stage=SVC_B1 & run_b1 & pp_b1=0 & oo_b1=0 -> (st_b1'=0) & (bk_b1'=0) & (stage'=SVC_B2);
 
-    // == stage SVC_B2: service background slot 2 =============================
-    [] stage=SVC_B2 & !b2_in -> (stage'=PREEMPT);
-    [] stage=SVC_B2 & b2_pre>0 ->
-        (b2_blk'=min(6,b2_blk+chunk_b2)) & (b2_pre'=b2_pre-chunk_b2) & (stage'=PREEMPT);
-    [] stage=SVC_B2 & b2_pre=0 & b2_dec>0 ->
-        (b2_dec'=b2_dec-1) & (b2_blk'=(b2_dec-1=0 ? 0 : min(6,b2_blk+1))) & (stage'=PREEMPT);
-    [] stage=SVC_B2 & b2_in & b2_pre=0 & b2_dec=0 -> (b2_blk'=0) & (stage'=PREEMPT);
+    // ---- SVC_B2 ----
+    [] stage=SVC_B2 & !run_b2 -> (stage'=PREEMPT);
+    [] stage=SVC_B2 & run_b2 & pp_b2>0 ->
+        (bk_b2'=min(6,bk_b2+ch_b2)) & (pp_b2'=pp_b2-ch_b2) & (stage'=PREEMPT);
+    [] stage=SVC_B2 & run_b2 & pp_b2=0 & oo_b2>0 ->
+        (oo_b2'=oo_b2-1) & (bk_b2'=(oo_b2-1=0 ? 0 : min(6,bk_b2+1))) & (st_b2'=(oo_b2-1=0 ? 0 : 2)) & (stage'=PREEMPT);
+    [] stage=SVC_B2 & run_b2 & pp_b2=0 & oo_b2=0 -> (st_b2'=0) & (bk_b2'=0) & (stage'=PREEMPT);
 
-    // == stage PREEMPT: evict (recompute) until the KV pool fits =============
-    // exit: pool fits -> advance the clock, start next iteration
+    // ---- PREEMPT: evict running->waiting (LIFO) until KV pool fits (loops) --
     [] stage=PREEMPT & kv<=KV_CAP -> (t'=min(T,t+1)) & (stage'=VINJECT);
-    // evict victim (only when it has the top score: FCFS newest, or forced)
-    [] stage=PREEMPT & kv>KV_CAP & v_score>=b1_score & v_score>=b2_score & v_score>=0 ->
-        (v_blk'=0) & (v_pre'=v_blk)                       // recompute: rebuild all held blocks
+    [] stage=PREEMPT & kv>KV_CAP & sc_v>=sc_b1 & sc_v>=sc_b2 & sc_v>=0 ->        // evict victim -> queue
+        (st_v'=1) & (pp_v'=bk_v) & (bk_v'=0)
         & (v_preempts'=min(3,v_preempts+1)) & (preempts'=min(PT,preempts+1))
         & (v_gap'=v_gap1) & (v_maxgap'=max(v_maxgap,v_gap1));
-    // evict background slot 1
-    [] stage=PREEMPT & kv>KV_CAP & b1_score>v_score & b1_score>=b2_score ->
-        (b1_blk'=0) & (b1_pre'=b1_blk) & (preempts'=min(PT,preempts+1));
-    // evict background slot 2
-    [] stage=PREEMPT & kv>KV_CAP & b2_score>v_score & b2_score>b1_score ->
-        (b2_blk'=0) & (b2_pre'=b2_blk) & (preempts'=min(PT,preempts+1));
+    [] stage=PREEMPT & kv>KV_CAP & sc_b1>sc_v & sc_b1>=sc_b2 ->
+        (st_b1'=1) & (pp_b1'=bk_b1) & (bk_b1'=0) & (preempts'=min(PT,preempts+1));
+    [] stage=PREEMPT & kv>KV_CAP & sc_b2>sc_v & sc_b2>sc_b1 ->
+        (st_b2'=1) & (pp_b2'=bk_b2) & (bk_b2'=0) & (preempts'=min(PT,preempts+1));
 
 endmodule
 
-// ===========================================================================
-//  Labels — the "bad events", all read at the terminal state (t=T)
-// ===========================================================================
-label "done"          = (t=T);
-label "v_preempted"   = (v_preempts>=1);       // BE1: victim was evicted
-label "v_stalled"     = (v_maxgap>=SLO_TBT);   // BE2: victim TBT-SLO violation
-label "cascade"       = (preempts>=K_CASC);    // BE3: preemption cascade
+// ---- bad events (read at terminal "done") ---------------------------------
+label "done"        = (t=T);
+label "v_preempted" = (v_preempts>=1);       // BE1 (victim framing)
+label "v_stalled"   = (v_maxgap>=SLO_TBT);   // BE2 (victim framing)
+label "cascade"     = (preempts>=K_CASC);    // BE3 (system-level framing)

@@ -5,8 +5,8 @@ request records (PRISM has no arrays/loops, so we emit the records explicitly).
 
 Record 1 is the tagged "victim" (instrumented with gap counters -- NOT a
 scheduler privilege); records 2..M are background. This generalizes the
-hand-written 3-record model (chunked/scheduler_queue.pm): generating with
-M=3, N_SLOTS=2 reproduces it exactly (see --check).
+hand-written 3-record model (chunked/scheduler.pm): generating with
+M=3, N_SLOTS=2 reproduces it exactly.
 
 Usage:
   python3 gen_scheduler.py --M 8 --out scheduler_big.pm \

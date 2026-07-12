@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  v2 queue-based chunked scheduler — conditional-probability table (one regime).
+#  Chunked scheduler — conditional-probability table for one input regime.
 #  Requires:  source ~/buffy-prism-tools/env.sh
-#  Usage:  ./run_queue_study.sh          (defaults below)
-#          TV=3 PA=0.5 PLP=0.4 POL=0.4 POLICY=0 SLO=3 ./run_queue_study.sh
+#  Usage:  ./run_study.sh          (defaults below)
+#          TV=3 PA=0.5 PLP=0.4 POL=0.4 POLICY=0 SLO=3 ./run_study.sh
 # ============================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -17,11 +17,11 @@ CONST="T_V=$TV,POLICY=$POLICY,ADM_POLICY=$ADM,N_SLOTS=$NS,KV_CAP=$KV,CHUNK_BLK=$
 ratio(){ python3 -c "print('n/a' if $2==0 else f'{$1/$2:.4f}')"; }
 
 echo "############################################################"
-echo "# v2 queue scheduler — victim TBT stall (queueing)"
+echo "# chunked scheduler — victim TBT stall (queueing)"
 echo "# T_V=$TV p_arr=$PA p_lp=$PLP p_ol=$POL POLICY=$POLICY"
 echo "############################################################"
 
-mapfile -t R < <($PRISM scheduler_queue.pm scheduler_queue.props -const "$CONST" 2>/dev/null \
+mapfile -t R < <($PRISM scheduler.pm scheduler.props -const "$CONST" 2>/dev/null \
                  | grep -E "Result:" | sed 's/.*Result: //; s/ (exact.*//')
 
 names=("A: stall | EARLY long-prompt (before, none after)" \

@@ -1,6 +1,6 @@
 # SMC validation at realistic scale
 
-The headline finding (`NOTES_queue.md`) was found on the small exact model. To rule
+The headline finding (`NOTES.md`) was found on the small exact model. To rule
 out a toy-scale artifact, we re-test it at realistic scale via **statistical model
 checking** (the model is far too large for exact checking).
 
@@ -8,7 +8,7 @@ checking** (the model is far too large for exact checking).
 
 `gen_scheduler.py` emits the unified-record scheduler for arbitrary `M` records
 (PRISM has no arrays). **Correctness check:** generating `M=3, N_SLOTS=2` reproduces the
-hand-written `scheduler_queue.pm` *exactly* (all probabilities match).
+hand-written `scheduler.pm` *exactly* (all probabilities match).
 
 `scheduler_big.pm` (`./run_smc_validation.sh` regenerates it):
 - **M = 8** request records, **N_SLOTS = 3** (oversubscribed → the victim must queue),

@@ -1,84 +1,118 @@
-# Case study notes — CHUNKED-prefill batch scheduler
+# Findings — chunked scheduler (`scheduler.pm`)
 
-*The chunked-prefill variant (vLLM-V1 default). The eager/no-chunking variant is
-in [`../no_chunking/`](../no_chunking/); domain background is in
-[`../SCHEDULING_PRIMER.md`](../SCHEDULING_PRIMER.md).*
+## What the model computes
 
-## Model
+`scheduler.pm` is a DTMC of a GPU worker running chunked-prefill continuous
+batching. One tracked request (record 1, the "victim": short prompt, modest
+output) competes for `N_SLOTS` batch slots against background requests. Background
+requests arrive with probability `p_arr` per iteration; each has a long prompt
+with probability `p_lp` and a long output with probability `p_ol_sp` / `p_ol_lp`
+(conditioned on prompt class). The tracked request has no scheduler privilege.
 
-`scheduler.pm` is a DTMC; one step = one scheduler sub-stage, one iteration spans
-`VINJECT→ARRIVE→SETUP→SVC_V→SVC_B1→SVC_B2→PREEMPT`. Chunked prefill is always on
-(`chunk = min(pre, CHUNK_BLK)`), so a prefill never stalls a decode — the victim's
-**only** stall source is KV-exhaustion preemption + recompute. Small enough for
-**exact** model checking (~13k states). Sweepable undefined consts: `POLICY`
-(0 fcfs / 1 priority), `p_arr`, `p_long` (the request-mix input pattern).
+Bad event: the tracked request's inter-token gap reaches the SLO threshold
+(`v_maxgap >= SLO_TBT`), i.e. an interactive-latency stall. Queries in
+`scheduler.props` report `P(bad)`, `P(bad & C)`, and `P(C)` for several
+conditions `C` on the request pattern; the conditional is the ratio.
 
-Bad events (monotone counters, read at the horizon): `v_preempts>=1` (BE1, victim
-evicted), `v_maxgap>=SLO_TBT` (BE2, victim TBT-SLO violation), `preempts>=K_CASC`
-(BE3, cascade).
+Run: `source ~/buffy-prism-tools/env.sh && ./run_study.sh`.
 
-## Headline finding — *shape and timing, not volume*
+## Main result: prompt length is irrelevant; output length drives stalls
 
-Regime `p_arr=0.5, p_long=0.4`, `POLICY=fcfs`. Exact results (`./run_case_study.sh`):
+Set `CHUNK_BLK >= LP` so a long prompt still prefills in about one iteration
+(realistic: a prefill chunk holds far more tokens than a typical prompt).
+Sweep `P(stall)` over the long-prompt fraction `p_lp` and the long-output
+fraction `p_ol` (`N_SLOTS=1`, `p_arr=0.8`):
 
-| condition C on the request pattern | P(BE1) | P(BE1 \| C) | P(C) | lift |
-|---|---|---|---|---|
-| — (baseline) | 0.143 | — | — | — |
-| **a long request arrived *before* the victim, none after** | 0.143 | **0.397** | **0.20** | **2.8×** |
-| the same longs arrived *after* the victim, none before | 0.143 | **0.000** | 0.36 | 0 |
-| *volume*: `n_long>=2` (≥2 long requests arrived at all) | 0.143 | 0.273 | 0.50 | 1.9× |
+|            | p_ol=0.0 | p_ol=0.5 | p_ol=1.0 |
+|------------|----------|----------|----------|
+| p_lp=0.0   | 0.640    | 0.864    | 0.960    |
+| p_lp=0.5   | 0.640    | 0.864    | 0.960    |
+| p_lp=1.0   | 0.640    | 0.864    | 0.960    |
 
-**The non-obvious assumption:** the interactive request is evicted not because load
-is high, nor because many long requests arrive, but because a long-context request
-arrives **just before it**. Under FCFS the KV-exhaustion eviction order is **LIFO**
-(most-recently-admitted first), so an early long prompt makes the *later* interactive
-request the "newest" → the eviction target. The identical longs arriving *after* the
-victim are harmless (P = 0): they become the newest and shield it.
+`P(stall)` does not change with `p_lp` (spread 0.000) and rises monotonically with
+`p_ol`. It holds at `N_SLOTS=2` as well (`p_lp` 0.2→0.8: 0.017→0.017;
+`p_ol` 0.2→0.8: 0.017→0.138).
 
-This is **mild** (holds ~20% of the time), **informative** (nearly triples the risk),
-**invisible per component** (every request is individually fine — the harm is in the
-arrival order relative to the victim × LIFO eviction), and **stronger than the obvious
-knob** (volume `n_long>=2` lifts P only to 0.27 and is far more common). Mirrors
-FQ-CoDel ("shape not volume") and incast ("timing matters, invisible per buffer").
+**Mechanism.** Chunked prefill reduces any prompt to about one iteration, so prompt
+length no longer changes how long a request holds a slot. Output length does: a
+request occupies its slot for one decode iteration per output token. The tracked
+request's queueing delay is set by how long incumbents hold their slots, which is
+their output length, not their prompt length.
 
-## Policy comparison (chunked, same input)
+**Why this matters.** The common expectation is that long-context (long-prompt)
+requests threaten interactive latency. Under chunked prefill they do not. The
+driver is output length, which the scheduler cannot observe at admission (see
+`../SCHEDULING_PRIMER.md`). So admission, routing, or prioritization based on
+prompt length targets a variable that does not control the stall; controlling it
+requires predicting output length.
 
-| policy | P(preempt) | P(stall) | P(cascade) |
-|---|---|---|---|
-| fcfs | 0.143 | 0.143 | 0.084 |
-| priority | **0.000** | **0.000** | 0.032 |
+If a prompt spans multiple prefill chunks (`CHUNK_BLK < LP`), prompt length
+re-enters in proportion to the number of chunks it spans, but output length still
+dominates. This is quantified at scale in `VALIDATION.md`.
 
-- `priority` protects the victim (P → 0) — but the literature caveat applies: priority
-  merely *moves* the harm onto the low-priority background requests (starvation). A
-  natural follow-up query: "P(a background request starves | priority)."
-- Under `fcfs`, BE1 and BE2 **coincide** — with chunked prefill the only way the victim
-  stalls is via preemption + recompute. That is itself the point of this variant:
-  chunked prefill removes prefill-induced stalls, leaving KV exhaustion as the residual,
-  non-obvious risk. (Compare `../no_chunking/`, where P(stall) is much higher because a
-  whole-prompt prefill freezes decodes.)
+## Paper assumption (monotone parameter box)
 
-## Reproduce
+`P(stall)` is monotone increasing in `p_lp`, `p_ol`, and `p_arr` (checked on the
+sweep grid: 0/72, 0/48, 1/64 violations). A box over these parameters is therefore
+certified at its lower corner.
 
-```bash
-source ~/buffy-prism-tools/env.sh
-./run_case_study.sh                 # baseline regime + policy table
-PA=0.7 PL=0.4 ./run_case_study.sh   # heavier load (lift grows)
-```
+**Primary box (output dominance):**
+> Under chunked prefill, for prompts within one prefill chunk, `P(stall)` is
+> invariant to `p_lp` in [0,1] and monotone increasing in the long-output fraction.
+> For `p_ol >= 0.5` (at this load), `P(stall) >= 0.86`, independent of prompt lengths.
 
-## Honest caveats / next steps (from the design review)
+**Secondary box (composition beats load):** at `A = { p_arr in [0.6,0.8],
+p_lp in [0.6,0.8], p_ol = 0.6 }`, `P(stall) >= 0.19` at the worst corner (typically
+0.36–0.48). By contrast `{ p_lp <= 0.4, p_ol = 0.3 }` gives `P(stall) <= 0.12` even
+at higher load. A moderately loaded worker with a long-heavy mix stalls the tracked
+request more than a heavily loaded worker with short requests:
 
-- **Toy magnitudes, faithful ratios.** 3 slots (vs ~256 real `max_num_seqs`), KV_CAP=8
-  blocks, chunk 1 block, T=10 — none are real magnitudes; only the *ratios*
-  (oversubscribed KV ~2.3×, long≈3×short, chunk≪prompt, arrivals>slots) are meant to be
-  faithful. This is a mechanism model, not a calibrated one. Sweep to check robustness.
-- **No queue** (two senses): background arrivals to a full worker are *dropped* (no
-  admission queue → TTFT/queueing not modelled); an evicted request recomputes *in place*
-  in its slot (no preempted-request waiting queue, unlike real vLLM). Adding a small
-  waiting queue is the biggest fidelity upgrade and would bring TTFT bad events into scope.
-- **Bundled prompt/output length** bakes in a fixed *positive* correlation, which
-  precludes studying the prompt↔output-correlation hypothesis. Decoupling them (with a
-  tunable correlation) is a priority enhancement.
-- **Fixed victim arrival `T_V=3`.** Sweep `T_V` to confirm the finding isn't specific to
-  one arrival time.
-- **Independent cross-check pending.** A Python oracle re-implementing the exact dynamics
-  (as in the FQ-CoDel/incast studies) is the next task; guards against modeling bugs.
+| regime | P(stall) |
+|--------|----------|
+| moderate load, long-heavy (p_arr=0.6, p_lp=0.8, p_ol=0.6) | 0.359 |
+| high load, short mix (p_arr=0.8, p_lp=0.2, p_ol=0.3)      | 0.101 |
+
+The composition box is the paper-ready form. `T_V` (arrival time) is non-monotone
+under a finite horizon and is kept out of the box as a fixed input assumption.
+
+## Secondary results
+
+**Queueing delay is timing-sensitive.** With `CHUNK_BLK=3`, `p_arr=0.5`,
+`p_lp=p_ol=0.4`, baseline `P(stall)=0.108`:
+
+| condition C | P(stall \| C) | P(C) | vs baseline |
+|-------------|--------------|------|-------------|
+| a long-prompt request arrived before the tracked request, none after | 0.221 | 0.19 | 2.0× |
+| the same longs arrived after, none before | 0.018 | 0.34 | 0.17× |
+| >= 2 long requests arrived (volume) | 0.163 | 0.50 | 1.5× |
+| long in both prompt and output | 0.236 | 0.24 | 2.2× |
+
+A long request arriving before the tracked request holds a slot and delays it;
+the same request arriving after is harmless. Timing matters more than volume.
+This conditional does not form a clean parameter box (`T_V` is non-monotone), so it
+supports the mechanism but is not the paper assumption.
+
+**Three scheduling levers, tested:**
+1. SJF admission by prompt length helps the short tracked request (0.857→0.380). It
+   does not backfire on it.
+2. Adding KV capacity reduces stalls. But raising `N_SLOTS` at fixed `KV_CAP`
+   increases preemption (`KV_CAP=8`: `N_SLOTS` 1→2→3 gives `P(preempt)` 0→0.11→0.27).
+   Adding batch slots trades queueing delay for preemption unless KV scales too.
+3. Eviction priority for the tracked request gives the same `P(stall)` as FCFS
+   (0.335) in the queueing regime: protecting it from eviction does nothing for its
+   queueing delay.
+
+Prompt/output correlation, at equal marginals, barely moves `P(stall)`
+(independent 0.231, positive 0.236, negative 0.198).
+
+## Caveats
+
+- At these small sizes the tracked request is never preempted (`P(preempted)=0`) and
+  the preemption cascade never fires. Preemption bad events need the larger SMC
+  config (`run_smc_validation.sh`), where they reappear.
+- Magnitudes are small; only the ratios are meant to be realistic. See
+  `../PARAMETERS.md`.
+- `T_V` (arrival time) is fixed, not random.
+- The dedicated-slot model in `../chunked_dedicated_slot/` gives the tracked request
+  its own slot; it is an earlier, simpler variant and is not used for the results
+  above.
