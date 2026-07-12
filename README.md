@@ -15,6 +15,9 @@ assumption `A` is a *box* over the input-traffic parameters — total senders `M
 synchronization window `WIN`, burst length `SLEN` — and we certify that `Q` is
 likely across the *whole* box, not just a skewing corner.
 
+**Picking this up?** See [`HANDOFF.md`](HANDOFF.md) for a full walkthrough of the
+model, what was tried/found, how to run it, caveats, and next steps.
+
 ## Examples (`model/`)
 Each example is a self-contained model + queries + oracle + notes for one
 assumption box.
