@@ -41,12 +41,21 @@ So the genuinely-uncertain region is a thin shell at the **provisioning knee** `
 certainly safe; below (`N≤2`) it certainly stalls; only at the knee does the workload
 composition decide.
 
-## Obvious / provable regions (what a 100% method finds)
+## Obvious / provable regions — certain stall `P = 1` (what a 100% method finds)
 
-- **`A_under ≡ (N_SLOTS ≤ 2)`** — `P(stall) ∈ [0.80, 0.99]` across realistic workloads →
-  "always stalls." Under-provisioned. Provable and obvious.
-- **`A_over ≡ (N_SLOTS ≥ 5)`** — `P(stall) ≤ 0.007 ≈ 0` → "never stalls." Over-provisioned.
-  Provable and obvious.
+The only regions a certainty method certifies are where `P(stall)` is exactly 1 or 0.
+**Certain stall, provable by exact model checking** (every corner = 1.000):
+
+```
+A_E ≡ (N_SLOTS = 1) ∧ (p_arr = 1) ∧ (p_lp ∈ [0,1]) ∧ (p_ol ∈ [0,1]) ∧ (T_V ∈ [2,5])   →   P(stall) = 1
+```
+
+A saturated one-slot worker always stalls the interactive request — *for any workload mix*
+(`p_lp, p_ol` free; the composition that decides the mild region is irrelevant here). This is
+a genuine `P = 1`, not "≈1": dropping load to `p_arr = 0.9` already breaks it (exact `P = 0.978`),
+and `N_SLOTS = 2` breaks at late `T_V` — certainty needs the saturated, under-provisioned corner.
+
+- **Never stalls** (the opposite extreme): `A_over ≡ (N_SLOTS ≥ 5)` → `P ≤ 0.007 ≈ 0`. Provable.
 
 ## Mild box — probabilistic, non-obvious (the payoff)
 
@@ -152,11 +161,19 @@ magnitudes** (and is *stronger* than at toy scale, not weaker).
   p_lp   (N=22, p_ol=0.3):  0.1->~0.34  0.5->~0.34  0.9->~0.35                            (flat)
 ```
 
-## Obvious / provable regions (what a 100% method finds)
+## Obvious / provable regions — certain stall `P = 1` (what a 100% method finds)
 
-- **`N_SLOTS ≤ 16`** → `P ∈ [0.84, 0.98]`: always stalls (under-provisioned).
-- **`N_SLOTS ≥ 28`** → `P ≤ 0.05`: never stalls (over-provisioned).
-- **`p_ol ≤ 0.22`** (output-light workload) → `P ≤ 0.06`: never stalls.
+`N_SLOTS ≤ 16` alone gives only `P ∈ [0.84, 0.98]` — near-certain but not certain, and a
+single-parameter condition. A genuine **`P = 1`** needs a **conjunction** of bad conditions:
+under-provisioned ∧ high-load ∧ output-heavy. Oracle (`P = 1.0000`, no counterexample in
+10⁴ samples across the whole box):
+
+```
+A_E' ≡ (N_SLOTS ∈ [8,12]) ∧ (λ ∈ [0.5,0.7]) ∧ (p_ol ∈ [0.5,0.7])   →   P(stall) = 1.000
+```
+
+(The provable version — `P = 1` by exact model checking, workload-independent — is the small-
+model box `A_E` above.) Opposite extreme: `N_SLOTS ≥ 28` → `P ≤ 0.05`; `p_ol ≤ 0.22` → `P ≤ 0.06` (never).
 
 ## Mild boxes (probabilistic, non-obvious) — every point a coin-flip
 
@@ -178,8 +195,9 @@ cannot observe at admission**; the visible feature (prompt length) does not move
 
 ## The contrast, at realistic scale
 
-A 100%/reachability method certifies only `N_SLOTS ≤ 16` (always) and `N_SLOTS ≥ 28` (never)
-— the provisioning extremes. The realistic operating regime — batch width at the knee
-(20–24) with a moderate, partly-invisible output-length mix — is exactly the mild box, where
+A 100%/reachability method certifies only the certain corners — `A_E`/`A_E'` (saturated,
+under-provisioned, output-heavy → always) and `N_SLOTS ≥ 28` (never). The realistic operating
+regime — batch width at the knee (20–24) with a moderate, partly-invisible output-length mix —
+has no certain answer, and is exactly the mild box, where
 `P(stall | A) ∈ [0.17, 0.56]` is the actionable answer, and it points at the output-length
 distribution as the lever, not prompt length.

@@ -85,10 +85,17 @@ and along the **output-fraction** axis; prompt fraction does not move it.
 
 ## Finding 3 — regions: obvious (provable) vs. mild (probabilistic)
 
-**Obvious / provable (a 100% or reachability method finds these):**
-- `A_under ≡ (N_SLOTS ≤ 16)` → `P(stall) ∈ [0.84, 0.98]` — always stalls (under-provisioned).
-- `A_over  ≡ (N_SLOTS ≥ 28)` → `P(stall) ≤ 0.05` — never stalls (over-provisioned).
-- `A_light ≡ (p_ol ≤ 0.22)`  → `P(stall) ≤ 0.06` — never stalls (output-light workload).
+**Obvious / provable — certain stall, `P(stall) = 1` (a verification/reachability method finds these):**
+- **Provable by exact model checking** (small model, all corners = 1.000):
+  `A_E ≡ (N_SLOTS = 1) ∧ (p_arr = 1) ∧ (p_lp ∈ [0,1]) ∧ (p_ol ∈ [0,1]) ∧ (T_V ∈ [2,5])` → **`P(stall) = 1`.**
+  A **saturated, under-provisioned** worker (one slot, always occupied) stalls the interactive request
+  with certainty — *regardless of the request mix* (`p_lp, p_ol` range over everything). The workload
+  composition that decides the mild region becomes irrelevant here.
+- **Realistic-scale analog** (oracle; `P = 1.0000`, no counterexample in 10⁴ samples, over a
+  multi-parameter box): `A_E' ≡ (N_SLOTS ∈ [8,12]) ∧ (λ ∈ [0.5,0.7]) ∧ (p_ol ∈ [0.5,0.7])` →
+  **`P(stall) = 1.000`** throughout — under-provisioned ∧ high-load ∧ output-heavy.
+- **Never stalls** (the opposite obvious extreme): `A_over ≡ (N_SLOTS ≥ 28)` → `P ≤ 0.05`;
+  `A_light ≡ (p_ol ≤ 0.22)` → `P ≤ 0.06`.
 
 **Mild / non-obvious (probabilistic — every point a coin-flip; monotone, so corners certify):**
 - **Workload box** (ranges the *invisible* long-output fraction):
@@ -99,11 +106,13 @@ and along the **output-fraction** axis; prompt fraction does not move it.
 In both, prompt fraction `p_lp` is free (≤0.05 swing); the outcome is set by provisioning
 and the long-output fraction.
 
-**Methodological point (the paper's thesis).** A certainty method can certify only the
-provisioning extremes (`A_under`/`A_over`) — the obvious cases. The realistic operating
-regime (batch width at the knee, moderate partly-invisible output mix) is invisible to it,
-and is exactly where a quantified `P(stall | A) ∈ [0.17, 0.56]` is the actionable answer —
-and it points at the *output-length distribution*, not prompt length, as the lever.
+**Methodological point (the paper's thesis).** A certainty method can only certify the
+extremes where `P(stall)` is exactly 0 or 1 — the *saturated, under-provisioned* box `A_E`
+(certain stall) and the *over-provisioned* box `A_over` (never). Both are obvious, and in
+`A_E` the workload composition is irrelevant. The realistic operating regime (batch width at
+the knee, moderate partly-invisible output mix) has no certain answer, and is exactly where a
+quantified `P(stall | A) ∈ [0.17, 0.56]` is the actionable one — and it points at the
+*output-length distribution*, not prompt length, as the lever.
 
 ## Validation
 
