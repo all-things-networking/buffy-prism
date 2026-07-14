@@ -36,9 +36,9 @@ def exact_bracket(model, consts):
 
 if __name__ == "__main__":
     # incast_mdp: per-slot start choice. Pmin=0 is degenerate (never-send).
-    # incast_pmin_mdp: forced-start scheduling. Pmin=0 means loss is avoidable
-    # by spreading starts WHILE all senders still send (physically meaningful).
-    for model in ("incast_mdp", "incast_pmin_mdp"):
+    # incast_mdp_Pmin: forced start (wait only while slot<WIN, forced at slot=WIN),
+    # so Pmin=0 means loss is avoidable by spreading starts WHILE all senders send.
+    for model in ("incast_mdp", "incast_mdp_Pmin"):
         print(f"# {model}")
         for consts in [
             dict(M=4, WIN=1, SLEN=1, BUF=1, THRESH=1),

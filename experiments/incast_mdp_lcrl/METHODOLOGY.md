@@ -153,25 +153,40 @@ policy recovers it: greedy MC `P[Q] = 1.000` (sparse reward gave `0.00`).
   may wait through the whole window and then (once `slot > WIN`) never start, so
   a scheduler avoids all drops by simply **not sending** (`run_synthesis.py
   --direction min` prints `mean_senders_started` -- ≈ 0 flags this). To make
-  `Pmin` physical, **`incast_pmin_mdp.pm`** moves start-time selection into an
-  initial nondeterministic phase: each in-fan-out sender's start slot `t_k` is
-  chosen in `[0..WIN]` (via an increment-or-commit idiom) and the sender is
-  *forced* to start (`on_k=1`); the run (`mode=1`) is then a deterministic
-  per-slot service. Now `Pmin` = best-case schedule **with all `M` senders
-  sending**. Exact checking on small instances confirms it is well-formed:
-  `Pmax = 1.0`, `Pmin = 0.0`, `max_actions = 2`, and every rollout starts all
-  `M` senders. So at small fan-in incast loss *is* avoidable by spreading
-  starts; whether `Pmin > 0` (loss unavoidable) at the case-study fan-in is the
-  open question this model poses.
-- **RL caveat for `Pmin`.** The dense `Δodrops` reward densifies the *run*, but
-  in `incast_pmin_mdp.pm` the scheduling decisions are in the *init* phase where
-  `odrops = 0`, so their reward is delayed to the run -- a long credit-assignment
-  chain. Tabular LCRL does not yet reliably synthesise the `Pmin` schedule (the
-  learned value looks optimal while the greedy policy does not execute it, even
-  with full state), and the projection must at least expose the committed `t_k`
-  for the scheduler to coordinate. Converging `Pmin` (init-phase reward shaping,
-  richer state, or function approximation) is future work; the model itself is
-  exact-checkable ground truth.
+  `Pmin` physical, **`incast_mdp_Pmin.pm`** keeps the per-slot start-vs-wait
+  choice but enables the *wait* command only while `slot < WIN`; at `slot = WIN`
+  wait is disabled, so a still-idle sender is **forced to start**. Every
+  in-fan-out sender therefore starts by the window's end, the nondeterminism is
+  retained where it matters (`slot < WIN`), and the decisions stay interleaved
+  with per-slot service (no separate phase). Exact checking on small instances
+  confirms it is well-formed: `Pmax = 1.0`, `Pmin = 0.0`, `max_actions = 2`,
+  every rollout starts all `M` senders, and -- because never-started states
+  become unreachable -- the state space is *smaller* than `incast_mdp.pm`. So at
+  small fan-in incast loss *is* avoidable by spreading starts; whether
+  `Pmin > 0` (loss unavoidable) at the case-study fan-in is the open question
+  this model poses.
+- **Why RL does not yet synthesise `Pmin` (exploration + overestimation, not
+  credit assignment).** Tabular LCRL-min still returns a greedy policy with
+  `P[Q] = 1.0` on `incast_mdp_Pmin.pm`, despite exact `Pmin = 0`. The cause is
+  **not** reward delay: `value@s0` converges to ~0, so the "avoidance is
+  possible" signal *does* reach the initial state. It is a **value--policy gap**:
+  - **The incast-free schedule is rare.** A random policy already loses with
+    `P[Q] = 0.958` (uniform-hazard 0.978, always-start 1.0) -- only ~4% of
+    schedules avoid loss. ε-greedy seldom samples the narrow safe path, so its
+    Q-values stay poorly estimated.
+  - **Q-learning overestimates.** The `max` in the Bellman backup is biased
+    optimistically (toward 0 for the minimisation), so `value@s0` looks optimal
+    while the greedy policy, following overestimated Q-values, still incurs a
+    drop; the bias compounds over the long (`21×HORIZON`) horizon.
+  - This is direction-specific: **`Pmax` trains cleanly** (greedy `P[Q] = 1.0`),
+    confirming the model is RL-trainable; only the rare-optimum `Pmin` direction
+    fails.
+
+  Fixes are on the *learner*, not the model: reduce overestimation (double
+  Q-learning, smaller/annealed learning rate), bias exploration toward spreading
+  starts, or -- last resort -- shape a per-slot reward on concurrency/queue
+  occupancy rather than only terminal drops. For the *value* of `Pmin`, exact
+  model checking / SMC is the reliable route (RL is weakest exactly here).
 
 **Bottom line.** LCRL on the MDP recreates the case-study `P[Q]` where the
 scheduler is forced (it recovers `Pmax = 1.0`, and `uniform_hazard` reproduces
@@ -201,10 +216,7 @@ PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py --M 2
 
 # loss-avoiding scheduler (Pmin) on the forced-start model (all senders send):
 PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py \
-    --model incast_pmin_mdp --M 16 --direction min --state-vars mode,istage,slot,odrops
-
-# regenerate the forced-start model from incast_mdp.pm:
-PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/gen_pmin_model.py
+    --model incast_mdp_Pmin --M 16 --direction min
 ```
 
 Runtime is a few minutes per corner (≈1200 episodes × ~5000 micro-steps, then
@@ -219,5 +231,4 @@ Runtime is a few minutes per corner (≈1200 episodes × ~5000 micro-steps, then
 | `run_synthesis.py` | train + MC-evaluate a corner (`--model`, `--direction max`/`min`) |
 | `dtmc_reference.py` | DTMC `P[Q]` at the corners (uniform start) |
 | `exact_bracket.py` | exact `Pmax`/`Pmin` on small instances, both models (StormPy) |
-| `gen_pmin_model.py` | generate `incast_pmin_mdp.pm` from `incast_mdp.pm` |
-| `models/.../incast_pmin_mdp.pm` `.props` | forced-start MDP for a physical `Pmin` |
+| `models/.../incast_mdp_Pmin.pm` `.props` | forced-start MDP (wait only while `slot<WIN`) for a physical `Pmin` |

@@ -104,14 +104,14 @@ def main():
                     help="max = worst-case (Pmax) scheduler; min = loss-avoiding (Pmin)")
     ap.add_argument("--model", default="incast_mdp",
                     help="model base name in models/example2_desync_short_bursts/ "
-                         "(incast_mdp = per-slot start choice; incast_pmin_mdp = "
-                         "forced-start scheduling variant for a physical Pmin)")
+                         "(incast_mdp = per-slot start-vs-wait; incast_mdp_Pmin = "
+                         "forced-start variant [wait only while slot<WIN] for a "
+                         "physical Pmin)")
     ap.add_argument("--episodes", type=int, default=1200)
     ap.add_argument("--mc", type=int, default=300, help="Monte-Carlo rollouts per policy")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--state-vars", default="slot,stage,odrops",
-                    help="comma-separated projected state variables (empty = full state); "
-                         "for incast_pmin_mdp use e.g. mode,istage,slot,odrops")
+                    help="comma-separated projected state variables (empty = full state)")
     a = ap.parse_args()
     consts = dict(BUF=a.BUF, THRESH=a.THRESH, M=a.M, WIN=a.WIN, SLEN=a.SLEN)
     state_vars = [v for v in a.state_vars.split(",") if v] or None
