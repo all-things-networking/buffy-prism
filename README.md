@@ -33,10 +33,11 @@ assumption box.
   (8–10 uplinks). Receiver loss stays likely (`P[Q] ≥ 0.54`) with every input
   buffer healthy — incast without synchronisation. `BUF=32`, `THRESH=8`.
 - **`example3_prob_vs_obvious/`** — the *probabilistic vs 100%-only* contrast:
-  two mild boxes that sit entirely in the uncertain band (`P[Q] ∈ [0.12, 0.55]`
+  several mild boxes that sit entirely in the uncertain band (`P[Q] ∈ [0.11, 0.56]`
   everywhere, so a certainty-only method certifies nothing) against an obvious
   extreme box (nearly-synchronised, 10–12 uplinks; `P[Q] = 1` everywhere). Shows
-  that 100%-certifiable assumptions are only the obvious extremes.
+  that 100%-certifiable assumptions are only the obvious extremes. Includes boxes
+  ranging 2–4 burst-length (`SLEN`) values, trading fan-in for `SLEN` width.
 
 ## Quick start (example 1)
 ```

@@ -60,9 +60,49 @@ holding only the fan-in fixed.
 
 box range: **`P[Q] ∈ [0.12, 0.55]`** — least-favorable corner `(SLEN=8, WIN=124)`
 = 0.115, most-severe corner `(SLEN=9, WIN=116)` = 0.550. Every one of the six
-points is a genuine coin-flip-ish risk. (This box is narrow in `WIN` precisely
-because of the 0/1 observation above: widen `SLEN` to `[8,10]` or `WIN` past
-~128 and a corner leaves the band.)
+points is a genuine coin-flip-ish risk. (This box is narrow in `WIN`, and holds
+only two `SLEN` values at this fan-in, precisely because of the 0/1 observation
+above. Boxes P3/P4 below trade fan-in for a wider `SLEN` range.)
+
+## Box P3 — like P2 but THREE SLEN values (same fan-in, more de-sync)
+```
+A_P3 ≡ (M = 16) ∧ (10 ≤ SLEN ≤ 12) ∧ (184 ≤ WIN ≤ 192)
+```
+Same 8-uplink fan-in as P1/P2, but **three** burst lengths in-band and an even
+larger de-sync (15–19× the flow length). SLEN 10–12 ≈ 15–18 KB (query/SRU).
+
+| P[Q] (oracle) | WIN=184 | WIN=192 |
+|---|---|---|
+| **SLEN=10** | 0.138 | 0.110 |
+| **SLEN=11** | 0.316 | 0.262 |
+| **SLEN=12** | 0.559 | 0.483 |
+
+box range: **`P[Q] ∈ [0.11, 0.56]`** — corner `(SLEN=10, WIN=192)` = 0.110,
+corner `(SLEN=12, WIN=184)` = 0.559.
+
+## Box P4 — FOUR SLEN values (lower fan-in)
+```
+A_P4 ≡ (M = 12) ∧ (13 ≤ SLEN ≤ 16) ∧ (196 ≤ WIN ≤ 204)
+```
+Drops to 6 uplinks, which softens the SLEN transition enough to hold **four**
+burst lengths in-band (de-sync 12–16×). SLEN 13–16 ≈ 20–24 KB (storage SRU).
+
+| P[Q] (oracle) | WIN=196 | WIN=204 |
+|---|---|---|
+| **SLEN=13** | 0.137 | 0.116 |
+| **SLEN=14** | 0.244 | 0.210 |
+| **SLEN=15** | 0.379 | 0.333 |
+| **SLEN=16** | 0.532 | 0.477 |
+
+box range: **`P[Q] ∈ [0.12, 0.53]`** — corner `(SLEN=13, WIN=204)` = 0.116,
+corner `(SLEN=16, WIN=196)` = 0.532. (A 5th value, SLEN=17, only fits if the
+band is widened to ~[0.08, 0.63].)
+
+**How many SLEN values fit is set by the fan-in.** The 0/1 sharpness scales with
+`M` (more senders → sharper transition), so the width of the in-band `SLEN`
+range trades directly against fan-in: `M=16` → 3 values (P3), `M=12` → 4 (P4),
+`M=10`/`M=8` → 5 — at the cost of fewer uplinks and a larger `WIN` for the same
+de-sync. This is the same sharpness observation, quantified.
 
 ## Box E — extreme / obvious (certain incast)
 ```
@@ -95,6 +135,10 @@ prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=16,SLEN=8,WIN=96:8
       -sim -simmethod ci -simwidth 0.01 -simconf 0.01 -simpathlen 8500
 # Box P2:
 prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=16,SLEN=8:1:9,WIN=116:4:124 ...
+# Box P3 (3 SLEN values):
+prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=16,SLEN=10:1:12,WIN=184:4:192 ...
+# Box P4 (4 SLEN values):
+prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=12,SLEN=13:1:16,WIN=196:4:204 ...
 # Box E:
 prism incast.pm incast.props -prop 1 -const BUF=32,THRESH=8,M=20:2:24,WIN=0:8:24,SLEN=8:2:12 ...
 ```
@@ -112,6 +156,10 @@ Corners, `BUF=32, THRESH=8`. Oracle values (n=120k, ±~0.004); PRISM at
 | P1 min | `M=16, WIN=120, SLEN=8` | 0.142 | 0.145 ± 0.01 |
 | P2 max | `M=16, WIN=116, SLEN=9` | 0.550 | 0.545 ± 0.01 |
 | P2 min | `M=16, WIN=124, SLEN=8` | 0.115 | 0.120 ± 0.01 |
+| P3 max | `M=16, WIN=184, SLEN=12`| 0.559 | _pending_ |
+| P3 min | `M=16, WIN=192, SLEN=10`| 0.110 | _pending_ |
+| P4 max | `M=12, WIN=196, SLEN=16`| 0.532 | _pending_ |
+| P4 min | `M=12, WIN=204, SLEN=13`| 0.116 | _pending_ |
 | E  min | `M=20, WIN=24, SLEN=8`  | 1.000 | 1.000 ± 0.001 |
 
 These are the box corners; by monotonicity (increasing in `M`, `SLEN`,

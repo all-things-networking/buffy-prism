@@ -111,6 +111,14 @@ if __name__ == "__main__":
     grid("A_P2 = M=16, SLEN in [8,9], WIN in [116,124]",
          [16], [116, 120, 124], [8, 9], BUF, THRESH)
 
+    print("\n=== Box P3 (3 SLEN values, same M=16 fan-in) ===")
+    grid("A_P3 = M=16, SLEN in [10,12], WIN in [184,192]",
+         [16], [184, 192], [10, 11, 12], BUF, THRESH)
+
+    print("\n=== Box P4 (4 SLEN values, M=12) ===")
+    grid("A_P4 = M=12, SLEN in [13,16], WIN in [196,204]",
+         [12], [196, 204], [13, 14, 15, 16], BUF, THRESH)
+
     print("\n=== Box E (extreme / obvious: many uplinks, nearly synchronised) ===")
     certify_box("A_E = (20<=M<=24) & (0<=WIN<=24) & (8<=SLEN<=12)",
                 (20, 24), (0, 24), (8, 12), BUF, THRESH)
