@@ -123,6 +123,7 @@ class PrismBlackBoxMDP:
 
         # State bookkeeping, populated by _record.
         self._full_state = None      # {var: value} for the current state
+        self._prev_full_state = None # {var: value} for the state before the last step
         self._labels = []            # labels of the current state
         self.current_state = None    # list, per _var_order
 
@@ -173,6 +174,7 @@ class PrismBlackBoxMDP:
     def reset(self):
         state, _reward, labels = self._sim.restart()
         self._record(state, labels)
+        self._prev_full_state = self._full_state  # no "previous step" at episode start
         return self.current_state
 
     def step(self, action):
@@ -199,6 +201,7 @@ class PrismBlackBoxMDP:
     # ------------------------------------------------------------------ #
     def _record(self, json_state, storm_labels):
         full = json.loads(str(json_state))
+        self._prev_full_state = self._full_state if self._full_state is not None else full
         self._full_state = full
         if self._var_order is None:
             self._var_order = sorted(full.keys())
@@ -235,6 +238,12 @@ class PrismBlackBoxMDP:
     def full_state(self):
         """The current state as a ``{var: value}`` dict over all program variables."""
         return dict(self._full_state) if self._full_state is not None else None
+
+    @property
+    def prev_full_state(self):
+        """The full state *before* the most recent ``step`` (equals ``full_state``
+        right after ``reset``). Useful for reward shaping over state deltas."""
+        return dict(self._prev_full_state) if self._prev_full_state is not None else None
 
     def is_done(self):
         """Whether the simulator is in an absorbing/sink state."""
