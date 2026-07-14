@@ -84,10 +84,13 @@ class PrismBlackBoxMDP:
             ``load_prism_program`` helper for arbitrary ``.pm`` files with
             undefined constants).
         state_variables:
-            Optional ordered list of program variable names to expose as the RL
-            state. Defaults to every variable (sorted), which is faithful but can
-            be large; project to the relevant variables to keep the Q-table
-            tractable. The ordering is fixed and used for ``current_state``.
+            Optional ordered list of coordinates to expose as the RL state. Each
+            entry is either a program **variable name** (``str``) or a **feature
+            callable** ``fn(full_state_dict) -> value`` computing a derived
+            feature (e.g. a bucketed count of currently-active flows). Defaults to
+            every variable (sorted), which is faithful but can be large; project
+            to the relevant coordinates to keep the Q-table tractable. The
+            ordering is fixed and used for ``current_state``.
         label_fn:
             Optional ``callable(state_dict, declared_labels) -> iterable[str]``
             returning the atomic propositions true in a state, where
@@ -205,7 +208,7 @@ class PrismBlackBoxMDP:
         self._full_state = full
         if self._var_order is None:
             self._var_order = sorted(full.keys())
-        self.current_state = [full[v] for v in self._var_order]
+        self.current_state = [v(full) if callable(v) else full[v] for v in self._var_order]
         declared = set(storm_labels)
         if self._label_fn is None:
             self._labels = list(declared)
@@ -231,8 +234,12 @@ class PrismBlackBoxMDP:
     # ------------------------------------------------------------------ #
     @property
     def state_variables(self):
-        """Ordered variable names corresponding to entries of ``current_state``."""
-        return list(self._var_order) if self._var_order is not None else None
+        """Ordered coordinate names corresponding to entries of ``current_state``
+        (feature callables are shown by their ``__name__``)."""
+        if self._var_order is None:
+            return None
+        return [v if isinstance(v, str) else getattr(v, "__name__", "feature")
+                for v in self._var_order]
 
     @property
     def full_state(self):

@@ -35,6 +35,34 @@ from src.netmdp.lcrl import (
     uniform_hazard_policy,
 )
 
+MMAX = 20  # sender slots in the incast models
+
+
+def resolve_state_vars(tokens, consts):
+    """Map --state-vars tokens to variable names or derived-feature callables.
+    Known features (bucketed to keep the tabular state small): `qo_bucketed`
+    (output-buffer occupancy // 4), `n_active_bucketed` (count of currently-active
+    flows, capped at 8), `Ftot` (number of backlogged uplink ports)."""
+    if not tokens:
+        return None
+    slen = consts["SLEN"]
+
+    def qo_bucketed(fs):
+        return fs["qo"] // 4
+
+    def n_active_bucketed(fs):
+        n = sum(1 for k in range(1, MMAX + 1)
+                if fs[f"on{k}"] == 1 and fs["slot"] - fs[f"t{k}"] < slen)
+        return min(n, 8)
+
+    def Ftot(fs):
+        return sum(1 for j in range(1, 11) if fs[f"q{j}"] > 0)
+
+    features = {"qo_bucketed": qo_bucketed,
+                "n_active_bucketed": n_active_bucketed,
+                "Ftot": Ftot}
+    return [features.get(t, t) for t in tokens]
+
 
 def run(consts, direction, episodes, mc, seed, state_vars, model):
     pm = os.path.join(MODEL_DIR, f"{model}.pm")
@@ -47,6 +75,7 @@ def run(consts, direction, episodes, mc, seed, state_vars, model):
         pm, prop_index=0, constants=consts, props_path=props, state_variables=state_vars
     )
     print(f"model={model} | corner={consts} | HORIZON={horizon} | iter_max={iter_max}")
+    print(f"state projection: {mdp.state_variables}")
     print(f"property: {prop.raw}  ->  LTL {prop.ltl}  | action_space {mdp.action_space}")
     print(f"LDBA: start {ldba.initial_automaton_state}, accepting {ldba.accepting_sets}, "
           f"epsilon {ldba.epsilon_transitions}")
@@ -111,10 +140,12 @@ def main():
     ap.add_argument("--mc", type=int, default=300, help="Monte-Carlo rollouts per policy")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--state-vars", default="slot,stage,odrops",
-                    help="comma-separated projected state variables (empty = full state)")
+                    help="comma-separated projected state coordinates (empty = full "
+                         "state). Besides program variables, these derived congestion "
+                         "features are available: qo_bucketed, n_active_bucketed, Ftot")
     a = ap.parse_args()
     consts = dict(BUF=a.BUF, THRESH=a.THRESH, M=a.M, WIN=a.WIN, SLEN=a.SLEN)
-    state_vars = [v for v in a.state_vars.split(",") if v] or None
+    state_vars = resolve_state_vars([v for v in a.state_vars.split(",") if v], consts)
     run(consts, a.direction, a.episodes, a.mc, a.seed, state_vars, a.model)
 
 

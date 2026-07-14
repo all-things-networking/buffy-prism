@@ -165,28 +165,47 @@ policy recovers it: greedy MC `P[Q] = 1.000` (sparse reward gave `0.00`).
   small fan-in incast loss *is* avoidable by spreading starts; whether
   `Pmin > 0` (loss unavoidable) at the case-study fan-in is the open question
   this model poses.
-- **Why RL does not yet synthesise `Pmin` (exploration + overestimation, not
-  credit assignment).** Tabular LCRL-min still returns a greedy policy with
-  `P[Q] = 1.0` on `incast_mdp_Pmin.pm`, despite exact `Pmin = 0`. The cause is
-  **not** reward delay: `value@s0` converges to ~0, so the "avoidance is
-  possible" signal *does* reach the initial state. It is a **value--policy gap**:
-  - **The incast-free schedule is rare.** A random policy already loses with
-    `P[Q] = 0.958` (uniform-hazard 0.978, always-start 1.0) -- only ~4% of
-    schedules avoid loss. ε-greedy seldom samples the narrow safe path, so its
-    Q-values stay poorly estimated.
-  - **Q-learning overestimates.** The `max` in the Bellman backup is biased
-    optimistically (toward 0 for the minimisation), so `value@s0` looks optimal
-    while the greedy policy, following overestimated Q-values, still incurs a
-    drop; the bias compounds over the long (`21×HORIZON`) horizon.
-  - This is direction-specific: **`Pmax` trains cleanly** (greedy `P[Q] = 1.0`),
-    confirming the model is RL-trainable; only the rare-optimum `Pmin` direction
-    fails.
+- **Why RL does not yet synthesise `Pmin`.** Tabular LCRL-min returns a greedy
+  policy with `P[Q] = 1.0` on `incast_mdp_Pmin.pm`, despite exact `Pmin = 0`.
+  Two regimes were investigated and they rule out the "obvious" causes:
+  - **Tiny instance** (`M=4, THRESH=1`, full state, exact `Pmin=0`): the
+    incast-free schedule is *rare* (random policy loses with `P[Q]=0.958`, only
+    ~4% avoid loss), and with optimistic initialisation `value@s0≈0` is a *false*
+    optimum -- for a minimisation, unexplored states look perfect, so the greedy
+    walks into unexplored territory (defaulting to `start`) and drops. Neither
+    **double Q-learning**, **smaller α**, nor **pessimistic init** (which makes
+    `value@s0=−1` *honest*) moves the greedy off `P[Q]=1.0`: **overestimation is
+    not the cause**.
+  - **Reasonable constants** (`M=16, WIN=96, SLEN=8, BUF=32, THRESH=8`; state
+    projected): LCRL-min gives `P[Q]=1.0`, *worse* than the uniform baseline's
+    `0.53`, for **every** projection tried -- `[slot,stage,odrops]`,
+    `+qo_bucketed`, `+qo_bucketed,n_active_bucketed`. The identical `1.0`
+    (`mean_odrops=8`, exactly always-start) reveals the mechanism: the
+    **deterministic greedy collapses to a synchronising extreme**. In the
+    forced-start model there are two ways to synchronise, both giving 8 drops --
+    *start everything ASAP* (coincide near slot 0) or *wait everything* (all hit
+    the `slot=WIN` deadline and are forced to start together). A deterministic
+    tabular policy makes ~one decision per `(slot, congestion)` state and drifts
+    to a pole; it cannot **stagger** senders across the window. Uniform's `0.53`
+    comes precisely from **stochastic** staggering, which a value-based greedy
+    (deterministic) cannot reproduce.
+  - So richer **state projection is necessary but not sufficient** (the congestion
+    features make a spread policy *representable* but the terminal-only reward
+    never *teaches* it), and the blocker is that staggering is not learnable from
+    a terminal reward. **`Pmax` trains cleanly** (`P[Q]=1.0`), so the model is
+    RL-trainable; only the stagger-requiring `Pmin` direction fails.
 
-  Fixes are on the *learner*, not the model: reduce overestimation (double
-  Q-learning, smaller/annealed learning rate), bias exploration toward spreading
-  starts, or -- last resort -- shape a per-slot reward on concurrency/queue
-  occupancy rather than only terminal drops. For the *value* of `Pmin`, exact
-  model checking / SMC is the reliable route (RL is weakest exactly here).
+  The indicated fix is therefore **per-slot reward shaping**: penalise congestion
+  (`qo` / number of active flows) *every slot* so that both poles are punished --
+  early synchronisation causes early congestion, late synchronisation a spike at
+  `WIN` -- pushing the learner toward a spread schedule, paired with the `qo` /
+  `n_active` projection (the enabling half). For the *value* of `Pmin`, exact
+  model checking / SMC remains the reliable route (RL is weakest exactly here).
+
+  State projections may include **derived congestion features**, not just program
+  variables: `PrismBlackBoxMDP` accepts callables in `state_variables`, and
+  `run_synthesis.py --state-vars` exposes `qo_bucketed`, `n_active_bucketed`, and
+  `Ftot` (see `resolve_state_vars`).
 
 **Bottom line.** LCRL on the MDP recreates the case-study `P[Q]` where the
 scheduler is forced (it recovers `Pmax = 1.0`, and `uniform_hazard` reproduces
