@@ -103,14 +103,17 @@ mid-probability box-P points need ~10^8 samples for that width, so use
 `simwidth ≈ 0.01` there.
 
 ## Validation (PRISM simulation vs oracle)
-Corners, `BUF=32, THRESH=8`. Oracle values (n=120k, ±~0.004); PRISM
-cross-check at `simwidth=0.01` (box E at `0.001`) is consistent within CI, as
-throughout this repo.
+Corners, `BUF=32, THRESH=8`. Oracle values (n=120k, ±~0.004); PRISM at
+`simwidth=0.01` (box E at `0.001`), 99% confidence. They agree within CI.
 
-| box corner | point | oracle | PRISM |
+| box corner | point | oracle | PRISM (±CI) |
 |---|---|---|---|
-| P1 max | `M=16, WIN=96, SLEN=8`  | 0.536 | _pending_ |
-| P1 min | `M=16, WIN=120, SLEN=8` | 0.142 | _pending_ |
-| P2 max | `M=16, WIN=116, SLEN=9` | 0.550 | _pending_ |
-| P2 min | `M=16, WIN=124, SLEN=8` | 0.115 | _pending_ |
-| E  min | `M=20, WIN=24, SLEN=8`  | 1.000 | _pending_ |
+| P1 max | `M=16, WIN=96, SLEN=8`  | 0.536 | 0.541 ± 0.01 |
+| P1 min | `M=16, WIN=120, SLEN=8` | 0.142 | 0.145 ± 0.01 |
+| P2 max | `M=16, WIN=116, SLEN=9` | 0.550 | 0.545 ± 0.01 |
+| P2 min | `M=16, WIN=124, SLEN=8` | 0.115 | 0.120 ± 0.01 |
+| E  min | `M=20, WIN=24, SLEN=8`  | 1.000 | 1.000 ± 0.001 |
+
+These are the box corners; by monotonicity (increasing in `M`, `SLEN`,
+decreasing in `WIN`) they bound every interior point, so each box is certified
+as a whole: P1/P2 lie entirely in `[0.12, 0.55]`, E is `1.0` throughout.
