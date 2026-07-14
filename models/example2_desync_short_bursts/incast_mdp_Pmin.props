@@ -33,3 +33,8 @@ P=? [ F ("done" & idrops>=THRESH) ]
 
 // (3) is the bad event likely under the current (point) assumption?
 P>=0.5 [ F ("done" & odrops>=THRESH) ]
+
+// (4) SAFE complement: reach the end of the run with fewer than THRESH output
+//     drops. Pmax of this = 1 - Pmin[Q], so LCRL maximising this LTL property
+//     synthesises the loss-AVOIDING scheduler (the native route to Pmin).
+P=? [ F ("done" & odrops<THRESH) ]

@@ -31,17 +31,42 @@ from lcrl.core.lcrl_core import LCRL
 
 
 class ShapedLCRL(LCRL):
-    def __init__(self, *args, scale=1.0, reward_var="odrops", sign=1, **kwargs):
+    def __init__(self, *args, scale=1.0, reward_var="odrops", sign=1,
+                 drop_weight=1.0, ltl_weight=0.0,
+                 congestion_fn=None, congestion_weight=0.0, congestion_per_slot=True,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         self._scale = scale
         self._reward_var = reward_var
         self._sign = sign
+        # ``drop_weight`` scales the dense delta-reward on ``reward_var``;
+        # ``ltl_weight`` re-adds LCRL's native +1-at-the-accepting-state reward.
+        # For the *maximise-a-property* framing (e.g. Pmin via the safe complement
+        # F(done & odrops<THRESH)) set ltl_weight=1: returns then lie in [0,1], so
+        # the default Q_init=0 is the WORST value and the greedy prefers proven
+        # paths -- avoiding the optimistic-init pathology of reward-minimisation.
+        self._drop_weight = drop_weight
+        self._ltl_weight = ltl_weight
+        # Optional congestion penalty (subtracted) to keep congestion low. Applied
+        # once per slot (``congestion_per_slot=True``, at the service step -- for
+        # output signals like ``qo`` that only update there) or every substage
+        # (``False`` -- for ``n_active``, which changes as each sender starts).
+        self._congestion_fn = congestion_fn
+        self._congestion_weight = congestion_weight
+        self._congestion_per_slot = congestion_per_slot
 
     def reward(self, reward_flag):
+        r = self._ltl_weight * (1.0 if reward_flag > 0 else 0.0)
         cur, prev = self.MDP.full_state, self.MDP.prev_full_state
         if cur is None or prev is None:
-            return 0.0
-        return self._sign * (cur[self._reward_var] - prev[self._reward_var]) / self._scale
+            return r
+        if self._drop_weight:
+            r += self._drop_weight * self._sign * \
+                (cur[self._reward_var] - prev[self._reward_var]) / self._scale
+        if self._congestion_fn is not None:
+            if not self._congestion_per_slot or cur["slot"] != prev["slot"]:
+                r -= self._congestion_weight * self._congestion_fn(cur)
+        return r
 
 
 def greedy_action(agent, mdp, ldba):

@@ -195,17 +195,47 @@ policy recovers it: greedy MC `P[Q] = 1.000` (sparse reward gave `0.00`).
     a terminal reward. **`Pmax` trains cleanly** (`P[Q]=1.0`), so the model is
     RL-trainable; only the stagger-requiring `Pmin` direction fails.
 
-  The indicated fix is therefore **per-slot reward shaping**: penalise congestion
-  (`qo` / number of active flows) *every slot* so that both poles are punished --
-  early synchronisation causes early congestion, late synchronisation a spike at
-  `WIN` -- pushing the learner toward a spread schedule, paired with the `qo` /
-  `n_active` projection (the enabling half). For the *value* of `Pmin`, exact
-  model checking / SMC remains the reliable route (RL is weakest exactly here).
+  Per-slot / per-substage congestion **reward shaping** was tried (penalise `qo`
+  per slot; penalise `n_active` per substage, linear and convex), across weights
+  and with pessimistic Q-initialisation. **None moved `P[Q]` off `1.0`.** Worse,
+  with the minimisation framing the shaping is *counter-productive*: it drives
+  explored (congested) states more negative than the optimistic `Q_init=0`, so
+  the greedy flees to unexplored states even harder (`value@s0` fell to `−29`
+  while `P[Q]` stayed `1.0`). State projections may include **derived congestion
+  features** (`PrismBlackBoxMDP` accepts callables in `state_variables`;
+  `run_synthesis.py --state-vars` exposes `qo_bucketed`, `n_active_bucketed`,
+  `Ftot`), but no projection helped.
 
-  State projections may include **derived congestion features**, not just program
-  variables: `PrismBlackBoxMDP` accepts callables in `state_variables`, and
-  `run_synthesis.py --state-vars` exposes `qo_bucketed`, `n_active_bucketed`, and
-  `Ftot` (see `resolve_state_vars`).
+- **The real cause was the *framing*, not the learner: `Pmin` is LTL
+  *maximisation* of the complement.** All of the above minimised a `−Δodrops`
+  reward. That is self-sabotaging: for a minimisation the returns lie in
+  `[−1, 0]`, so the default `Q_init=0` is the *best* possible value — unexplored
+  states look optimal, so the greedy `argmax` flees into unexplored territory
+  (defaulting to `start`) and synchronises; every congestion penalty makes
+  explored states look worse and *strengthens* the flight. LCRL is not built to
+  minimise a reward — it **maximises the probability of satisfying an LTL
+  property**. The native route to `Pmin` is the complement:
+
+      Pmin[F(done & odrops>=THRESH)] = 1 − Pmax[F(done & odrops<THRESH)]
+
+  i.e. run LCRL on `φ_safe = F("done" & odrops<THRESH)` with its own
+  `+1`-at-the-accepting-state reward. Now returns lie in `[0, 1]`, so `Q_init=0`
+  is the *worst* value — unexplored looks bad and the greedy prefers *proven-safe*
+  paths. **The optimistic-init pathology does not arise.** Two clarifications:
+  - **A deterministic optimum exists.** For MDPs and ω-regular objectives there is
+    always an optimal *deterministic* (memoryless-over-the-product) policy; exact
+    checking finds a deterministic scheduler achieving `Pmin=0` at small scale. So
+    the uniform-beats-learned gap (0.53 vs 1.0) is a *learning* failure, not proof
+    that a stochastic policy is required.
+  - **What is genuinely general** (not LCRL-specific): exploration of the safe
+    trajectory (regime-dependent — rare ~4% at `THRESH=1`, common ~47% at the
+    `THRESH=8` corner, where native LCRL on `φ_safe` should work) and state
+    abstraction at scale (a lossy projection may not represent the optimum). These
+    are ordinary RL costs, and exactly where a *learned, generalising* policy is
+    meant to beat exact/SMC, which cannot scale. So the `Pmin` difficulty is
+    **primarily a framing error corrected by `φ_safe`-maximisation**, with the
+    usual RL exploration/abstraction costs remaining — not a fundamental LCRL
+    limitation.
 
 **Bottom line.** LCRL on the MDP recreates the case-study `P[Q]` where the
 scheduler is forced (it recovers `Pmax = 1.0`, and `uniform_hazard` reproduces
