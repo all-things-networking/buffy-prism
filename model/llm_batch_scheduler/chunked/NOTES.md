@@ -16,10 +16,21 @@ conditions `C` on the request pattern; the conditional is the ratio.
 
 Run: `source ~/buffy-prism-tools/env.sh && ./run_study.sh`.
 
-## Main result: prompt length is irrelevant; output length drives stalls
+## Main result: output length dominates; prompt length is the weaker, and visible, factor
 
-Set `CHUNK_BLK >= LP` so a long prompt still prefills in about one iteration
-(realistic: a prefill chunk holds far more tokens than a typical prompt).
+> **Correction (see `REGIONS.md`).** An earlier phrasing said prompt length is
+> *irrelevant*. That is true only in the **single-chunk** special case below
+> (`CHUNK_BLK >= LP`, i.e. a prompt that fits in one prefill chunk). For **realistic
+> multi-chunk** long-context prompts (a prompt spanning several 512-token chunks), prompt
+> length is **not** irrelevant — but a long **output** request still harms interactive
+> latency **~2–4× more** than a long-context prompt request (it holds its slot ~33 vs. ~5
+> iterations), and output is the half the scheduler cannot see at admission. The corrected,
+> realistic analysis and the mild/obvious regions are in `REGIONS.md`.
+
+### Single-chunk special case (exact invariance)
+
+Set `CHUNK_BLK >= LP` so a long prompt prefills in about one iteration (true only for
+short prompts, ≲ one 512-token chunk).
 Sweep `P(stall)` over the long-prompt fraction `p_lp` and the long-output
 fraction `p_ol` (`N_SLOTS=1`, `p_arr=0.8`):
 
@@ -40,15 +51,16 @@ request's queueing delay is set by how long incumbents hold their slots, which i
 their output length, not their prompt length.
 
 **Why this matters.** The common expectation is that long-context (long-prompt)
-requests threaten interactive latency. Under chunked prefill they do not. The
-driver is output length, which the scheduler cannot observe at admission (see
-`../SCHEDULING_PRIMER.md`). So admission, routing, or prioritization based on
-prompt length targets a variable that does not control the stall; controlling it
-requires predicting output length.
+requests are the main threat to interactive latency. Under chunked prefill that threat is
+much smaller than expected: a long **output** request is the ~2–4× larger driver, and it
+is the one feature the scheduler cannot observe at admission (see `../SCHEDULING_PRIMER.md`).
+So admission, routing, or prioritization based on prompt length (the visible feature)
+targets the weaker factor; controlling the stall requires predicting output length.
 
-If a prompt spans multiple prefill chunks (`CHUNK_BLK < LP`), prompt length
-re-enters in proportion to the number of chunks it spans, but output length still
-dominates. This is quantified at scale in `VALIDATION.md`.
+For **realistic multi-chunk** prompts the per-request comparison, the sharp-vs-gradual
+structure, and the certified mild/obvious **regions** (in the `example3` style) are in
+`REGIONS.md`, on the realistic model `scheduler_mc.pm`. The single-chunk invariance above
+is the limiting case; `VALIDATION.md` covers the multi-chunk scaling.
 
 ## Paper assumption (monotone parameter box)
 
