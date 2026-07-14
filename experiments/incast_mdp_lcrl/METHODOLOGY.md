@@ -1,5 +1,9 @@
 # LCRL policy synthesis on the incast MDP — methodology
 
+> New to this project? Read **`experiments/README.md`** first — setup, the
+> pipeline, how to run each study, and a prioritised list of what to try next.
+> This file is the detailed evidence behind those findings.
+
 Can [LCRL](https://github.com/grockious/lcrl) (Logically-Constrained
 Reinforcement Learning), applied to the **MDP** model
 `models/example2_desync_short_bursts/incast_mdp.pm` and the LTL specification in

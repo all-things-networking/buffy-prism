@@ -85,13 +85,27 @@ fqcodel.props   Q = F(time=14 & iq5_deqs_bl>3) [maximise], plus the fairness com
 NOTES.md        this file
 ```
 
-## How to run (once ready)
-The synthesis reuses the LCRL pipeline. Maximise the bad event (worst-case
-traffic); the dense-reward variant helps over the ~224-step horizon:
+## How to run
+```
+PYTHONPATH=. .venv/bin/python experiments/example3_fqcodel/run_fqcodel.py
+```
+It maximises Q (native +1-at-accepting reward + dense +Δiq5_deqs_bl) and prints
+the over-service profile `P[iq5_deqs_bl>t]` for the learned greedy vs random.
 
-```
-PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py \
-    --model fqcodel --state-vars <projection> --direction max ...
-```
-(The runner currently resolves models under `models/example2_desync_short_bursts/`;
-point it at this directory, or add a small example-3 driver, when running.)
+## Status / how to continue
+Current result: with the projection `[time, stage, iq5_deqs_bl]` — and even a
+richer one adding `iqs_bl`, `iq5_contents`, `iq5_new_rank`, `iq5_old_rank` at
+6000 episodes — LCRL does **not** yet synthesise the worst-case: it reaches
+`P[>3]=0` and a mean *below* random (~2.0 vs ~2.5). Over-service is rare and needs
+precise multi-step control the tabular greedy cannot capture. Next steps
+(see `experiments/README.md` §5 for the general playbook):
+1. **Find a witness first.** A directed/beam search over the simulator
+   (`s._get_current_state()` + `s.restart(state)` to save/restore) confirms `>3`
+   is reachable and yields a concrete offending traffic trace; use it to sanity-
+   check the property and to warm-start RL.
+2. **Expose the scheduling state the policy must control** — richer/less-lossy
+   features around FQ-CoDel's new/old lists and ranks (what decides *who* is
+   dequeued under contention), and the per-flow contents; iterate until the
+   learned greedy beats the random baseline's mean.
+3. If the tabular projection stays insufficient, move to **function
+   approximation** (LCRL `train_nfq`) so the policy can generalise.
