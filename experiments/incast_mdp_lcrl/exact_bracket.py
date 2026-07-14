@@ -16,28 +16,33 @@ import stormpy
 from src.netmdp.prism_utils.prism_utils import load_prism_program
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-MDP = os.path.join(REPO, "models", "example2_desync_short_bursts", "incast_mdp.pm")
+MODEL_DIR = os.path.join(REPO, "models", "example2_desync_short_bursts")
 
 
-def exact_bracket(consts):
-    prog = load_prism_program(MDP, consts)
+def exact_bracket(model, consts):
+    prog = load_prism_program(os.path.join(MODEL_DIR, f"{model}.pm"), consts)
     out = {}
     for direction in ("Pmax", "Pmin"):
         props = stormpy.parse_properties(
             f'{direction}=? [ F ("done" & odrops>=THRESH) ]', prog
         )
         opts = stormpy.BuilderOptions([p.raw_formula for p in props])
-        model = stormpy.build_sparse_model_with_options(prog, opts)
-        result = stormpy.model_checking(model, props[0])
-        out[direction] = result.at(model.initial_states[0])
-        out["states"] = model.nr_states
+        model_ = stormpy.build_sparse_model_with_options(prog, opts)
+        result = stormpy.model_checking(model_, props[0])
+        out[direction] = result.at(model_.initial_states[0])
+        out["states"] = model_.nr_states
     return out
 
 
 if __name__ == "__main__":
-    for consts in [
-        dict(M=4, WIN=1, SLEN=1, BUF=1, THRESH=1),
-        dict(M=4, WIN=2, SLEN=2, BUF=2, THRESH=2),
-    ]:
-        r = exact_bracket(consts)
-        print(f"{consts}: Pmax={r['Pmax']}  Pmin={r['Pmin']}  states={r['states']}")
+    # incast_mdp: per-slot start choice. Pmin=0 is degenerate (never-send).
+    # incast_pmin_mdp: forced-start scheduling. Pmin=0 means loss is avoidable
+    # by spreading starts WHILE all senders still send (physically meaningful).
+    for model in ("incast_mdp", "incast_pmin_mdp"):
+        print(f"# {model}")
+        for consts in [
+            dict(M=4, WIN=1, SLEN=1, BUF=1, THRESH=1),
+            dict(M=4, WIN=2, SLEN=2, BUF=2, THRESH=2),
+        ]:
+            r = exact_bracket(model, consts)
+            print(f"  {consts}: Pmax={r['Pmax']}  Pmin={r['Pmin']}  states={r['states']}")

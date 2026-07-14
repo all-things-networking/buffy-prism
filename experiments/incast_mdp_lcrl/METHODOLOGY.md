@@ -148,16 +148,30 @@ policy recovers it: greedy MC `P[Q] = 1.000` (sparse reward gave `0.00`).
   distribution" that `HANDOFF.md` proposed as the MDP next step). At **M=20** the
   corner is *saturated*: uniform, worst-case, and always-start all give `1.0`, so
   LCRL recreates the result trivially but the bracket collapses.
-- **`Pmin` and a modelling caveat.** The loss-avoiding direction
-  (`--direction min`) is reproducible but, as the model stands, `Pmin ≈ 0`
-  *degenerately*: a waiting sender may wait through the whole window and then
-  (once `slot > WIN`) can never start, so a scheduler can avoid all drops by
-  simply **not sending**. `run_synthesis.py --direction min` reports
-  `mean_senders_started`; if it is ≈ 0 the "avoidance" is this non-physical
-  never-send schedule. A meaningful `Pmin` (loss avoidable *while still sending
-  all traffic*) requires a model constraint that every one of the `M` senders
-  starts within the window. Small-instance exact `Pmin = 0.0` is consistent with
-  this.
+- **`Pmin` and the forced-start model.** In `incast_mdp.pm` the loss-avoiding
+  direction (`--direction min`) hits `Pmin ≈ 0` *degenerately*: a waiting sender
+  may wait through the whole window and then (once `slot > WIN`) never start, so
+  a scheduler avoids all drops by simply **not sending** (`run_synthesis.py
+  --direction min` prints `mean_senders_started` -- ≈ 0 flags this). To make
+  `Pmin` physical, **`incast_pmin_mdp.pm`** moves start-time selection into an
+  initial nondeterministic phase: each in-fan-out sender's start slot `t_k` is
+  chosen in `[0..WIN]` (via an increment-or-commit idiom) and the sender is
+  *forced* to start (`on_k=1`); the run (`mode=1`) is then a deterministic
+  per-slot service. Now `Pmin` = best-case schedule **with all `M` senders
+  sending**. Exact checking on small instances confirms it is well-formed:
+  `Pmax = 1.0`, `Pmin = 0.0`, `max_actions = 2`, and every rollout starts all
+  `M` senders. So at small fan-in incast loss *is* avoidable by spreading
+  starts; whether `Pmin > 0` (loss unavoidable) at the case-study fan-in is the
+  open question this model poses.
+- **RL caveat for `Pmin`.** The dense `Δodrops` reward densifies the *run*, but
+  in `incast_pmin_mdp.pm` the scheduling decisions are in the *init* phase where
+  `odrops = 0`, so their reward is delayed to the run -- a long credit-assignment
+  chain. Tabular LCRL does not yet reliably synthesise the `Pmin` schedule (the
+  learned value looks optimal while the greedy policy does not execute it, even
+  with full state), and the projection must at least expose the committed `t_k`
+  for the scheduler to coordinate. Converging `Pmin` (init-phase reward shaping,
+  richer state, or function approximation) is future work; the model itself is
+  exact-checkable ground truth.
 
 **Bottom line.** LCRL on the MDP recreates the case-study `P[Q]` where the
 scheduler is forced (it recovers `Pmax = 1.0`, and `uniform_hazard` reproduces
@@ -185,9 +199,12 @@ PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py \
 # saturated corner:
 PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py --M 20
 
-# loss-avoiding scheduler (Pmin) + senders-started diagnostic:
+# loss-avoiding scheduler (Pmin) on the forced-start model (all senders send):
 PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/run_synthesis.py \
-    --M 16 --direction min
+    --model incast_pmin_mdp --M 16 --direction min --state-vars mode,istage,slot,odrops
+
+# regenerate the forced-start model from incast_mdp.pm:
+PYTHONPATH=. .venv/bin/python experiments/incast_mdp_lcrl/gen_pmin_model.py
 ```
 
 Runtime is a few minutes per corner (≈1200 episodes × ~5000 micro-steps, then
@@ -199,6 +216,8 @@ Runtime is a few minutes per corner (≈1200 episodes × ~5000 micro-steps, then
 | file | role |
 |---|---|
 | `src/netmdp/lcrl/shaped.py` | `ShapedLCRL` (dense reward), `mc_evaluate`, `greedy_action`, `uniform_hazard_policy` |
-| `run_synthesis.py` | train + MC-evaluate a corner (`--direction max`/`min`) |
+| `run_synthesis.py` | train + MC-evaluate a corner (`--model`, `--direction max`/`min`) |
 | `dtmc_reference.py` | DTMC `P[Q]` at the corners (uniform start) |
-| `exact_bracket.py` | exact `Pmax`/`Pmin` on small instances (StormPy) |
+| `exact_bracket.py` | exact `Pmax`/`Pmin` on small instances, both models (StormPy) |
+| `gen_pmin_model.py` | generate `incast_pmin_mdp.pm` from `incast_mdp.pm` |
+| `models/.../incast_pmin_mdp.pm` `.props` | forced-start MDP for a physical `Pmin` |

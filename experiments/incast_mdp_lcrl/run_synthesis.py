@@ -25,8 +25,7 @@ import statistics
 import time
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PM = os.path.join(REPO, "models", "example2_desync_short_bursts", "incast_mdp.pm")
-PROPS = os.path.join(REPO, "models", "example2_desync_short_bursts", "incast_mdp.props")
+MODEL_DIR = os.path.join(REPO, "models", "example2_desync_short_bursts")
 
 from src.netmdp.lcrl import (
     ShapedLCRL,
@@ -37,15 +36,17 @@ from src.netmdp.lcrl import (
 )
 
 
-def run(consts, direction, episodes, mc, seed, state_vars):
+def run(consts, direction, episodes, mc, seed, state_vars, model):
+    pm = os.path.join(MODEL_DIR, f"{model}.pm")
+    props = os.path.join(MODEL_DIR, f"{model}.props")
     horizon = consts["WIN"] + consts["M"] * consts["SLEN"] + consts["SLEN"]
     iter_max = 21 * (horizon + 4)  # (MMAX+1) substages per slot, + slack to reach "done"
     random.seed(seed)
 
     mdp, ldba, prop = build_mdp_and_ldba(
-        PM, prop_index=0, constants=consts, props_path=PROPS, state_variables=state_vars
+        pm, prop_index=0, constants=consts, props_path=props, state_variables=state_vars
     )
-    print(f"corner={consts} | HORIZON={horizon} | iter_max={iter_max}")
+    print(f"model={model} | corner={consts} | HORIZON={horizon} | iter_max={iter_max}")
     print(f"property: {prop.raw}  ->  LTL {prop.ltl}  | action_space {mdp.action_space}")
     print(f"LDBA: start {ldba.initial_automaton_state}, accepting {ldba.accepting_sets}, "
           f"epsilon {ldba.epsilon_transitions}")
@@ -101,15 +102,20 @@ def main():
     ap.add_argument("--THRESH", type=int, default=8)
     ap.add_argument("--direction", choices=["max", "min"], default="max",
                     help="max = worst-case (Pmax) scheduler; min = loss-avoiding (Pmin)")
+    ap.add_argument("--model", default="incast_mdp",
+                    help="model base name in models/example2_desync_short_bursts/ "
+                         "(incast_mdp = per-slot start choice; incast_pmin_mdp = "
+                         "forced-start scheduling variant for a physical Pmin)")
     ap.add_argument("--episodes", type=int, default=1200)
     ap.add_argument("--mc", type=int, default=300, help="Monte-Carlo rollouts per policy")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--state-vars", default="slot,stage,odrops",
-                    help="comma-separated projected state variables (empty = full state)")
+                    help="comma-separated projected state variables (empty = full state); "
+                         "for incast_pmin_mdp use e.g. mode,istage,slot,odrops")
     a = ap.parse_args()
     consts = dict(BUF=a.BUF, THRESH=a.THRESH, M=a.M, WIN=a.WIN, SLEN=a.SLEN)
     state_vars = [v for v in a.state_vars.split(",") if v] or None
-    run(consts, a.direction, a.episodes, a.mc, a.seed, state_vars)
+    run(consts, a.direction, a.episodes, a.mc, a.seed, state_vars, a.model)
 
 
 if __name__ == "__main__":
