@@ -5,6 +5,33 @@ import stormpy
 from stormpy import PrismProgram
 
 
+def load_prism_program(path: str, constants=None) -> PrismProgram:
+    """Parse a PRISM model file and instantiate any undefined constants.
+
+    Works for an *arbitrary* ``.pm`` file. ``constants`` supplies values for the
+    model's undefined constants and may be either a ``dict`` (e.g.
+    ``{"M": 16, "WIN": 96}``) or a PRISM-style string (``"M=16,WIN=96"``). If the
+    model has no undefined constants, ``constants`` may be omitted.
+
+    Returns a fully-instantiated ``PrismProgram`` ready to hand to a simulator.
+    """
+    program = stormpy.parse_prism_program(path)
+    if constants:
+        if isinstance(constants, dict):
+            constants = ",".join(f"{k}={v}" for k, v in constants.items())
+        description = stormpy.SymbolicModelDescription(program)
+        constant_map = description.parse_constant_definitions(constants)
+        program = description.instantiate_constants(constant_map).as_prism_program()
+
+    undefined = [c.name for c in program.constants if not c.defined]
+    if undefined:
+        raise ValueError(
+            f"PRISM model '{path}' still has undefined constants after "
+            f"instantiation: {undefined}. Provide them via `constants`."
+        )
+    return program
+
+
 def build_prism_program_from_trace(prism_program, trace_name, trace, trace_len: int) -> PrismProgram:
     commands = []
     variables = dict()
