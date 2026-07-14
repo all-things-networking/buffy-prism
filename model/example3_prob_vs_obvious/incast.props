@@ -1,0 +1,10 @@
+// Queries for the probabilistic-vs-obvious boxes (example 3). Same model family
+// as example 2 (all uplinks, MPP=2), generated with MMAX=24 so the extreme box
+// (M up to 24 = 12 uplinks) fits. M=16 gives identical results to the MMAX=20
+// model (idle uplinks never start). Bad event Q: >= THRESH output drops.
+//
+// See NOTES.md for the three boxes and their sweeps. Path length must exceed
+// (MMAX+1)*HORIZON; use -simpathlen 8500.
+P=? [ F ("done" & odrops>=THRESH) ]
+P=? [ F ("done" & idrops>=THRESH) ]
+P>=0.5 [ F ("done" & odrops>=THRESH) ]
