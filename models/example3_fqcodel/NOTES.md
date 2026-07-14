@@ -23,13 +23,15 @@ packet arrivals / the FQ-CoDel record it produces). It is adapted from
 
 ## The bad event and the specification
 `iq5_deqs_bl` counts how many times flow 5 is dequeued *while all other input
-queues are backlogged* — its share of service under contention. The correctness
-expectation FQ-CoDel should meet is **fairness**: a backlogged flow 5 should be
-served, i.e. by end of run `iq5_deqs_bl >= 4`. The **bug** lets adversarial
-traffic starve flow 5. As an (unbounded) LTL property, the bad event is
+queues are backlogged* — its share of the output under contention. The
+correctness expectation FQ-CoDel should meet is **fairness**: no flow hogs the
+link, i.e. by end of run `iq5_deqs_bl <= 3`. The **bug** lets adversarial traffic
+make FQ-CoDel **over-serve flow 5** — dequeue it more than 3 times while the
+other queues are backlogged — so flow 5 hogs the output and **flows 1–4 starve**.
+As an (unbounded) LTL property, the bad event is
 
 ```
-Q  =  F (time=14 & iq5_deqs_bl < 4)          // flow 5 starved by end of run
+Q  =  F (time=14 & iq5_deqs_bl > 3)          // flow 5 over-served -> flows 1-4 starved
 ```
 
 `time=14` (= `TIME_STEPS`) marks end of run. It is written as a state predicate
@@ -37,10 +39,10 @@ rather than the `done` label because StormPy's program-level **simulator** does
 not report this model's declared label (a relational atom is evaluated directly
 from the state, and still works for exact model checking); the `done` label is
 kept in the `.pm` for reference. `iq5_deqs_bl` is monotone, so `Q` equals
-"`iq5_deqs_bl` never reaches 4" — flow 5 starved throughout. The fairness spec is
-the complement `F(time=14 & iq5_deqs_bl>=4)`; the bug is exactly its violation.
+"`iq5_deqs_bl` eventually exceeds 4". The fairness spec is the complement
+`F(time=14 & iq5_deqs_bl<=3)`; the bug is exactly its violation.
 Verified: the derived LDBA reaches its accepting state **iff** the run ends with
-`iq5_deqs_bl<4`.
+`iq5_deqs_bl>3`.
 
 ## The study
 **Train LCRL to MAXIMISE `P[Q]`.** Because the nondeterminism is the traffic,
@@ -56,24 +58,30 @@ the incast `Pmax` (worst-case incast) study, and a contrast to the incast `Pmin`
 (loss-*avoidance*) direction, which is hard for value-based RL.
 
 ## What is known so far
-- The model is a well-formed MDP (max 5 nondeterministic actions), terminates at
-  `done` (200/200 random rollouts, ~216–233 simulator micro-steps ≈ 14×16), and
-  the bad event is genuinely reachable — under **random** traffic flow 5 is
-  starved in **199/200** rollouts, so starvation is pervasive and `Pmax[Q]` is
-  high (worst-case traffic starves flow 5 essentially always).
-- Because the bad event is common under random traffic, the *value* `Pmax[Q]` is
-  not the interesting output — the **policy** is. The `iq5_deqs_bl<4` threshold
-  controls difficulty: a smaller threshold makes starvation rarer and the
-  worst-case traffic more discriminating; `<4` matches the case study.
+- The model is a well-formed MDP (max 5 nondeterministic actions) and terminates
+  at end of run (200/200 random rollouts, ~216–233 simulator micro-steps ≈
+  14×16).
+- **The bad event is rare but reachable.** `iq5_deqs_bl` increments at most once
+  per dequeue-cycle (≤ 14 total), so over-serving flow 5 requires *sustained*
+  adversarial traffic that keeps flows 1–4 backlogged while flow 5 is repeatedly
+  served. Under **random** traffic the final count is heavily 2–3 and **caps at 4**
+  (`{1:5, 2:1078, 3:916, 4:1}` over 2200 rollouts) — `iq5_deqs_bl>3` occurs ~1 in
+  2200, i.e. `Pmax[Q]` is small under random. This makes the worst-case a
+  genuinely **non-obvious** traffic pattern LCRL must discover (unlike a saturated
+  event) — the point of the study.
+- **State abstraction matters.** A deterministic policy over `[time, stage,
+  iq5_deqs_bl]` cannot engineer the queue backlog needed to over-serve flow 5 (it
+  does *worse* than random). The projection must expose the scheduling state — e.g.
+  whether all of flows 1–4 are backlogged, and flow 5's queue contents / FQ-CoDel
+  ranks — so the policy can control when flow 5 is dequeued under contention.
 - `Pmin[Q] = 1 - Pmax[fairness]` answers the dual, harder question — *can a
-  scheduler protect flow 5?* — and is the loss-avoidance direction (see the
-  incast `Pmin` discussion for why that direction is hard for value-based RL and
-  should be framed as maximising the fairness complement).
+  scheduler always keep flow 5 fair?* — the loss-avoidance direction (see the
+  incast `Pmin` discussion for why value-based RL struggles there).
 
 ## Files
 ```
 fqcodel.pm      buggy FQ-CoDel MDP + done label + terminal self-loop
-fqcodel.props   Q = F(done & iq5_deqs_bl<4) [maximise], plus the fairness complement
+fqcodel.props   Q = F(time=14 & iq5_deqs_bl>3) [maximise], plus the fairness complement
 NOTES.md        this file
 ```
 
