@@ -175,29 +175,38 @@ A_E' ≡ (N_SLOTS ∈ [8,12]) ∧ (λ ∈ [0.5,0.7]) ∧ (p_ol ∈ [0.5,0.7])   
 (The provable version — `P = 1` by exact model checking, workload-independent — is the small-
 model box `A_E` above.) Opposite extreme: `N_SLOTS ≥ 28` → `P ≤ 0.05`; `p_ol ≤ 0.22` → `P ≤ 0.06` (never).
 
-## Mild boxes (probabilistic, non-obvious) — every point a coin-flip
+## Mild box (probabilistic, non-obvious) — every point a coin-flip
 
-Both range a variable no one controls well, hold prompt fraction **free** (it barely
-matters, ≤0.05 swing), and are monotone so the corners certify the interior:
+A single box ranging **all three** input axes at once — provisioning (`N_SLOTS`, the knob
+operators can't set well), the **invisible** long-output fraction (`p_ol`), and the prompt
+fraction (`p_lp`, free). Monotone (↓ in `N_SLOTS`, ↑ in `p_ol`, weakly ↑ in `p_lp`), so the
+two extreme corners certify the whole box:
 
 ```
-Workload box (ranges the INVISIBLE long-output fraction):
-  A_w  ≡ (N_SLOTS = 22) ∧ (p_ol ∈ [0.26, 0.34]) ∧ (p_lp ∈ [0,1])   →  P(stall) ∈ [0.17, 0.54]
-
-Config box (ranges the PROVISIONING knob operators can't set well; per review note 3):
-  A_cfg ≡ (N_SLOTS ∈ [20, 24]) ∧ (p_ol = 0.3) ∧ (p_lp ∈ [0,1])     →  P(stall) ∈ [0.19, 0.56]
+A_mild ≡ (N_SLOTS ∈ [20,24]) ∧ (p_ol ∈ [0.28,0.32]) ∧ (p_lp ∈ [0,1])   →   P(stall) ∈ [0.12, 0.66]
 ```
 
-Corners: `A_w` min `(p_ol=0.26)=0.17`, max `(p_ol=0.34)=0.54`; `A_cfg` min `(N=24,p_lp=.9)=0.23`,
-max `(N=20,p_lp=.9)=0.56` (min over the box `(N=24,p_lp=.1)=0.19`). No point rare, no point
-certain. The outcome is set by provisioning and the **long-output fraction the scheduler
-cannot observe at admission**; the visible feature (prompt length) does not move it.
+Corners: min `(N=24, p_ol=0.28, p_lp=0) = 0.123`, max `(N=20, p_ol=0.32, p_lp=1) = 0.656`.
+Five provisioning values × a ranged output fraction × a free prompt fraction — **no point
+rare, no point certain.** Prompt fraction moves it only ~0.04 (multi-chunk prefill adds a
+little slot time); the outcome is set by provisioning and the **long-output fraction the
+scheduler cannot observe at admission**. Grid interior (`p_lp=0.3`):
+
+|       | p_ol=0.28 | 0.30 | 0.32 |
+|---|---|---|---|
+| **N=20** | 0.418 | 0.517 | 0.619 |
+| **N=21** | 0.331 | 0.431 | 0.535 |
+| **N=22** | 0.250 | 0.345 | 0.443 |
+| **N=23** | 0.192 | 0.272 | 0.353 |
+| **N=24** | 0.132 | 0.19  | 0.25  |
+
+(Tighten `p_ol` to `[0.28,0.30]` for a narrower `[0.12, 0.52]` band if preferred.)
 
 ## The contrast, at realistic scale
 
 A 100%/reachability method certifies only the certain corners — `A_E`/`A_E'` (saturated,
 under-provisioned, output-heavy → always) and `N_SLOTS ≥ 28` (never). The realistic operating
 regime — batch width at the knee (20–24) with a moderate, partly-invisible output-length mix —
-has no certain answer, and is exactly the mild box, where
-`P(stall | A) ∈ [0.17, 0.56]` is the actionable answer, and it points at the output-length
+has no certain answer, and is exactly the mild box `A_mild`, where
+`P(stall | A_mild) ∈ [0.12, 0.66]` is the actionable answer, and it points at the output-length
 distribution as the lever, not prompt length.

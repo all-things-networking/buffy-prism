@@ -98,20 +98,23 @@ and along the **output-fraction** axis; prompt fraction does not move it.
   `A_light ≡ (p_ol ≤ 0.22)` → `P ≤ 0.06`.
 
 **Mild / non-obvious (probabilistic — every point a coin-flip; monotone, so corners certify):**
-- **Workload box** (ranges the *invisible* long-output fraction):
-  `A_w ≡ (N_SLOTS = 22) ∧ (p_ol ∈ [0.26, 0.34]) ∧ (p_lp ∈ [0,1])` → **`P(stall) ∈ [0.17, 0.54]`**
-- **Config box** (ranges the provisioning knob operators can't set well):
-  `A_cfg ≡ (N_SLOTS ∈ [20, 24]) ∧ (p_ol = 0.3) ∧ (p_lp ∈ [0,1])` → **`P(stall) ∈ [0.19, 0.56]`**
-
-In both, prompt fraction `p_lp` is free (≤0.05 swing); the outcome is set by provisioning
-and the long-output fraction.
+One box ranging **all three** input axes at once — provisioning, the invisible output-length
+fraction, and the prompt fraction:
+```
+A_mild ≡ (N_SLOTS ∈ [20,24]) ∧ (p_ol ∈ [0.28,0.32]) ∧ (p_lp ∈ [0,1])   →   P(stall) ∈ [0.12, 0.66]
+```
+Certified at the extreme corners (monotone: ↓ in `N_SLOTS`, ↑ in `p_ol`, weakly ↑ in `p_lp`):
+min `(N=24, p_ol=0.28, p_lp=0) = 0.12`, max `(N=20, p_ol=0.32, p_lp=1) = 0.66`. Five
+provisioning values × a ranged output fraction × a free prompt fraction — **no point rare, no
+point certain.** Prompt fraction moves it only ~0.04; the outcome is set by provisioning and
+the long-output fraction (the admission-invisible one).
 
 **Methodological point (the paper's thesis).** A certainty method can only certify the
 extremes where `P(stall)` is exactly 0 or 1 — the *saturated, under-provisioned* box `A_E`
 (certain stall) and the *over-provisioned* box `A_over` (never). Both are obvious, and in
 `A_E` the workload composition is irrelevant. The realistic operating regime (batch width at
 the knee, moderate partly-invisible output mix) has no certain answer, and is exactly where a
-quantified `P(stall | A) ∈ [0.17, 0.56]` is the actionable one — and it points at the
+quantified `P(stall | A_mild) ∈ [0.12, 0.66]` is the actionable one — and it points at the
 *output-length distribution*, not prompt length, as the lever.
 
 ## Validation
