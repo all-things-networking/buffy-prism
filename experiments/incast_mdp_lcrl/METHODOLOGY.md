@@ -232,10 +232,26 @@ policy recovers it: greedy MC `P[Q] = 1.000` (sparse reward gave `0.00`).
     `THRESH=8` corner, where native LCRL on `φ_safe` should work) and state
     abstraction at scale (a lossy projection may not represent the optimum). These
     are ordinary RL costs, and exactly where a *learned, generalising* policy is
-    meant to beat exact/SMC, which cannot scale. So the `Pmin` difficulty is
-    **primarily a framing error corrected by `φ_safe`-maximisation**, with the
-    usual RL exploration/abstraction costs remaining — not a fundamental LCRL
-    limitation.
+    meant to beat exact/SMC, which cannot scale.
+
+  **Empirically, at M=16, `φ_safe`-maximisation still returns `P[Q]=1.0`** across
+  configs (pure native; native+drop-shaping; +`n_active` projection) — so the
+  framing correction is **necessary but not sufficient**, and it is honest to say
+  the earlier "this is the fix" was premature. The `value@s0` values say why:
+  *pure native* gives `value@s0 = 0.000` — the `+1`-at-`done` LTL reward is too
+  **sparse** to propagate over the ~4872-step horizon (the very problem the dense
+  reward was introduced to solve for `Pmax`); adding drop-shaping propagates the
+  value (`-0.06 … -0.9`) but the greedy still collapses to the synchronising pole
+  (the **state-abstraction / deterministic-staggering** limits at reasonable
+  constants remain). So removing the optimistic-init pathology exposes the *other*
+  two general RL costs (sparse-reward horizon, and lossy abstraction of a
+  stochastically-staggered optimum), which are the binding constraints for this
+  `Pmin`. Net: the `Pmin` difficulty is a **combination** — a framing error (now
+  corrected) plus ordinary RL exploration/horizon/abstraction costs — not a
+  fundamental LCRL limitation, but not solved here either. For the `Pmin`
+  *value*, exact/SMC remains the reliable route where it is tractable. Note the
+  **maximisation** direction (worst-case), where LCRL is strong, is exercised
+  cleanly in `models/example3_fqcodel/` (worst-case FQ-CoDel starvation).
 
 **Bottom line.** LCRL on the MDP recreates the case-study `P[Q]` where the
 scheduler is forced (it recovers `Pmax = 1.0`, and `uniform_hazard` reproduces
