@@ -1,0 +1,34 @@
+// =====================================================================
+//  Queries for the buggy FQ-CoDel model (fqcodel.pm) -- example 3
+// =====================================================================
+//
+//  Bad event Q : flow 5 is STARVED -- at the end of the run (time=TIME_STEPS=14)
+//                it has received fewer than 4 dequeues while all other input
+//                queues were backlogged  ->  iq5_deqs_bl < 4.
+//
+//  End of run is written as the state predicate `time=14` (= TIME_STEPS) rather
+//  than the "done" label: StormPy's program-level SIMULATOR does not report this
+//  model's declared label, whereas a relational atom is evaluated directly from
+//  the state (and still works for exact model checking). The "done" label is
+//  kept in the .pm for reference.
+//
+//  The correctness expectation FQ-CoDel should meet is fairness: a backlogged
+//  flow 5 should get its share of service, i.e. iq5_deqs_bl >= 4 by end of run.
+//  The known FQ-CoDel bug lets adversarial input traffic violate this. Because
+//  the traffic (arrivals) is the *nondeterministic* choice in this MDP, LCRL
+//  MAXIMISING P[Q] synthesises the worst-case traffic pattern -- an interpretable
+//  explanation of how the bug is triggered.
+
+// (1) worst-case starvation probability of flow 5  =  Pmax[Q]
+//     (LCRL maximises this; the learned policy is the worst-case traffic pattern)
+Pmax=? [ F (time=14 & iq5_deqs_bl<4) ]
+
+// (2) query form
+P=? [ F (time=14 & iq5_deqs_bl<4) ]
+
+// (3) best-case / can fairness be guaranteed?  Pmin[Q] = 1 - Pmax[fairness]
+Pmin=? [ F (time=14 & iq5_deqs_bl<4) ]
+
+// (4) fairness (safe complement): reach the end with flow 5 adequately served.
+//     Pmax of this = 1 - Pmin[Q]; LCRL maximising it synthesises a fair schedule.
+P=? [ F (time=14 & iq5_deqs_bl>=4) ]
