@@ -109,8 +109,77 @@ $PRISM scheduler_mc.pm -pf 'P=? [ F ("done" & v_maxgap>=SLO_TBT) ]' \
   -sim -simsamples 15000 -simpathlen 4000
 ```
 
-## Validation (open)
+## Validation
 
-Corners are from PRISM SMC. The independent from-scratch oracle (the flagged open item;
-incast has `incast_sim.py`) is not yet written for this model — that is the next step to
-cross-check the box corners, exactly as example3 validates its boxes against `incast_sim.py`.
+The independent from-scratch oracle `sched_sim.py` (no PRISM) reproduces the PRISM/SMC
+values above within CI at every corner — e.g. `(N=3, p_lp=.2, p_ol=.2)` oracle 0.183 vs
+PRISM 0.181; `(N=3, .4, .4)` 0.564 vs 0.568; `N=2/3/4 (.3,.3)` 0.800/0.375/0.086 vs
+0.802/0.372/0.085. This is example3's setup (incast's `incast_sim.py`), and it lets us go
+to realistic magnitudes PRISM cannot reach — below.
+
+---
+
+# Realistic magnitudes (oracle `sched_sim.py`)
+
+The regions above use the small PRISM-checkable model. The oracle — cross-checked against
+PRISM at that scale — also runs at realistic token magnitudes. Config (tokens): prefill
+**chunk 512**; prompt **short 16 / long 2048** (a long prompt = 4 prefill chunks); output
+**short 8 / long 256** (a long output = 256 decode iterations → **64:1** vs a long prompt's
+prefill cost); victim 16-tok prompt / 32-tok output; **Poisson load λ=0.3 req/iter**; batch
+width `N_SLOTS` (the realistic knob; knee ≈ 20–24 here); `M=64` record pool; horizon
+`T=400`, victim arrives `T_V=200`; KV pool generous (queueing-dominated). Reproduce with
+`./run_regions_oracle.sh` (8k samples, 99% CI ≈ ±0.015).
+
+## Per-request law sharpens at realistic ratios — output dominance is near-total
+
+| fraction f long (one dimension) | long-**prompt** (2048-tok) only | long-**output** (256-tok) only |
+|---|---|---|
+| 0.3 | **0.000** | 0.332 |
+| 0.5 | **0.000** | 0.967 |
+
+A long-context (2048-token prompt) request causes **~zero** interactive stall; long-output
+requests drive it to near-certain. The "prompt matters 2–4×" seen earlier was the small-`LO`
+(=32) regime; at realistic `LO=256`, a long prompt's 4 prefill iterations are negligible
+against 256 decode iterations. **So the strong claim — prompt length is nearly irrelevant,
+output length drives it, and output is unobservable at admission — holds at realistic
+magnitudes** (and is *stronger* than at toy scale, not weaker).
+
+## Structure (realistic): sharp in provisioning, gradual in output fraction, flat in prompt
+
+```
+  N_SLOTS (p_lp=p_ol=0.3):  12->0.98  16->0.84  20->0.51  22->0.34  24->0.20  28->0.05  32->0.008
+  p_ol   (N=22, p_lp=0.3):  0.22->0.06  0.26->0.17  0.30->0.34  0.34->0.54  0.38->0.71   (gradual)
+  p_lp   (N=22, p_ol=0.3):  0.1->~0.34  0.5->~0.34  0.9->~0.35                            (flat)
+```
+
+## Obvious / provable regions (what a 100% method finds)
+
+- **`N_SLOTS ≤ 16`** → `P ∈ [0.84, 0.98]`: always stalls (under-provisioned).
+- **`N_SLOTS ≥ 28`** → `P ≤ 0.05`: never stalls (over-provisioned).
+- **`p_ol ≤ 0.22`** (output-light workload) → `P ≤ 0.06`: never stalls.
+
+## Mild boxes (probabilistic, non-obvious) — every point a coin-flip
+
+Both range a variable no one controls well, hold prompt fraction **free** (it barely
+matters, ≤0.05 swing), and are monotone so the corners certify the interior:
+
+```
+Workload box (ranges the INVISIBLE long-output fraction):
+  A_w  ≡ (N_SLOTS = 22) ∧ (p_ol ∈ [0.26, 0.34]) ∧ (p_lp ∈ [0,1])   →  P(stall) ∈ [0.17, 0.54]
+
+Config box (ranges the PROVISIONING knob operators can't set well; per review note 3):
+  A_cfg ≡ (N_SLOTS ∈ [20, 24]) ∧ (p_ol = 0.3) ∧ (p_lp ∈ [0,1])     →  P(stall) ∈ [0.19, 0.56]
+```
+
+Corners: `A_w` min `(p_ol=0.26)=0.17`, max `(p_ol=0.34)=0.54`; `A_cfg` min `(N=24,p_lp=.9)=0.23`,
+max `(N=20,p_lp=.9)=0.56` (min over the box `(N=24,p_lp=.1)=0.19`). No point rare, no point
+certain. The outcome is set by provisioning and the **long-output fraction the scheduler
+cannot observe at admission**; the visible feature (prompt length) does not move it.
+
+## The contrast, at realistic scale
+
+A 100%/reachability method certifies only `N_SLOTS ≤ 16` (always) and `N_SLOTS ≥ 28` (never)
+— the provisioning extremes. The realistic operating regime — batch width at the knee
+(20–24) with a moderate, partly-invisible output-length mix — is exactly the mild box, where
+`P(stall | A) ∈ [0.17, 0.56]` is the actionable answer, and it points at the output-length
+distribution as the lever, not prompt length.
