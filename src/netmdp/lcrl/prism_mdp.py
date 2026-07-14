@@ -249,6 +249,11 @@ class PrismBlackBoxMDP:
         """Whether the simulator is in an absorbing/sink state."""
         return self._sim.is_done()
 
+    def nr_available_actions(self):
+        """Number of choices enabled in the current state (1 means no genuine
+        nondeterminism there; >1 is a real decision point)."""
+        return self._sim.nr_available_actions()
+
     # ------------------------------------------------------------------ #
     # pickling: LCRL's train() dill-dumps the trained task (which holds this
     # MDP). The stormpy program/simulator are C++ objects that cannot be
