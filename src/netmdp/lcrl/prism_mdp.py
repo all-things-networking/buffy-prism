@@ -37,6 +37,7 @@ Two impedance mismatches between PRISM and LCRL are handled here:
     the model's declared PRISM labels are used.
 """
 
+import inspect
 import json
 import random
 
@@ -45,6 +46,21 @@ import stormpy.simulator as sim
 from stormpy import PrismProgram
 
 from src.netmdp.prism_utils.prism_utils import load_prism_program
+
+
+def _callable_arity(fn):
+    """Number of positional parameters ``fn`` accepts (2+ if it is variadic)."""
+    try:
+        params = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return 1
+    positional = [
+        p for p in params
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+    ]
+    if any(p.kind == p.VAR_POSITIONAL for p in params):
+        return max(2, len(positional))
+    return len(positional)
 
 
 class PrismBlackBoxMDP:
@@ -73,10 +89,12 @@ class PrismBlackBoxMDP:
             be large; project to the relevant variables to keep the Q-table
             tractable. The ordering is fixed and used for ``current_state``.
         label_fn:
-            Optional ``callable(state_dict) -> iterable[str]`` returning the
-            atomic propositions true in a state, where ``state_dict`` maps *all*
-            program variables to their values. Defaults to the model's declared
-            PRISM labels reported by the simulator.
+            Optional ``callable(state_dict, declared_labels) -> iterable[str]``
+            returning the atomic propositions true in a state, where
+            ``state_dict`` maps *all* program variables to their values and
+            ``declared_labels`` is the set of PRISM labels the simulator reports
+            as holding there. (A one-argument ``callable(state_dict)`` is also
+            accepted.) Defaults to the model's declared PRISM labels.
         num_actions:
             Size of the (fixed) action space. If ``None``, it is auto-detected as
             the maximum number of available choices seen over a handful of random
@@ -97,6 +115,7 @@ class PrismBlackBoxMDP:
         self.program = program
         self._out_of_range = out_of_range
         self._label_fn = label_fn
+        self._label_fn_arity = _callable_arity(label_fn) if label_fn is not None else 0
         self._state_variables = list(state_variables) if state_variables is not None else None
         self._var_order = list(state_variables) if state_variables is not None else None
 
@@ -184,10 +203,13 @@ class PrismBlackBoxMDP:
         if self._var_order is None:
             self._var_order = sorted(full.keys())
         self.current_state = [full[v] for v in self._var_order]
-        if self._label_fn is not None:
-            self._labels = list(self._label_fn(full))
+        declared = set(storm_labels)
+        if self._label_fn is None:
+            self._labels = list(declared)
+        elif self._label_fn_arity >= 2:
+            self._labels = list(self._label_fn(full, declared))
         else:
-            self._labels = list(storm_labels)
+            self._labels = list(self._label_fn(full))
 
     def _resolve_action(self, action):
         n = self._sim.nr_available_actions()
@@ -217,6 +239,21 @@ class PrismBlackBoxMDP:
     def is_done(self):
         """Whether the simulator is in an absorbing/sink state."""
         return self._sim.is_done()
+
+    # ------------------------------------------------------------------ #
+    # pickling: LCRL's train() dill-dumps the trained task (which holds this
+    # MDP). The stormpy program/simulator are C++ objects that cannot be
+    # pickled, so the saved model is a static snapshot (Q-table + metadata);
+    # the live simulator is not restored.
+    # ------------------------------------------------------------------ #
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_sim"] = None
+        state["program"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
     def __str__(self):
         n = len(self.action_space)
