@@ -13,15 +13,19 @@ This note estimates, for the case-study models, two different quantities:
    simulators (for statistical model checking / LCRL), never built explicitly,
    precisely because both numbers are far past what an explicit engine can
    enumerate. The smaller `llm_batch_scheduler/` models *are* exact-model-checked
-   (PRISM), so their reachable counts are — or can be — computed directly.
+   (PRISM), so their reachable counts below are exact, not estimated.
 
-| model | declared (range product) | reachable estimate | main collapse mechanism |
+| model | declared (range product) | reachable | main collapse mechanism |
 |---|---|---|---|
-| `example2_desync_short_bursts/incast.pm` (cert. corner) | ~10⁶⁸ | ~2×10³⁵ | DTMC: buffers are a deterministic function of the `97¹⁶` start-time vectors |
-| `example3_fqcodel/fqcodel.pm` | ~3×10²⁴ | ~10¹² | FQ-CoDel list-validity + `contents>0 ⟺ in-list` invariants |
-| `llm_batch_scheduler/chunked` | ~1.1×10²⁰ | ~2×10⁵ | DTMC deterministic in arrivals; queue/shape/counter invariants |
-| `llm_batch_scheduler/chunked_dedicated_slot` | ~4.2×10¹⁷ | ~1.3×10⁴ | same, no admission queue (**documented ~13k**) |
-| `llm_batch_scheduler/no_chunking` | ~8.4×10¹⁷ | ~2×10⁴ | same skeleton + `hog` bit; eager prefill |
+| `example2_desync_short_bursts/incast.pm` (cert. corner) | ~10⁶⁸ | ~2×10³⁵ (est.) | DTMC: buffers are a deterministic function of the `97¹⁶` start-time vectors |
+| `example3_fqcodel/fqcodel.pm` | ~3×10²⁴ | ~10¹² (est.) | FQ-CoDel list-validity + `contents>0 ⟺ in-list` invariants |
+| `llm_batch_scheduler/chunked` | ~1.1×10²⁰ | **307,766** (exact) | DTMC deterministic in arrivals; queue/shape/counter invariants |
+| `llm_batch_scheduler/chunked_dedicated_slot` | ~4.2×10¹⁷ | **13,020** (exact) | same, no admission queue |
+| `llm_batch_scheduler/no_chunking` | ~8.4×10¹⁷ | **9,471** (exact) | same skeleton + `hog` bit; eager prefill |
+
+Reachable counts for `incast`/`fqcodel` are structural estimates (those models
+are too large to build); the `llm_batch_scheduler/` counts are **exact**, built
+with PRISM 4.10.1 (see that section for configs and reproduction commands).
 
 For context, explicit engines (Storm/PRISM sparse) top out around 10⁷–10⁹
 states, so neither `incast` nor `fqcodel` is explicitly constructible at these
@@ -184,11 +188,11 @@ sweepable consts (`N_SLOTS, KV_CAP, CHUNK_BLK, POLICY, ADM_POLICY, T_V, p_*`)
 never appear in a range, so the **declared space is independent of them** — they
 affect only reachability.
 
-| variant | declared | reachable estimate |
+| variant | declared | reachable (exact, PRISM) |
 |---|---|---|
-| `chunked/scheduler.pm`                | ~1.1×10²⁰ | ~2×10⁵ (10⁵–10⁶) |
-| `chunked_dedicated_slot/scheduler.pm` | ~4.2×10¹⁷ | ~1.3×10⁴ (documented exact) |
-| `no_chunking/scheduler.pm`            | ~8.4×10¹⁷ | ~2×10⁴ |
+| `chunked/scheduler.pm`                | ~1.1×10²⁰ | 307,766 |
+| `chunked_dedicated_slot/scheduler.pm` | ~4.2×10¹⁷ | 13,020 |
+| `no_chunking/scheduler.pm`            | ~8.4×10¹⁷ | 9,471 |
 
 ### Declared state space (exact range products)
 
@@ -217,9 +221,12 @@ request recomputes in place), a single `n_long` counter + 3 timing bools:
 one `hog` bit (decodes stall while a whole-prompt prefill hogs the iteration), so
 exactly **2×** ≈ **8.4 × 10¹⁷**.
 
-### Reachable state space
+### Reachable state space (exact, PRISM 4.10.1)
 
-Declared → reachable collapses by ~10¹³–10¹⁵, from four structural facts:
+Unlike `incast`/`fqcodel`, these three are small enough to construct, so the
+counts below are **exact** — built with PRISM at the configs from the repo's run
+scripts. The declared → reachable collapse (factor ~10¹³–10¹⁴) follows from four
+structural facts:
 
 1. **Determinism in the arrivals.** Each iteration has only 3 arrival outcomes
    (`none / short / long`) for the two dedicated-slot variants, 5 for `chunked`
@@ -234,31 +241,41 @@ Declared → reachable collapses by ~10¹³–10¹⁵, from four structural fact
 4. **Bounded concurrency** (≤3 occupied records) caps how much history the
    records can hold at once.
 
-**`chunked_dedicated_slot` ≈ 1.3 × 10⁴** — documented in its `NOTES.md` ("Small
-enough for exact model checking (~13k states)") at `POLICY ∈ {0,1}, KV_CAP=8,
-CHUNK_BLK=1, T_V=3`. This is the anchor for the other two.
+Exact counts (POLICY=0 / FCFS baseline; POLICY=1 / priority in parentheses):
 
-**`no_chunking` ≈ 2 × 10⁴** — same skeleton as the anchor, adjusted by: the `hog`
-bit (≲ ×1.4, one frozen bit of history through the service stages); eager prefill
-collapses a whole prompt in one step, *removing* intermediate `pre=2,1` configs
-(× ~0.7); but the resulting decode stalls spread `v_gap/v_maxgap` over more values
-(× ~1.5). Net ≈ ×1.5.
+| variant | states | transitions |
+|---|---|---|
+| `chunked_dedicated_slot` | 13,020 (12,499) | 14,516 |
+| `no_chunking`            | 9,471 (9,459)   | 10,331 |
+| `chunked`                | 307,766 (307,766) | 361,562 |
 
-**`chunked` ≈ 2 × 10⁵ (10⁵–10⁶)** — larger than the anchor at its exact-checking
-config (`N_SLOTS=2, KV_CAP=8, CHUNK_BLK=3, ADM_POLICY=0, T_V=3`): a live waiting
-queue + `N_SLOTS` admission add `st` states (× ~3); four arrival shapes vs two
-enrich per-record `(pp,oo,bk)` (× ~1.7); dual `n_lp × n_lo` + four timing bools vs
-one counter + three bools multiplies the feature block (× ~6 after correlation);
-`CHUNK_BLK=3` prefills a long prompt in one iteration, partly offsetting
-(× ~0.7). Net ≈ ×15–20 over 13k.
+- **`chunked_dedicated_slot` = 13,020** — matches the "~13k" reported in its
+  `NOTES.md`, confirming the config (`POLICY=0, KV_CAP=8, CHUNK_BLK=1, T_V=3`).
+- **`no_chunking` = 9,471** — *fewer* than the dedicated-slot variant, not more:
+  eager prefill loads a whole prompt in a single iteration, so the intermediate
+  `pre=2,1` prefill configs never arise, and that reduction outweighs both the
+  extra `hog` bit and the wider victim-gap spread. (The earlier ~2×10⁴ estimate
+  had the sign of the `hog`/gap effect wrong.)
+- **`chunked` = 307,766** — ~24× the dedicated-slot count, from the live waiting
+  queue + `N_SLOTS=2` admission, four arrival shapes (vs two), and the dual
+  `n_lp × n_lo` + four timing-bool instrumentation (at `KV_CAP=8, CHUNK_BLK=3,
+  ADM_POLICY=0, T_V=3`).
 
-Unlike `incast`/`fqcodel`, these three are **exact-model-checked** by the repo's
-own scripts (PRISM, e.g. `chunked/run_study.sh`,
-`chunked_dedicated_slot/run_case_study.sh`), so their reachable counts are
-directly computable — `chunked_dedicated_slot`'s is already confirmed at ~13k,
-and the `chunked`/`no_chunking` figures (structural extrapolations from that
-anchor) could be pinned down exactly by building them. They carry more
-uncertainty than the exact declared products.
+`POLICY` (fcfs vs priority) moves the count by <4% (`chunked`: not at all). The
+count is **invariant to the probability constants** (`p_arr`, `p_long`, …) for any
+values in `(0,1)` — verified at `p_arr ∈ {0.5,0.7,0.9}`, `p_long ∈ {0.4,0.9}` —
+because every arrival branch stays enabled; only the integer knobs
+(`N_SLOTS, KV_CAP, CHUNK_BLK, POLICY, ADM_POLICY, T_V`) change it.
+
+Reproduce (PRISM 4.10.1; a bare `.pm` with no `.props` builds the model and
+prints `States:`):
+
+```bash
+prism chunked_dedicated_slot/scheduler.pm -const POLICY=0,p_arr=0.5,p_long=0.4
+prism no_chunking/scheduler.pm            -const POLICY=0,p_arr=0.5,p_long=0.4
+prism chunked/scheduler.pm \
+  -const T_V=3,POLICY=0,ADM_POLICY=0,N_SLOTS=2,KV_CAP=8,CHUNK_BLK=3,p_arr=0.7,p_lp=0.4,p_ol_sp=0.4,p_ol_lp=0.4
+```
 
 ---
 
@@ -272,8 +289,8 @@ uncertainty than the exact declared products.
   `fqcodel` an explicit build is intractable at these sizes, which is why the
   study uses simulation / reinforcement learning rather than exact model
   checking. The `llm_batch_scheduler/` variants are small enough to build, so
-  those reachable figures are confirmable (and `chunked_dedicated_slot`'s ~13k is
-  already reported by the repo).
+  those reachable figures are **exact** (PRISM 4.10.1 builds them in ≤1.5 s);
+  `chunked_dedicated_slot`'s 13,020 matches the ~13k reported by the repo.
 - For `incast.pm`, all figures assume the certification corner
   `M=16, WIN=96, SLEN=8, BUF=32, THRESH=8`; other points in the assumption box
   scale as described above (driven mainly by `WIN`).
