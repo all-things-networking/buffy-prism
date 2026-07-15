@@ -1,4 +1,4 @@
-# FPerf's certain-but-contrived workload vs. probabilistic relaxations
+# How strict / explainable is FPerf's FQ-CoDel workload? A probabilistic dissection
 
 FPerf (NSDI'23, §2.1) synthesizes, for the FQ-CoDel starvation query, a workload that
 makes the property hold with **certainty (100%)**. For `T=14`, query = `cdeq(Q5,T) > 2⌊T/5⌋`
@@ -11,12 +11,20 @@ C3:  ∀t∈[13,14] cenq(Q5,t) ≥ 5       # enough packets to dequeue 5
 C4:  ∧_{i=1}^4 ∀t cenq(Qi,t) ≥ t     # Q1..Q4 backlogged EVERY step  (the query's antecedent)
 ```
 
-The question: when we allow the probability to slip below 100%, which of these constraints
-are essential, and which are incidental precision that a probabilistic assumption can drop?
+A workload that must hold with certainty is forced to nail down *everything* that could
+possibly break the property — so a 100% workload cannot, by itself, tell you which of its
+clauses carry the real explanation and which are just precision demanded by the "for all
+traces" requirement. **Relaxing the probability below 100% is what makes the workload
+explainable:** by perturbing each clause and watching `P(problem)`, we can measure how
+*load-bearing* each one is. A clause whose removal collapses the probability is essential
+(and points at the actual mechanism); a clause we can drop or loosen with little effect was
+incidental precision — often an artifact of the query rather than a discovered pattern.
+
 Method: fix IQ5's arrival shape, use **natural random background** for Q1..Q4 (mean 2 pkt/step)
-unless noted, and measure `P(iq5_deqs_bl ≥ n)` (SMC, width 3-4e-3, horizon 224). Note
+unless noted, and measure `P(iq5_deqs_bl ≥ n)` (SMC, width 3-5e-3, horizon 224). Note
 `iq5_deqs_bl` only counts a Q5 dequeue when **all four** of Q1..Q4 are backlogged at that
 instant — so every counted event is genuine theft under full 5-way contention.
+Models: `gen_fperf_relaxation.py`.
 
 ## C4 (Q1..Q4 backlogged ∀t) — droppable almost for free, but it's a query artifact
 
@@ -77,19 +85,45 @@ sends (hence the reachable level), because nearly every spaced packet becomes a 
 dequeue. So the exact rate is incidental precision that a qualitative assumption ("Q5 sends
 sparingly") can drop.
 
-## Takeaway
+## C3 (Q5 sends ≥5 packets) — query bookkeeping; the attack simply scales with count
 
-The probabilistic view **characterizes** which of FPerf's certain-workload constraints matter:
+Relax the packet count (quiet first 4 steps fixed; keep spacing ≥2 while possible; natural bg):
 
-- **C4** (backlog ∀t): incidental (a query antecedent); droppable at ~3 points, and the global
-  assumption is doing almost no work that the per-event contention check doesn't already do.
-- **C1** (quiet start): a real, essential requirement (Q5 is a *new/joining* flow); only its
-  exact length is a soft knob.
-- **C2** (exact rate): incidental precision; a broad family of sparse rates works.
+| Q5 packets sent | P(≥4) | P(≥5) | P(≥6) | P(≥7) |
+|---|---|---|---|---|
+| 4 (all gap≥2) | 1.00 | **0.00** | 0.00 | 0.00 |
+| **5 (= FPerf C3)** | 0.98 | **0.98** | 0.00 | 0.00 |
+| 6 (one gap=1) | 0.98 | 0.98 | **0.97** | 0.00 |
+| 7 (several gap=1) | 0.98 | 0.98 | 0.98 | **0.97** |
+| 10 (every step) | 0.68 | 0.68 | 0.68 | 0.68 |
 
-So the "much nicer assumption" is: **a new light flow that joins an already-busy link and
-sends sparingly** — qualitatively C1 (quiet start) + C2 (sparse), dropping C3's exact count and
-C4's global-backlog assumption. It holds with probability 0.68-0.97 instead of a rigid,
-certain, four-part spec with specific time windows. And relaxing all the way to a stationary
-"Q5 is a light flow (~0.3 pkt/step)" — no idle phase, no cadence — lands at P(≥4)=0.30,
-squarely in the interesting operating regime rather than an adversarial corner.
+The reachable starvation level simply equals the number of spaced packets Q5 sends: each
+spaced packet converts to a contended dequeue with ~0.97 probability. So C3 is not an
+independent pattern — it is "send at least as many packets as the query threshold asks for."
+Relaxing it *down* (4 packets) just lowers the level (can't reach 5); raising it *up* (6, 7)
+scales the starvation to higher levels at the *same* ~0.97 probability — until the count is so
+high that spacing must collapse (every step → 0.68), which is really a C2 (rate) effect, not a
+count effect. FPerf's `≥5` is fixed by the query's threshold, nothing more.
+
+## Takeaway: only C1+C2 are load-bearing; C3+C4 are query bookkeeping
+
+Perturbing each clause and watching `P(problem)` sorts FPerf's four-part workload into what
+actually explains the bug versus what the 100% requirement demanded:
+
+| clause | what it says | load-bearing? | evidence |
+|---|---|---|---|
+| **C1** quiet-early | Q5 is a *new/just-activated* flow | **ESSENTIAL** | drop it → P(≥4)=0.00; the actual bug trigger |
+| **C2** aipg≥2 | Q5 sends *sparsely* | **essential qualitatively, robust quantitatively** | any of every-1/2/3 works (0.68–0.99); only exact rate is incidental |
+| **C3** cenq≥5 | send ≥ threshold packets | query bookkeeping | level = count; `5` is just the query's threshold |
+| **C4** Qᵢ backlogged ∀t | victims are contending | query antecedent | drop → 0.97; per-event guard already ensures it |
+
+So FPerf's intricate four-clause, specific-time-window workload distills to a **two-part
+qualitative condition — "a new light flow that joins a busy link and sends sparingly"** — with
+C3 and C4 falling out as bookkeeping tied to the query. That condition holds with probability
+0.68–0.97 rather than a brittle 100%, and relaxing even C1/C2 to a stationary "Q5 is a light
+flow (~0.3 pkt/step)" — no idle phase, no cadence — still lands at P(≥4)=0.30, in the
+interesting operating regime rather than an adversarial corner.
+
+This is the sense in which probabilistic reasoning makes the workload **explainable**: the
+certain workload cannot tell you which clauses matter, but the shape of `P(problem)` as you
+perturb each clause does.

@@ -58,4 +58,10 @@ if __name__ == "__main__":
     det("fprlx_c2_every3.pm", list(range(4, 14, 3)))
     for p in (30, 50, 70):
         bern(f"fprlx_c2_rand{p}.pm", 4, p / 100)
+    # C3: relax the packet COUNT (quiet first 4 steps fixed, keep spacing>=2 while possible)
+    det("fprlx_c3_K4.pm",  [4, 7, 10, 13])                 # 4 pkts (below the query threshold)
+    det("fprlx_c3_K5.pm",  [4, 6, 8, 10, 12])              # 5 pkts (= FPerf C3)
+    det("fprlx_c3_K6.pm",  [4, 6, 8, 10, 12, 13])          # 6 pkts (one gap=1)
+    det("fprlx_c3_K7.pm",  [4, 6, 8, 10, 11, 12, 13])      # 7 pkts (several gap=1)
+    det("fprlx_c3_K10.pm", list(range(4, 14)))             # 10 pkts (every step -> spacing collapses)
     print("wrote fprlx_c4_*, fprlx_c1_quiet*, fprlx_c2_* into", HERE)
