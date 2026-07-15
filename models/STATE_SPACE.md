@@ -1,6 +1,6 @@
 # State-space sizes of the PRISM models
 
-This note estimates, for two of the case-study models, two different quantities:
+This note estimates, for the case-study models, two different quantities:
 
 1. **Declared (syntactic) state space** — the Cartesian product of every module
    variable's declared range. This is the upper bound PRISM/Storm would start
@@ -8,19 +8,26 @@ This note estimates, for two of the case-study models, two different quantities:
    variable ranges.
 2. **Reachable state space** — the number of states actually visited by some
    run. This is far smaller, because most variable combinations are dynamically
-   impossible. These are structural order-of-magnitude estimates, not exact
-   counts: the models are used as black-box simulators (for statistical model
-   checking / LCRL), never built explicitly, precisely because both numbers are
-   far past what an explicit engine can enumerate.
+   impossible. For the large models (`incast`, `fqcodel`) these are structural
+   order-of-magnitude estimates, not exact counts: they are used as black-box
+   simulators (for statistical model checking / LCRL), never built explicitly,
+   precisely because both numbers are far past what an explicit engine can
+   enumerate. The smaller `llm_batch_scheduler/` models *are* exact-model-checked
+   (PRISM), so their reachable counts are — or can be — computed directly.
 
 | model | declared (range product) | reachable estimate | main collapse mechanism |
 |---|---|---|---|
 | `example2_desync_short_bursts/incast.pm` (cert. corner) | ~10⁶⁸ | ~2×10³⁵ | DTMC: buffers are a deterministic function of the `97¹⁶` start-time vectors |
 | `example3_fqcodel/fqcodel.pm` | ~3×10²⁴ | ~10¹² | FQ-CoDel list-validity + `contents>0 ⟺ in-list` invariants |
+| `llm_batch_scheduler/chunked` | ~1.1×10²⁰ | ~2×10⁵ | DTMC deterministic in arrivals; queue/shape/counter invariants |
+| `llm_batch_scheduler/chunked_dedicated_slot` | ~4.2×10¹⁷ | ~1.3×10⁴ | same, no admission queue (**documented ~13k**) |
+| `llm_batch_scheduler/no_chunking` | ~8.4×10¹⁷ | ~2×10⁴ | same skeleton + `hog` bit; eager prefill |
 
 For context, explicit engines (Storm/PRISM sparse) top out around 10⁷–10⁹
-states, so neither model is explicitly constructible at these settings — which
-is why the repo simulates them rather than model-checking them.
+states, so neither `incast` nor `fqcodel` is explicitly constructible at these
+settings — which is why the repo simulates them rather than model-checking them.
+The `llm_batch_scheduler/` variants are far smaller and *are* exact-model-checked
+(see that section).
 
 ---
 
@@ -164,15 +171,115 @@ MDP's arrival freedom leaves the buffers genuinely free, unlike the incast DTMC.
 
 ---
 
+## `llm_batch_scheduler/` — three scheduler variants
+
+Three DTMC variants of one GPU inference-batch scheduler run for `T=10`
+iterations (7 sub-stages each), each tracking 3 request records (victim `v` +
+backgrounds `b1, b2`), victim-latency counters, and arrival-history "feature"
+variables. The **only randomness is the background arrivals** (the `ARRIVE`
+commands); given the arrival sequence, the entire trajectory is deterministic.
+
+Variable *ranges* are fixed literals keyed to `T=10, GAPMAX=10, NL=4, PT=6`. The
+sweepable consts (`N_SLOTS, KV_CAP, CHUNK_BLK, POLICY, ADM_POLICY, T_V, p_*`)
+never appear in a range, so the **declared space is independent of them** — they
+affect only reachability.
+
+| variant | declared | reachable estimate |
+|---|---|---|
+| `chunked/scheduler.pm`                | ~1.1×10²⁰ | ~2×10⁵ (10⁵–10⁶) |
+| `chunked_dedicated_slot/scheduler.pm` | ~4.2×10¹⁷ | ~1.3×10⁴ (documented exact) |
+| `no_chunking/scheduler.pm`            | ~8.4×10¹⁷ | ~2×10⁴ |
+
+### Declared state space (exact range products)
+
+The variants share a skeleton and differ only in which per-record and
+instrumentation variables exist.
+
+**`chunked`** (28 variables) — richest: it adds a real admission queue
+(`st ∈ {empty,waiting,running}` per record) and dual arrival instrumentation.
+
+| group | # vars | values/var | subtotal |
+|---|---|---|---|
+| `t`, `ad_v/b1/b2`, `v_gap`, `v_maxgap`     | 6 | 11 | 11⁶ |
+| `stage`, `pp_·`, `bk_·`, `preempts`         | 8 | 7  | 7⁸  |
+| `oo_·`, `v_preempts`, `peak_conc`           | 5 | 4  | 4⁵  |
+| `st_v/b1/b2`                                | 3 | 3  | 3³  |
+| `n_lp`, `n_lo`                              | 2 | 5  | 5²  |
+| `lp_before/after_v`, `both_before/after_v`  | 4 | 2  | 2⁴  |
+
+Product = `11⁶·7⁸·4⁵·3³·5²·2⁴` ≈ **1.1 × 10²⁰**.
+
+**`chunked_dedicated_slot`** (23 variables) — no queue (`st` absent; an evicted
+request recomputes in place), a single `n_long` counter + 3 timing bools:
+`11⁶·7⁸·4⁵·5·2³` ≈ **4.2 × 10¹⁷**.
+
+**`no_chunking`** (24 variables) — identical to `chunked_dedicated_slot` plus the
+one `hog` bit (decodes stall while a whole-prompt prefill hogs the iteration), so
+exactly **2×** ≈ **8.4 × 10¹⁷**.
+
+### Reachable state space
+
+Declared → reachable collapses by ~10¹³–10¹⁵, from four structural facts:
+
+1. **Determinism in the arrivals.** Each iteration has only 3 arrival outcomes
+   (`none / short / long`) for the two dedicated-slot variants, 5 for `chunked`
+   (`none` + prompt∈{S,L} × output∈{S,L}), over 10 iterations; everything
+   downstream is deterministic.
+2. **Only 2–3 request shapes.** Prompts `pre ∈ {1,3}`, outputs `dec ∈ {2,3}`
+   (victim `1/3`), so a record's reachable `(pre,dec,blk)` is a few dozen
+   lifecycle configs, not the declared `7·4·7 = 196`.
+3. **Correlated / capped counters.** `adm ≤ t`, `blk` tracks sequence progress,
+   gap counters advance only on a stall, feature counters are monotone and
+   saturating.
+4. **Bounded concurrency** (≤3 occupied records) caps how much history the
+   records can hold at once.
+
+**`chunked_dedicated_slot` ≈ 1.3 × 10⁴** — documented in its `NOTES.md` ("Small
+enough for exact model checking (~13k states)") at `POLICY ∈ {0,1}, KV_CAP=8,
+CHUNK_BLK=1, T_V=3`. This is the anchor for the other two.
+
+**`no_chunking` ≈ 2 × 10⁴** — same skeleton as the anchor, adjusted by: the `hog`
+bit (≲ ×1.4, one frozen bit of history through the service stages); eager prefill
+collapses a whole prompt in one step, *removing* intermediate `pre=2,1` configs
+(× ~0.7); but the resulting decode stalls spread `v_gap/v_maxgap` over more values
+(× ~1.5). Net ≈ ×1.5.
+
+**`chunked` ≈ 2 × 10⁵ (10⁵–10⁶)** — larger than the anchor at its exact-checking
+config (`N_SLOTS=2, KV_CAP=8, CHUNK_BLK=3, ADM_POLICY=0, T_V=3`): a live waiting
+queue + `N_SLOTS` admission add `st` states (× ~3); four arrival shapes vs two
+enrich per-record `(pp,oo,bk)` (× ~1.7); dual `n_lp × n_lo` + four timing bools vs
+one counter + three bools multiplies the feature block (× ~6 after correlation);
+`CHUNK_BLK=3` prefills a long prompt in one iteration, partly offsetting
+(× ~0.7). Net ≈ ×15–20 over 13k.
+
+Unlike `incast`/`fqcodel`, these three are **exact-model-checked** by the repo's
+own scripts (PRISM, e.g. `chunked/run_study.sh`,
+`chunked_dedicated_slot/run_case_study.sh`), so their reachable counts are
+directly computable — `chunked_dedicated_slot`'s is already confirmed at ~13k,
+and the `chunked`/`no_chunking` figures (structural extrapolations from that
+anchor) could be pinned down exactly by building them. They carry more
+uncertainty than the exact declared products.
+
+---
+
 ## Method notes
 
 - **Declared** numbers are exact products of the declared ranges; only rounding
   is approximate.
 - **Reachable** numbers are structural estimates from the model dynamics (forced
-  starts + determinism for incast; list invariants for fqcodel), not from an
-  explicit build — which is intractable at these sizes and is the reason the
-  study uses simulation / reinforcement learning over the models rather than
-  exact model checking.
+  starts + determinism for incast; list invariants for fqcodel; arrival
+  determinism + shape/counter invariants for the schedulers). For `incast` and
+  `fqcodel` an explicit build is intractable at these sizes, which is why the
+  study uses simulation / reinforcement learning rather than exact model
+  checking. The `llm_batch_scheduler/` variants are small enough to build, so
+  those reachable figures are confirmable (and `chunked_dedicated_slot`'s ~13k is
+  already reported by the repo).
 - For `incast.pm`, all figures assume the certification corner
   `M=16, WIN=96, SLEN=8, BUF=32, THRESH=8`; other points in the assumption box
   scale as described above (driven mainly by `WIN`).
+- For the `llm_batch_scheduler/` variants, reachable figures assume the
+  exact-checking configs from the repo's run scripts (`T=10`, `T_V=3`, `KV_CAP=8`;
+  `CHUNK_BLK=1` dedicated / `3` chunked / eager for no-chunking; `N_SLOTS=2` for
+  chunked). The probability constants (`p_arr`, `p_long`, …) do not change *which*
+  states are reachable, so the reachable count is the same for any values in
+  `(0,1)`.
