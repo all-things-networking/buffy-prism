@@ -96,6 +96,11 @@ PYTHONPATH=. .venv/bin/python experiments/example3_fqcodel/run_fqcodel.py
 3. **Function approximation.** The tabular Q-table cannot generalise across the
    huge product state. LCRL ships `train_nfq`/`train_ddpg`; or wrap the product in
    a small NN. This is the principled fix for the abstraction wall.
+   A working adapter is provided: `src/netmdp/lcrl/nfq.py` (`NFQMDP` exposes the
+   state as an ndarray, which `train_nfq` requires). Verified feasible (TF 2.x is
+   installed); use `decaying_learning_rate=False`, an `iteration_threshold` long
+   enough to reach the accepting state, and expect it to be slow. See the module
+   docstring for the exact caveats.
 4. **Shorter effective horizon.** incast's `(MMAX+1)` substages inflate the
    horizon ~21x; a per-slot-collapsed model (see the retired init-phase Pmin
    variant in git history) learns far faster. Trade faithfulness for tractability
