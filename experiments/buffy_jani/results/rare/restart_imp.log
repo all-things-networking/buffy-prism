@@ -1,0 +1,39 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes models/rare_p0.2_imp.jani --props starve_violation -C 0.95 -W 0.1 --relative-width -J 1 --seed 1 --rare Restart --ifun-prop imp 0 4
+
+
+
+
+rare_p0.2_imp.jani:model: info: rare_p0 is a DTMC model and will be simulated as an MDP with uniform resolution of nondeterminism.
+
+Analysis results for rare_p0.2_imp.jani
+Status:          Finished
+Simulation time: 144.9 s
+
++ Property starve_violation
+  Estimated probability: 0.0003708917908636337
+  Confidence interval:   [0.0003338026117772703, 0.00040798096994999706]
+  Interval half-width:   3.7089179086363384E-05
+  Runs used:             1029950
+  Distribution support:  {0, 1}
+  Run type:              MDP / RESTART
+  Status:                Finished
+
+  + Sample data
+    Mean:     0.0003708917908636337
+    Variance: 0.0003673563636023626
+    Skewness: 51.89443367231058
+    Kurtosis: 2700.2693294187184
+
+  + Statistical guarantees
+    Method:    Chow-Robbins sequential method
+    Statement: Approx. 100*γ % of the confidence intervals contain the true probability
+    Caveats:   CLT and large number of samples assumption; confidence level γ is only reached asymptotically as width -> 0
+    γ:         0.95
+
+  + Importance function
+    Type:               Ad-hoc monolithic
+    Level calc. method: Expected success (1)
+    Level calc. sweeps: 86
+    Levels:             2
+

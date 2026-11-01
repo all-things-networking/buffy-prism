@@ -1,0 +1,5 @@
+plain rc=0 wall_s=220
+restart_imp rc=0 wall_s=146
+fixedeffort_imp rc=0 wall_s=428
+restart_auto rc=0 wall_s=2
+restart_imp_manual rc=0 wall_s=439

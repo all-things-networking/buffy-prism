@@ -1,0 +1,3 @@
+bfy_mdp_mixed_p0.2_choose rc=0 wall_s=27
+bfy_mdp_mixed_p0.6_choose rc=0 wall_s=27
+bfy_mdp_mixed_p0.6_staged rc=0 wall_s=78

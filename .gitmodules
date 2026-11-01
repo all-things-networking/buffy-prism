@@ -1,4 +1,4 @@
 [submodule "buffy"]
 	path = buffy
 	url = https://github.com/all-things-networking/buffy.git
-	branch = jani-backend
+	branch = features

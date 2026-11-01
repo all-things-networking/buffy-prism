@@ -118,13 +118,14 @@ neither is the right primary target.
 2. Prototype a Buffy -> JANI emitter for one device (FQ-CoDel), with one edge per time step; compare state counts and
    `modes` throughput against the 11-stage PRISM encoding. [Done for SMC. State counts were not compared:
    exact exploration at this size is intractable.]
-3. Decide the bounded-LTL path: DFA monitor automata in JANI vs PRISM-language LTL with Storm. [Still open. The
-   compiler's queries are bounded F / G / U only. Item 6 makes monitor automata more attractive.]
+3. Decide the bounded-LTL path: DFA monitor automata in JANI vs PRISM-language LTL with Storm. [Decided: monitors.
+   Bounded-LTL queries compile to deterministic monitors (formula progression at compile time, one state variable)
+   that work in JANI, PRISM and SMT alike, SMC included; see "Second round" below.]
 4. Re-read the Buffy paper to confirm which constructs (loops, queue ops, multi-device composition) the emitter must
    cover. [Done. The compiler covers bounded loops, `if`, `move-p`, `backlog-p`, queues
    (`enq`/`deq`/`has`/`empty`), `global`/`local`/`//@ monitor`, `assume`/`assert`, and multi-instance composition
-   via `connect`. It does not yet cover `B |> F` filters or `move-b`/`backlog-b`, which need a class/byte-aware
-   buffer model.]
+   via `connect`. Since the second round it also covers `B |> F` filters and `move-b`/`backlog-b` with packet
+   classes.]
 
 ## Results (2026-11-01)
 
@@ -218,3 +219,46 @@ Cost per run, single thread:
 
 Hence: use `--staged` for MDP simulation and RL. It gives a factored per-source action space, and the compiler
 now prints a note for sync-layout MDPs with more than 64 joint choices.
+
+## Second round (2026-11-01): compiler branch `features`
+
+The `buffy` submodule now points at branch `features` (JANI/PRISM; `fperf-backend` adds SMT-LIB and FPerf).
+`buffy/docs/user-guide.md` documents the language and every path; design decisions 20–34 are in
+`docs/notes/buffy-compiler-design-decisions.md`.
+
+- **Packet classes, filters, `move-b`/`backlog-b`.** Buffers are per-class counts or FIFO sequences of class
+  ids, chosen per buffer. Three new examples are checked against Python references in every layout, and the two
+  representations agree.
+- **Bounded-LTL queries via monitors, `given`, network `assume`, `--prune-violations`.** This settles open
+  question 3. The URF slides' round-robin example with its path condition is `examples/jani/deck_rr.buffy`;
+  pruning shrinks it from 787 to 410 states with identical results.
+- **Inferred ranges** for globals and monitors.
+- **PRISM `merged` stages.** FQ goes from 46 to 11 PRISM steps per time step. `prism -sim`, 20k runs, starve at
+  P0 = 0.6: compiled `merged` 19 s (0.0116 ± 0.0020), compiled `stages` 47 s (0.01165), hand model 19 s
+  (0.0109). The earlier 3× gap to the hand model came from the stage count, not from the expressions.
+  Logs: `experiments/buffy_jani/results/prism_merged/`.
+- **JANI `choose` layout for MDPs** (default above 64 joint choices). modes, uniform resolution, 100k runs,
+  mixed FQ MDP (queues 0–3 nondeterministic, queue 4 with P0): starve 0.01245 [0.0118, 0.0132] at P0 = 0.6
+  (DTMC references 0.0119–0.0120) and 4.2e-4 at P0 = 0.2; 27 s against 78 s staged. The netmdp native simulator
+  (1M runs) gives 0.01190 ± 0.00021 and 3.37e-4 ± 3.6e-5 and costs 0.48 µs per time step (staged 0.44, sync
+  3.5). Logs: `experiments/buffy_jani/results/choose/`.
+- **Layout semantics fix:** staged layouts now resolve nondeterministic sources before probabilistic ones,
+  as the sync layout does.
+- **FPerf:** multi-instance contention points linked by FPerf queue edges, checked against a hand-written
+  composition of two `PriorityQM`s (144/144 queries).
+- **Rare events (`experiments/buffy_jani/run_rare.sh`).** FQ starve at P0 = 0.2, modes, until a 95% CI of
+  ±10% relative half-width, one thread:
+
+  | method | estimate | runs | wall time |
+  |---|---|---|---|
+  | plain Monte Carlo | 3.71e-4 | 2.26M | 220 s |
+  | RESTART, compiled hint `imp` = `deqs_bl` (2 levels chosen) | 3.71e-4 ± 3.7e-5 | 1.03M | 146 s |
+  | RESTART, `imp`, manual levels 1:4, 2:4, 3:4 | 3.27e-4 ± 3.3e-5 | 0.45M | 439 s |
+  | fixed effort, `imp` | 3.63e-4 ± 3.6e-5 | 63k | 428 s (partly shared the CPU) |
+  | RESTART, modes' automatic importance | fails: "Array index out of range" inside modes | | 2 s |
+
+  At this probability, splitting gains at most 1.5×: `deqs_bl` has only five values, and the event is not
+  rare enough to amortise splitting. A finer hint (for instance one that also counts the last queue's backlog)
+  or rarer variants would be needed. modes' automatic compositional importance function crashes on the
+  compiled model; this is worth reporting to the Modest developers.
+

@@ -12,6 +12,14 @@ this size, so every run is capped with `timeout`.
 | `run_smc.sh` | 100k runs each: modes (sync, staged), `prism -sim` (compiled, hand), and `fig2_mc.py` |
 | `fig2_mc.py` | direct Python Monte Carlo of Fig. 2, independent of all models |
 | `parse_time.sh` | how PRISM/stormpy parsing scales when temporaries are `formula`s, against staged temporaries |
+| `run_rare.sh` | rare-event benchmark: modes plain MC vs importance splitting (RESTART, fixed effort; compiled hint vs automatic) on the starve property at P0 = 0.2, to a ±10% relative 95% CI |
+
+Further results (second round, compiler branch `features`):
+- `results/prism_merged/`: `prism -sim` (20k runs, starve, P0 = 0.6) on the compiled model with `merged` stages
+  (11 PRISM steps per time step) vs per-level `stages` (46) vs the hand model.
+- `results/choose/`: modes with uniform resolution on the mixed FQ MDP (`fq_buggy_mdp_mixed.buffy`) in the
+  `choose` and `staged` layouts; must equal the DTMC at the same P0.
+- `results/rare/`: `run_rare.sh` output.
 
 Results and discussion: `docs/notes/jani-vs-prism-compilation-target.md`, section "Results (2026-11-01)". Raw logs
 are in `results/`. `results/smc/` came from an equivalent earlier run of the same models, made by the same

@@ -1,0 +1,39 @@
+PRISM
+=====
+
+Version: 4.10.1
+Date: Sun Nov 01 08:09:03 PST 2026
+Hostname: Jamies-MacBook-Air-2.local
+Memory limits: cudd=1g, java(heap)=2g
+Command line: prism fq_stages.pm fq_stages.props -prop 1 -sim -simmethod ci -simsamples 20000 -simpathlen 1000
+
+Parsing PRISM model file "fq_stages.pm"...
+
+Type:        DTMC
+Modules:     net
+Actions:     [arr_fq_ibs_0] [arr_fq_ibs_1] [arr_fq_ibs_2] [arr_fq_ibs_3] [arr_fq_ibs_4] [temps_1] [temps_2] [temps_3] [temps_4] [temps_5] [temps_6] [temps_7] [temps_8] [temps_9] [temps_10] [temps_11] [temps_12] [temps_13] [temps_14] [temps_15] [temps_16] [temps_17] [temps_18] [temps_19] [temps_20] [temps_21] [temps_22] [temps_23] [temps_24] [temps_25] [temps_26] [temps_27] [temps_28] [temps_29] [temps_30] [temps_31] [temps_32] [temps_33] [temps_34] [temps_35] [temps_36] [temps_37] [temps_38] [temps_39] [temps_40] [step]
+Variables:   stage fq_ibs_0 fq_ibs_1 fq_ibs_2 fq_ibs_3 fq_ibs_4 fq_nq_0 fq_nq_1 fq_nq_2 fq_nq_3 fq_nq_4 fq_nq_len fq_oq_0 fq_oq_1 fq_oq_2 fq_oq_3 fq_oq_4 fq_oq_len fq_deqs_bl fq_cenq fq_aipg time arr_fq_ibs_4 t36 t38 t41 t46 t51 t55 t81 t95 t96 t97 t98 t99 t100 t101 t153 t172 t173 t174 t175 t176 t177 t178 t240 t259 t260 t261 t262 t263 t264 t265 t337 t356 t357 t358 t359 t360 t361 t444 t463 t464 t465 t466 t467 t468 t472 t474 t483 t500 t501 t502 t503 t504 t505 t506 t507 t508 t509 t510 t511 t512 t527 t533 t542 t553 t566 t567 t576 t623 t624 t628 t676 t677 t678 t679 t680 t681 t682 t683 t684 t685 t687 t688 t692 t695 t707 t714 t730 t731 t734 t737 t738 t739 t742 t765 t780 t797 t816 t837 t838 t862 t952 t965 t1045 t1046 t1047 t1048 t1049 t1050 t1051 t1052 t1053 t1055 t1056 t1057 t1058 t1059 t1060 t1061 t1063 t1064 t1065 t1070 t1074 t1087 t1095 t1111 t1112 t1113 t1118 t1119 t1120 t1122 t1156 t1181 t1208 t1237 t1268 t1269 t1298 t1402 t1425 t1510 t1511 t1512 t1513 t1514 t1515 t1516 t1517 t1518 t1519 t1521 t1522 t1523 t1524 t1525 t1526 t1527 t1529 t1530 t1535 t1539 t1552 t1560 t1576 t1577 t1580 t1583 t1584 t1585 t1588 t1631 t1666 t1703 t1742 t1783 t1784 t1813 t1917 t1950 t2035 t2036 t2037 t2038 t2039 t2040 t2041 t2042 t2043 t2045 t2046 t2047 t2048 t2049 t2050 t2051 t2053 t2054 t2055 t2060 t2064 t2077 t2085 t2101 t2102 t2103 t2108 t2109 t2110 t2112 t2166 t2211 t2258 t2307 t2358 t2359 t2388 t2492 t2535
+
+Parsing properties file "fq_stages.props"...
+
+4 properties:
+(1) "starve_violation": P=? [ F<=644 (stage=0&!(fq_deqs_bl<4)) ]
+(2) "cond_a_violation": P=? [ F<=644 (stage=0&!((fq_deqs_bl<4)&((5<time)|(fq_cenq<2)))) ]
+(3) "early_violation": P=? [ F<=644 (stage=0&!((5<time)|(fq_cenq<2))) ]
+(4) "gap_violation": P=? [ F<=644 (stage=0&!((time<7)|(1<fq_aipg))) ]
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F<=644 (stage=0&!(fq_deqs_bl<4)) ]
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=20000
+Simulation parameters: max path length=1000
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 20000 iterations in 46.518 seconds (average 0.0023)
+Path length statistics: average 6.4e+02, min 368, max 645
+
+Result: 0.01165 (+/- 0.001954480246011674 with probability 0.99; rel err 0.1677665447220321)
+

@@ -1,8 +1,10 @@
 # Buffy compiler: design decisions to review (2026-11-01)
 
 These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule:
-- branch `jani-backend`: JANI and PRISM;
-- branch `fperf-backend` = `jani-backend` + the SMT-LIB and FPerf targets.
+- branch `features` (= `jani-backend` + decisions 20–31): JANI and PRISM;
+- branch `fperf-backend` = `features` + the SMT-LIB and FPerf targets.
+
+The [user guide](../../buffy/docs/user-guide.md) (`buffy/docs/user-guide.md`) documents the result.
 
 Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-backend.md` and
 `docs/fperf-backend.md`.
@@ -29,9 +31,8 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
 
 ## Language extensions (all new syntax)
 
-4. Value ranges are required for globals and monitors: `int<lo..hi>`, `queue<lo..hi>[cap]`. Locals need none,
-   because they are transient. *Alternative:* infer ranges by interval analysis (the analysis now exists in
-   `immut/Bounds`).
+4. Value ranges for globals and monitors: `int<lo..hi>`, or inferred when left out (decision 21). Queues still
+   need `queue<lo..hi>[cap]`. Locals need none, because they are transient.
 5. **Buffer direction is inferred.** A parameter is an input if it is a `move-p` source or receives traffic or a
    connection, and an output otherwise. Explicit `in`/`out` keywords are optional.
 6. **A `network { ... }` block** declares `instance`, `capacity`, `traffic ~ uniform | nondet | bernoulli | {k: p}`,
@@ -45,9 +46,8 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
 
 ## Semantics choices
 
-9. **Count buffers only** (the URF "tally" model): input buffers tail-drop at capacity, and output buffers start
-   empty each step. Filters `B |> F` and `move-b`/`backlog-b` are rejected with an error; they need a
-   class-aware buffer module, which is the next language feature to add.
+9. **Count buffers** (the URF "tally" model) when the program has no `packet` declaration: input buffers
+   tail-drop at capacity, and output buffers start empty each step. With packet classes, see decision 20.
 10. **Queues:**
     - `enq` on a full queue is a no-op;
     - `deq` on an empty queue returns `lo` and leaves the queue unchanged;
@@ -93,3 +93,71 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     independent Python references. Every layout is checked in Storm and mcsta, and SMT answers against Storm.
     FQ-size models are compared **only by SMC** (modes, `prism -sim`) and with a direct Python Monte Carlo of the
     paper's Fig. 2, always under `timeout`.
+
+## Additions on branch `features` (2026-11-01, second round)
+
+20. **Packet classes.** `packet { int<lo..hi> field; ... }` makes every combination of field values a class
+    (at most 4096). Filters are `B |> pred` over fields, constants and program variables, allowed in move
+    sources, `backlog-p`/`backlog-b`, `arrivals-p`/`drops-p` and traffic. Each buffer is stored either as
+    **per-class counts** or as a **FIFO sequence** of class ids (slots plus a length; unused slots 0), chosen
+    per buffer: counts when every move out of it "pins" one class (its filter conjunction contains
+    `field == e` for every field, with e free of fields), FIFO otherwise. This matches the URF slides' choice
+    between tuples and multiscale (count) buffer models. `--fifo-buffers` forces FIFO everywhere; the tests
+    check that both representations agree. Output buffers are always FIFO with classes (they cost no state).
+    *Alternatives:* always FIFO (exact but far more states); multisets with a fixed tie-break (inexact).
+21. **`move-b(src, dst, n)`** moves the longest FIFO prefix of (matching) packets whose total size is at most
+    n, so a head packet that does not fit blocks the rest (no partial packets). Sizes come from a field named
+    `size`; without one every packet is 1 byte. `backlog-b` sums sizes.
+22. **Traffic with classes:** each source must select exactly one class (a filter of constants), and a buffer
+    may have one source per class. Several sources into one buffer arrive in declaration order within a step,
+    which decides tail drops. The emitters no longer build arrival updates: the elaborator gives each staged
+    arrival transition its updates.
+23. **Range inference:** the least fixpoint of interval analysis over the step from the initial value, with
+    widening to the program's constants (±1) and one narrowing pass; a variable still growing at 2⁴⁰ is
+    an error that asks for a saturating range. Sound but can over-approximate (RR's `last` gets −1..2).
+24. **Queries are bounded LTL** over state predicates (F/G/X/U with step bounds, `! && || ->`). A single
+    unnested F/G/U keeps the old direct encoding; everything else becomes a **deterministic monitor** built
+    at compile time by formula progression (NNF, interned formulas, states enumerated by BFS over the atom
+    valuations, ≤ 16 atoms per state, ≤ 100k states). The monitor's update reads the values the step
+    computes, and the initial state is folded in at compile time, so it observes time-step boundary states
+    in every layout (sync, staged, choose, PRISM). The property is `F<=H mon = accept`. This answers open
+    question 3 of the JANI-vs-PRISM note in favour of monitors, which work for every target, SMC included.
+    *Alternative:* PRISM-language LTL (Storm/PRISM only, no SMC with modes).
+25. **`given ψ`:** for DTMCs, two properties `<q>_joint` = P(φ ∧ ψ) and `<q>_given` = P(ψ), whose ratio is the
+    conditional probability. For MDPs, `Pmax` uses φ ∧ ψ and `Pmin` uses φ ∨ ¬ψ, so violating paths count
+    against the optimiser; this is the constrained optimum when ψ only restricts nondeterministic choices and
+    can always be respected. `given assumptions` = no assumption flag set within the formula's horizon.
+    *Alternative:* Storm's conditional properties (reachability conditions only, Storm only).
+26. **Network assumptions** `assume e;` (in the network block) read globals and monitors before the step and
+    this step's `arrivals-p`/`drops-p`, but not buffers (which differ between layouts at that point). A
+    violation sets the sticky `assume_violated`. With monitors for memory, these express the slides' path
+    conditions (`examples/jani/deck_rr.buffy`).
+27. **`--prune-violations`:** the violating step leads to one absorbing sink (all state except flags and
+    monitors reset to initial values), the slides' "prune on path-condition violation". It is off by default
+    because it makes queries that do not exclude violations meaningless.
+28. **Staged layouts resolve nondeterministic sources before probabilistic ones** (keeping per-buffer order),
+    so a scheduler never sees the current step's probabilistic arrivals before choosing, as in the sync layout.
+    This was a semantic difference between layouts before.
+29. **PRISM `merged` temp stages** (the new `auto` choice above 2·10⁶ tree nodes): consecutive DAG levels are
+    grouped while every inlined expression stays below 4096 tree nodes (`--prism-stage-size`); only
+    temporaries read by a later stage are variables; the last group is folded into `[step]`. FQ: 11 instead of
+    46 PRISM steps per time step, 104 instead of 165 bounded variables, a 460 KB instead of 32 KB file, and
+    `prism -sim` as fast as on the hand model.
+30. **JANI `choose` layout** (agreed with the netmdp session): each nondeterministic source chooses on its own
+    edge (`arr_<src>_<k>`, ordered by a `turn` variable) into a persistent bounded variable; one `tick` then
+    runs the step with the probabilistic sources. It is the default for MDPs with more than 64 joint choices
+    (`--layout auto`). Property bounds are scaled by (choices + 1) and evaluated at `turn = 0`; a `time`-based
+    bound was rejected because it needs a `horizon`.
+31. **JANI properties never reference step temporaries** (a latent bug: a query atom identical to a shared
+    step node was printed as the transient's name, which Storm rejects in the staged layout).
+
+## Additions on branch `fperf-backend`
+
+32. **Multi-instance FPerf:** one queuing module per instance, linked with FPerf queue edges as `connect`
+    says. FPerf's queue semantics (an output's enqueues land at the tail of the linked queue at the next step,
+    tail-dropped at its size) equal Buffy's flush. Connected inputs use their value before the flush for
+    `deq_cnt`; modules share per-step state variables. Packet classes are rejected in FPerf for now.
+33. **SMT workload constraints** use network assumptions plus `given assumptions` rather than new syntax.
+34. **The old AST/visitor/SMTIR skeleton is kept**, documented as superseded, rather than deleted: it is the
+    starting point the URF report describes. *Revisit:* delete it once you agree.
+
