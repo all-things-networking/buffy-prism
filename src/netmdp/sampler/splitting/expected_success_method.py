@@ -16,11 +16,11 @@ class ExpectedSuccess:
         self.n = n
 
     def get_levels_splits(self):
-        import src.smc.sampler.fixed_effort_smc_sampler
+        import src.netmdp.sampler.fixed_effort_smc_sampler
         all_levels = self.importance.get_all_levels()
         max_level = max(all_levels)
         const_splits = len(all_levels) * [self.n]
-        generic_fe_sampler = src.smc.sampler.fixed_effort_smc_sampler.FixedEffortSMCSampler(
+        generic_fe_sampler = src.netmdp.sampler.fixed_effort_smc_sampler.FixedEffortSMCSampler(
             self.model_name, self.program, self.phi, self.trace_len, self.goal_deq,
             self.importance, self.n, None, all_levels, const_splits, max_level)
 

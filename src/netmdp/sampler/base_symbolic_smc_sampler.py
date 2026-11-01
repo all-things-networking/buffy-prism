@@ -29,13 +29,16 @@ class BaseSymbolicSMCSampler(BaseSMCSampler):
         else:
             if len(actions) != 5:
                 raise SamplerError(f"unexpected number of actions: {actions}")
+            # Choice index k is the k-th REC_PKT_GET_IQi command, i.e. k arrivals. The five commands share one
+            # action label, so this must run in INDEX_LEVEL mode: in GLOBAL_NAMES mode step(label) always takes
+            # the first matching choice (0 arrivals) and the traffic weights are silently ignored.
             select_action = random.choices(actions, weights=[0.4, 0.39, 0.14, 0.05, 0.02])[0]
         state, reward, labels = simulator.step(select_action)
         return state, reward, labels, select_action
 
     def make_program_simulator(self):
         simulator = stormpy.simulator.create_simulator(self.program)
-        simulator.set_action_mode(stormpy.simulator.SimulatorActionMode.GLOBAL_NAMES)
+        simulator.set_action_mode(stormpy.simulator.SimulatorActionMode.INDEX_LEVEL)
         simulator.set_observation_mode(stormpy.simulator.SimulatorObservationMode.PROGRAM_LEVEL)
         return simulator
 
