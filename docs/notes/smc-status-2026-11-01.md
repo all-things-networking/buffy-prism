@@ -201,6 +201,12 @@ The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa wo
 
   Recommendation (sent to the Buffy session): use per-source choice layouts (staged) for MDPs, simulation and RL.
 
+  **Decided (user, 2026-11-01): adopt the per-source-choice-then-sync MDP layout.**
+  - Each traffic automaton makes its own arrival choice, in a fixed order, into a persistent bounded variable; then one `tick` sync runs the step block.
+  - It becomes the default for MDPs whose sync layout would exceed 64 joint choices. DTMC layouts are unchanged, and `--staged` stays recommended for RL.
+  - Step bounds then count choice steps too. The Buffy session is asked to scale them by (sources + 1) or bound by a time counter.
+  - Requested from the Buffy session; native validation follows when it sends emitted files.
+
 ## Design decisions to review (made unattended)
 
 1. **Simulation engine: our own JANI → C compiler**, in C rather than Rust (clang already installed, no
