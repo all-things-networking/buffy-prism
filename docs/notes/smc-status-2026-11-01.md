@@ -180,6 +180,27 @@ states) and the die MDP: `tests/test_jani_native.py`. FQ-CoDel estimates are bit
 against the reference 0.7146, at 16 ms/run (native: 3.6 µs). The fixed-effort sampler runs and its estimate is
 consistent with the reference.
 
+## 7. Buffy emitter output on the native simulator
+
+The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa worktree, buffy@e45184e) are checked by
+`tests/buffy_jani_check.py`; 1M runs per property.
+- **Agreement:** every DTMC property agrees with the Buffy session's modes references within about 2 standard
+  errors, and native sync and staged layouts agree with each other to 3–4 digits. Examples:
+  - P0 = 0.6: starve 0.01189 (modes 0.01191), cond_a 0.8675 (0.8670);
+  - P0 = 0.2: starve 3.5e-4 (modes 3.5–4.4e-4, direct Python MC 3.25e-4).
+- **MDP with uniform choices** reproduces the uniform DTMC in both layouts.
+- **Code-size fix:** generating code per joint destination produced 128 MB of C for the sync layout (5 traffic
+  automata × 5 outcomes, each copying the 42-level step block). Code is now generated once per automaton edge,
+  network transitions call their parts, and joint outcomes are mixed-radix indices sampled part by part. The C is
+  now 65 KB and compiles in 0.6 s.
+- **Cost per run:**
+  - DTMC sync: 6.5 µs per 14-step run (modes: about 130 µs).
+  - Staged: 5.7 µs per 84-step run.
+  - MDP sync: 3.5 µs/step, because all 3125 joint choices are enabled in every state.
+  - MDP staged: 63 ns/step.
+
+  Recommendation (sent to the Buffy session): use per-source choice layouts (staged) for MDPs, simulation and RL.
+
 ## Design decisions to review (made unattended)
 
 1. **Simulation engine: our own JANI → C compiler**, in C rather than Rust (clang already installed, no
@@ -202,10 +223,16 @@ consistent with the reference.
    for compatibility with Storm's export. For networks, such actions never fire, with a warning.
 9. **Exact model checking is never used on the network models.** Storm explicit checks are used only for toy-model
    compiler tests.
+10. **Synchronised transitions sample their participants' outcomes independently**, one inverse-CDF draw per
+    participant from a single uniform rescaled within the chosen interval. This is exact, and keeps the batch
+    simulators' single-uniform-per-step interface.
+11. **For the Buffy emitter's output, cross-check against modes, not Storm**, because of the Storm bug the Buffy
+    session found for multi-level transients across synchronised edges. Storm stays the oracle for the toy-model
+    equivalence tests, which have no transients.
 
 ## Next steps
 
-1. Test the native compiler on the Buffy emitter's output (fq_buggy, sync and `--staged` layouts) against modes.
+1. Native splitting and learning on the Buffy emitter's models (staged MDP for RL; `imp` = `fq_deqs_bl`).
 2. Bounded-LTL monitors as extra JANI automata or indexed observer assignments. The compiler now supports both.
 3. Compare the step-aware Q-learner and cross-entropy against LCRL on the same MDP and monitor.
 4. A native splitting path for state-dependent schedulers (for example a tabular policy compiled into C), if
