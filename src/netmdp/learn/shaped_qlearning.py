@@ -16,8 +16,9 @@ from typing import Callable, Hashable, Optional
 
 import numpy as np
 
-from src.netmdp.sim.scheduler import Scheduler, PolicyScheduler
-from src.netmdp.sim.simulator import Simulator
+from src.netmdp.sim.jani_native import NativePolicy
+from src.netmdp.sim.scheduler import Scheduler, PolicyScheduler, action_weights
+from src.netmdp.sim.simulator import NativeJaniSimulator, Simulator
 
 
 @dataclass
@@ -114,3 +115,22 @@ class ShapedQLearning:
             p[int(np.argmax(row))] = 1.0
             return p
         return PolicyScheduler(policy)
+
+    def greedy_native_policy(self) -> NativePolicy:
+        """
+        greedy_scheduler() as a native table policy (keys: all state variables, plus the step count when step-aware)
+        for the native batch simulators and splitting. Needs the native backend and a behaviour scheduler given by
+        per-action weights, which handles states missing from the table, as in greedy_scheduler().
+        """
+        if not isinstance(self.sim, NativeJaniSimulator):
+            raise ValueError("greedy_native_policy needs a NativeJaniSimulator")
+        model = self.sim.model
+        rows = {}
+        for key, row in self.q.items():
+            state_bytes, t = key if self.step_aware else (key, None)
+            state = np.frombuffer(state_bytes, dtype=np.int32).copy()
+            enabled = model.enabled_edges(state)
+            if len(enabled) == len(row):
+                rows[tuple(int(v) for v in state) + ((t,) if self.step_aware else ())] = int(enabled[np.argmax(row)])
+        return NativePolicy.table(model, rows, step=self.step_aware,
+                                  default=action_weights(model, self.behaviour))

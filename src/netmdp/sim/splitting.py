@@ -4,7 +4,8 @@ expected-success selection of levels and splitting factors (Budde, D'Argenio & H
 importance splitting", 2019; the same method as sampler/splitting/expected_success_method.py and modes'
 --levels ExpectedSuccess).
 
-Choices are resolved by a memoryless, state-independent scheduler (per-action weights), i.e. on the induced DTMC.
+Choices are resolved by a scheduler: per-action weights (memoryless) or a NativePolicy, which may depend on the
+state and the step count (e.g. a learned policy); either way the splitting runs on the induced DTMC.
 """
 from collections import deque
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from typing import Optional
 import numpy as np
 
 from src.netmdp.sampler.sampler import Sampler
-from src.netmdp.sim.jani_native import JaniModel
+from src.netmdp.sim.jani_native import JaniModel, Scheduling
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class SplittingDesign:
 
 
 def expected_success(model: JaniModel, goal: str, importance: str, max_importance: int, horizon: int,
-                     action_weights: Optional[dict[str, float]] = None, pilot_effort: int = 256, seed: int = 1,
+                     scheduler: Scheduling = None, pilot_effort: int = 256, seed: int = 1,
                      max_pilots: int = 1000) -> SplittingDesign:
     """
     Pilot fixed-effort runs with a threshold at every importance value 1..max_importance (constant effort) until the
@@ -41,7 +42,7 @@ def expected_success(model: JaniModel, goal: str, importance: str, max_importanc
     p_up, m = np.zeros(max_importance + 1), 0
     while m < max_pilots and p_up[-1] == 0:
         m += 1
-        _, _, succ = model.fixed_effort(1, horizon, goal, importance, thresholds, efforts, action_weights,
+        _, _, succ = model.fixed_effort(1, horizon, goal, importance, thresholds, efforts, scheduler,
                                         seed=seed + m, level_successes=True)
         p_up += (succ[0] / pilot_effort - p_up) / m
     if p_up[-1] == 0:
@@ -60,14 +61,14 @@ def expected_success(model: JaniModel, goal: str, importance: str, max_importanc
 class NativeSplittingSampler(Sampler):
     """ Feeds per-run splitting estimates to the hypothesis tests (sample() = one RESTART or fixed-effort run). """
     def __init__(self, model: JaniModel, method: str, design: SplittingDesign, goal: str, importance: str,
-                 horizon: int, action_weights: Optional[dict[str, float]] = None, user_effort: int = 8,
+                 horizon: int, scheduler: Scheduling = None, user_effort: int = 8,
                  batch: int = 1000, seed: int = 1):
         super().__init__()
         if method not in ("restart", "fixed_effort"):
             raise ValueError("method must be 'restart' or 'fixed_effort'")
         self.model, self.method, self.design = model, method, design
         self.goal, self.importance, self.horizon = goal, importance, horizon
-        self.weights, self.user_effort, self.batch, self.seed = action_weights, user_effort, batch, seed
+        self.scheduler, self.user_effort, self.batch, self.seed = scheduler, user_effort, batch, seed
         self._buffer: deque = deque()
         self.steps = 0
 
@@ -78,10 +79,10 @@ class NativeSplittingSampler(Sampler):
         self.seed += 1
         if self.method == "restart":
             out, steps = self.model.restart(n, self.horizon, self.goal, self.importance, self.design.thresholds,
-                                            self.design.factors, self.weights, seed=self.seed)
+                                            self.design.factors, self.scheduler, seed=self.seed)
         else:
             out, steps = self.model.fixed_effort(n, self.horizon, self.goal, self.importance, self.design.thresholds,
-                                                 self.design.efforts(self.user_effort), self.weights, seed=self.seed)
+                                                 self.design.efforts(self.user_effort), self.scheduler, seed=self.seed)
         self.steps += steps
         return out
 

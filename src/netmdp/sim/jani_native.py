@@ -22,7 +22,7 @@ import subprocess
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Callable, Optional, Sequence, Union
 
 import numpy as np
 
@@ -30,6 +30,8 @@ CACHE = Path(os.environ.get("NETMDP_JANI_CACHE", Path.home() / ".cache" / "netmd
 CC = os.environ.get("CC", "cc")
 
 Expr = Union[int, float, bool, str, dict]
+# Schedulers accepted by the batch simulators: per-action weights (memoryless; None = uniform) or a NativePolicy.
+Scheduling = Union[None, dict[str, float], "NativePolicy"]
 
 
 class JaniUnsupported(Exception):
@@ -130,29 +132,86 @@ static uint64_t jm_splitmix(uint64_t *x) { uint64_t z = (*x += 0x9e3779b97f4a7c1
 static double jm_uniform(uint64_t s[4]) { uint64_t r = jm_rotl(s[1] * 5, 7) * 9, t = s[1] << 17;
     s[2] ^= s[0]; s[3] ^= s[1]; s[1] ^= s[2]; s[0] ^= s[3]; s[2] ^= t; s[3] = jm_rotl(s[3], 45);
     return (r >> 11) * 0x1.0p-53; }
+/* policy tables: open addressing on a hash of the key values (slot = row index, -1 = empty) */
+static uint64_t jm_khash(const int32_t *v, int n) { uint64_t h = 0xcbf29ce484222325ULL;
+    for (int i = 0; i < n; i++) { h ^= (uint32_t)v[i]; h *= 0x100000001b3ULL; h ^= h >> 29; } return h; }
+int jm_table_fill(int64_t nrows, int nkey, const int32_t *keys, int64_t mask, int32_t *slot) {
+  for (int64_t h = 0; h <= mask; h++) slot[h] = -1;
+  for (int64_t r = 0; r < nrows; r++) {
+    const int32_t *k = keys + r * nkey; uint64_t h = jm_khash(k, nkey) & mask;
+    for (; slot[h] >= 0; h = (h + 1) & mask)
+      if (!memcmp(keys + (int64_t)slot[h] * nkey, k, nkey * sizeof(int32_t))) return -5;
+    slot[h] = (int32_t)r;
+  }
+  return 0;
+}
+"""
+
+
+# Schedulers for the batch simulators. A policy maps (state, step count t, enabled edges) to weights over the enabled
+# edges; the choice is drawn in proportion to them. Sources, in order: a callback (any function of state and t), else
+# a table row looked up by the key (s[keyvar[0]], ..., with keyvar = -1 standing for t), holding (edge, weight) pairs;
+# if neither applies or the weights of the enabled edges sum to 0, the default per-edge weights w; uniform if those sum
+# to 0 too. Policies depend on (state, t) only, which the splitting trajectories carry, so splitting stays unbiased.
+_POLICY = r"""
+typedef int (*jm_policy_cb)(const int32_t *s, int t, const int32_t *en, int k, double *w);
+typedef struct {
+  const double *w;                         /* NE default per-edge weights */
+  int64_t mask;                            /* table slots - 1 (a power of two minus 1); -1: no table */
+  const int32_t *slot, *keyvar, *keys;     /* slot -> row; key variables; nrows * nkey key values */
+  int32_t nkey;
+  const int64_t *row_off;                  /* row r holds pairs row_off[r] .. row_off[r+1]-1 */
+  const int32_t *row_edge; const double *row_w;
+  jm_policy_cb cb;
+} jm_policy;
+
+/* Draws one of the k > 1 enabled edges en[0..k-1] in state s at step t; returns it, or -4 if the callback failed. */
+static int jm_pick(const jm_policy *p, const int32_t *s, int t, const int32_t *en, int k, uint64_t rng[4]) {
+  double wk[NE], tot = 0.0; int have = 0;
+  if (p->cb) {
+    if (p->cb(s, t, en, k, wk)) return -4;
+    have = 1;
+  } else if (p->mask >= 0) {
+    int32_t key[NV + 1];
+    for (int j = 0; j < p->nkey; j++) key[j] = p->keyvar[j] < 0 ? t : s[p->keyvar[j]];
+    for (uint64_t h = jm_khash(key, p->nkey) & p->mask; p->slot[h] >= 0; h = (h + 1) & p->mask) {
+      int64_t r = p->slot[h];
+      if (memcmp(p->keys + r * p->nkey, key, p->nkey * sizeof(int32_t))) continue;
+      for (int i = 0; i < k; i++) {
+        wk[i] = 0.0;
+        for (int64_t j = p->row_off[r]; j < p->row_off[r + 1]; j++) if (p->row_edge[j] == en[i]) wk[i] = p->row_w[j];
+      }
+      have = 1; break;
+    }
+  }
+  if (have) for (int i = 0; i < k; i++) tot += wk[i];
+  if (tot <= 0.0) { tot = 0.0; for (int i = 0; i < k; i++) tot += (wk[i] = p->w[en[i]]); }
+  double u = jm_uniform(rng);
+  if (tot <= 0.0) return en[(int)(u * k)];
+  double acc = 0.0; u *= tot;
+  for (int i = 0; i < k; i++) { acc += wk[i]; if (u < acc) return en[i]; }
+  return en[k - 1];
+}
 """
 
 
 # Native importance splitting. Levels: thresholds thr[0] < ... < thr[nlev-1] on an importance function;
-# level(s) = number of thresholds <= imp(s). Choices are resolved by per-edge weights, as in jm_simulate.
+# level(s) = number of thresholds <= imp(s). Choices are resolved by a jm_policy, as in jm_simulate.
 _SPLITTING = r"""
 static int jm_level(int64_t v, int nlev, const int64_t *thr) { int l = 0; while (l < nlev && v >= thr[l]) l++; return l; }
-static int jm_choose(const int32_t *s, const double *w, uint64_t rng[4], int32_t *en) {
+/* the edge taken from s at step t: -1 on a deadlock, -4 if the policy callback failed */
+static int jm_choose(const int32_t *s, int t, const jm_policy *pol, uint64_t rng[4], int32_t *en) {
   int k = jm_enabled(s, en); if (k == 0) return -1; if (k == 1) return en[0];
-  double tot = 0.0; for (int i = 0; i < k; i++) tot += w[en[i]];
-  double u = jm_uniform(rng);
-  if (tot <= 0.0) return en[(int)(u * k)];
-  double acc = 0.0; u *= tot;
-  for (int i = 0; i < k; i++) { acc += w[en[i]]; if (u < acc) return en[i]; }
-  return en[k - 1];
+  return jm_pick(pol, s, t, en, k, rng);
 }
 typedef struct { int32_t s[NV]; int32_t t; int32_t clev; } jm_traj;
 
 /* RESTART (Villen-Altamirano): a trajectory that up-crosses threshold i (from below) splits into fac[i] copies
    (itself + fac[i]-1 retrials created at level i+1); a retrial created at level c > 0 is killed when its level
    drops below c. Re-crossings split again. A goal hit at level l adds 1/prod_{i<l} fac[i]. Per-run estimates go to
-   out[r] (unbiased for P(goal within horizon)). Returns 0, or -1 (bounds error) / -2 (more than max_traj). */
-int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const double *w, int goal, int imp, int nlev,
+   out[r] (unbiased for P(goal within horizon)). Returns 0, or -1 (bounds error) / -2 (more than max_traj) /
+   -4 (policy callback failed). */
+int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, int goal, int imp, int nlev,
                const int64_t *thr, const int32_t *fac, uint64_t seed, int64_t max_traj, double *out, int64_t *steps_out) {
   uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
   double wl[65]; wl[0] = 1.0; for (int i = 0; i < nlev && i < 64; i++) wl[i + 1] = wl[i] / fac[i];
@@ -168,7 +227,9 @@ int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const double *w, 
       for (;;) {
         if (jm_goal(cur.s, goal)) { est += wl[lvl]; break; }
         if (cur.t >= horizon) break;
-        int e = jm_choose(cur.s, w, rng, en); if (e < 0) break;
+        int e = jm_choose(cur.s, cur.t, pol, rng, en);
+        if (e == -4) { free(stk); return -4; }
+        if (e < 0) break;
         if (jm_step(cur.s, e, jm_uniform(rng)) < 0) { free(stk); return -1; }
         cur.t++; steps++;
         int nl = jm_level(jm_imp(cur.s, imp), nlev, thr);
@@ -198,7 +259,7 @@ int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const double *w, 
    (entrance states kept with multiplicity); a trial succeeds on reaching level i+1 (or the goal, at the last level)
    before the horizon. Estimate prod_i succ_i / eff[i]. Per-level success counts go to succ[r*(nlev+1)+i] if succ is
    not NULL (used by the expected-success level selection). */
-int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const double *w, int goal, int imp, int nlev,
+int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, int goal, int imp, int nlev,
                     const int64_t *thr, const int32_t *eff, uint64_t seed, double *out, int32_t *succ,
                     int64_t *steps_out) {
   uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
@@ -218,7 +279,9 @@ int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const double
           if (jm_goal(tr.s, goal)) { hit = 1; break; }
           if (i < nlev && jm_level(jm_imp(tr.s, imp), nlev, thr) > i) { hit = 1; break; }
           if (tr.t >= horizon) break;
-          int e = jm_choose(tr.s, w, rng, en); if (e < 0) break;
+          int e = jm_choose(tr.s, tr.t, pol, rng, en);
+          if (e == -4) { free(cur); free(nxt); return -4; }
+          if (e < 0) break;
           if (jm_step(tr.s, e, jm_uniform(rng)) < 0) { free(cur); free(nxt); return -1; }
           tr.t++; steps++;
         }
@@ -249,6 +312,98 @@ class _Edge:
     """ A (possibly synchronised) transition of the network: one edge per participating automaton instance. """
     action: str
     parts: list[_Part]
+
+
+_i32p, _i64p, _dblp = ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(ctypes.c_double)
+_POLICY_CB = ctypes.CFUNCTYPE(ctypes.c_int, _i32p, ctypes.c_int, _i32p, ctypes.c_int, _dblp)
+
+
+class _PolicyStruct(ctypes.Structure):
+    """ Mirrors jm_policy in _POLICY. """
+    _fields_ = [("w", _dblp), ("mask", ctypes.c_int64), ("slot", _i32p), ("keyvar", _i32p), ("keys", _i32p),
+                ("nkey", ctypes.c_int32), ("row_off", _i64p), ("row_edge", _i32p), ("row_w", _dblp),
+                ("cb", _POLICY_CB)]
+
+
+class NativePolicy:
+    """
+    A scheduler for the native batch simulators (simulate, simulate_scores, restart, fixed_effort) that may depend
+    on the state and the step count t. Weights over the enabled edges come from, in order:
+      - a callback fn(state, t, enabled) -> weights for the enabled edges (any Python function; about 1 µs per
+        decision instead of a few ns);
+      - a table: key -> {edge index: weight} (or a single edge index, for deterministic choices), where the key is
+        the values of `key_vars` (default: all state variables), followed by t when step=True;
+      - the default per-action weights (a dict, as for memoryless schedulers), for table misses and callback rows
+        that give the enabled edges total weight 0; uniform if those sum to 0 too.
+    Depending only on (state, t) keeps importance splitting unbiased: trajectories carry t, so the induced process is
+    a Markov chain on (state, t) and clones continue under the same scheduler.
+    """
+    def __init__(self, model: "JaniModel", default: Optional[dict[str, float]] = None):
+        self.model = model
+        self.default = model.edge_weight_vector(default)
+        self.error: Optional[BaseException] = None
+        self._keep: list = []
+        self._s = _PolicyStruct(w=_dptr(self.default), mask=-1, cb=_POLICY_CB())
+
+    @classmethod
+    def table(cls, model: "JaniModel", rows: dict[tuple, Union[int, dict[int, float]]],
+              key_vars: Optional[Sequence[str]] = None, step: bool = True,
+              default: Optional[dict[str, float]] = None) -> "NativePolicy":
+        p = cls(model, default)
+        names = list(key_vars) if key_vars is not None else [v.name for v in model.variables]
+        keyvar = np.array([model.index[n] for n in names] + ([-1] if step else []), dtype=np.int32)
+        nkey, n = len(keyvar), len(rows)
+        keys = np.zeros((max(n, 1), max(nkey, 1)), dtype=np.int32)
+        off = np.zeros(n + 1, dtype=np.int64)
+        edges: list[int] = []
+        weights: list[float] = []
+        for r, (key, row) in enumerate(rows.items()):
+            if len(key) != nkey:
+                raise ValueError(f"policy key {key!r} has {len(key)} values, expected {nkey}")
+            keys[r, :nkey] = key
+            row = {int(row): 1.0} if not isinstance(row, dict) else row
+            edges.extend(int(e) for e in row)
+            weights.extend(float(w) for w in row.values())
+            off[r + 1] = len(edges)
+        edge_arr = np.array(edges or [0], dtype=np.int32)
+        if len(edges) and (edge_arr.min() < 0 or edge_arr.max() >= len(model.edges)):
+            raise ValueError("policy table refers to an edge index outside the model")
+        w_arr = np.array(weights or [0.0], dtype=np.float64)
+        cap = 1 << max(4, (2 * n).bit_length())     # load factor <= 1/2
+        slot = np.empty(cap, dtype=np.int32)
+        keys = np.ascontiguousarray(keys[:, :nkey]) if nkey else keys
+        if model.lib.jm_table_fill(n, nkey, _ptr(keys), cap - 1, _ptr(slot)) == -5:
+            raise ValueError("duplicate key in policy table")
+        p._keep += [keyvar, keys, off, edge_arr, w_arr, slot]
+        p._s.mask, p._s.slot, p._s.keyvar, p._s.keys, p._s.nkey = cap - 1, _ptr(slot), _ptr(keyvar), _ptr(keys), nkey
+        p._s.row_off, p._s.row_edge, p._s.row_w = _lptr(off), _ptr(edge_arr), _dptr(w_arr)
+        p.rows = n
+        return p
+
+    @classmethod
+    def callback(cls, model: "JaniModel",
+                 fn: Callable[[np.ndarray, int, np.ndarray], Sequence[float]],
+                 default: Optional[dict[str, float]] = None) -> "NativePolicy":
+        """ fn(state, t, enabled edge indices) -> weights; `state` is a read-only view valid only during the call. """
+        p = cls(model, default)
+        nv = len(model.variables)
+
+        def cb(s, t, en, k, w):
+            try:
+                state = np.ctypeslib.as_array(s, (nv,))
+                state.flags.writeable = False
+                np.ctypeslib.as_array(w, (k,))[:] = fn(state, t, np.ctypeslib.as_array(en, (k,)).copy())
+                return 0
+            except BaseException as e:          # re-raised by the caller once the C batch returns
+                p.error = e
+                return 1
+        p._cb = _POLICY_CB(cb)
+        p._s.cb = p._cb
+        return p
+
+    @property
+    def ref(self):
+        return ctypes.byref(self._s)
 
 
 class JaniModel:
@@ -585,10 +740,11 @@ double jm_prob(const int32_t *s, int e, int d) {
         for f, name in enumerate(self.importance_names):
             out.append(f"    case {f}: return (int64_t)({tr.c(self.importance[name])});")
         out.append("  }\n  return 0;\n}")
-        # Batch simulation under a memoryless scheduler given as one weight per edge (choices are drawn among the
-        # enabled edges in proportion to their weights; uniformly if all enabled weights are zero).
+        # Batch simulation under a scheduler given as a jm_policy (see _POLICY).
+        out.append(_POLICY)
         out.append(r"""
-int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const double *edge_weight, int goal,
+/* Returns the number of runs that reach the goal within the horizon, or -1 (bounds error) / -4 (callback failed). */
+int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, int goal,
                     uint64_t seed, int64_t *steps_out) {
   uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
   int64_t hits = 0, steps = 0; int32_t s[NV], en[NE];
@@ -598,14 +754,8 @@ int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const double
       if (jm_goal(s, goal)) { hits++; break; }
       if (t == horizon) break;
       int k = jm_enabled(s, en); if (k == 0) break;
-      int e = en[0];
-      if (k > 1) {
-        double tot = 0.0; for (int i = 0; i < k; i++) tot += edge_weight[en[i]];
-        double u = jm_uniform(rng);
-        if (tot <= 0.0) e = en[(int)(u * k)];
-        else { double acc = 0.0; u *= tot; e = en[k - 1];
-               for (int i = 0; i < k; i++) { acc += edge_weight[en[i]]; if (u < acc) { e = en[i]; break; } } }
-      }
+      int e = k > 1 ? jm_pick(pol, s, t, en, k, rng) : en[0];
+      if (e == -4) return -4;
       if (jm_step(s, e, jm_uniform(rng)) < 0) return -1;
       steps++;
     }
@@ -616,7 +766,7 @@ int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const double
 
 /* Like jm_simulate, but records for each run the maximum of variable score_var and how often each edge was chosen
    at decision points (states with several enabled edges); for cross-entropy / distribution learning. */
-int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const double *edge_weight, int score_var,
+int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, int score_var,
                        uint64_t seed, int32_t *scores, int32_t *counts) {
   uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
   int32_t s[NV], en[NE];
@@ -628,11 +778,7 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
       int k = jm_enabled(s, en); if (k == 0) break;
       int e = en[0];
       if (k > 1) {
-        double tot = 0.0; for (int i = 0; i < k; i++) tot += edge_weight[en[i]];
-        double u = jm_uniform(rng);
-        if (tot <= 0.0) e = en[(int)(u * k)];
-        else { double acc = 0.0; u *= tot; e = en[k - 1];
-               for (int i = 0; i < k; i++) { acc += edge_weight[en[i]]; if (u < acc) { e = en[i]; break; } } }
+        if ((e = jm_pick(pol, s, t, en, k, rng)) == -4) return -4;
         cnt[e]++;
       }
       if (jm_step(s, e, jm_uniform(rng)) < 0) return -1;
@@ -654,17 +800,20 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
         lib.jm_goal.argtypes, lib.jm_goal.restype = [i32p, ctypes.c_int], ctypes.c_int
         lib.jm_apply.argtypes, lib.jm_apply.restype = [i32p, ctypes.c_int, ctypes.c_int], ctypes.c_int
         lib.jm_ndest.argtypes, lib.jm_ndest.restype = [ctypes.c_int], ctypes.c_int
-        lib.jm_simulate.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, ctypes.POINTER(dbl), ctypes.c_int,
+        polp = ctypes.POINTER(_PolicyStruct)
+        lib.jm_table_fill.argtypes = [ctypes.c_int64, ctypes.c_int, i32p, ctypes.c_int64, i32p]
+        lib.jm_table_fill.restype = ctypes.c_int
+        lib.jm_simulate.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, polp, ctypes.c_int,
                                     ctypes.c_uint64, ctypes.POINTER(ctypes.c_int64)]
         lib.jm_simulate.restype = ctypes.c_int64
-        lib.jm_simulate_scores.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, ctypes.POINTER(dbl), ctypes.c_int,
+        lib.jm_simulate_scores.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, polp, ctypes.c_int,
                                            ctypes.c_uint64, i32p, i32p]
         lib.jm_simulate_scores.restype = ctypes.c_int
         i64p, dblp = ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(dbl)
-        lib.jm_restart.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, dblp, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        lib.jm_restart.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, polp, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                    i64p, i32p, ctypes.c_uint64, ctypes.c_int64, dblp, i64p]
         lib.jm_restart.restype = ctypes.c_int
-        lib.jm_fixed_effort.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, dblp, ctypes.c_int, ctypes.c_int,
+        lib.jm_fixed_effort.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, polp, ctypes.c_int, ctypes.c_int,
                                         ctypes.c_int, i64p, i32p, ctypes.c_uint64, dblp, i32p, i64p]
         lib.jm_fixed_effort.restype = ctypes.c_int
 
@@ -698,50 +847,63 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
     def goal(self, s: np.ndarray, name: str) -> bool:
         return bool(self.lib.jm_goal(_ptr(s), self.goal_names.index(name)))
 
-    def simulate(self, n_runs: int, horizon: int, goal: str, action_weights: Optional[dict[str, float]] = None,
+    def policy(self, scheduler: "Scheduling") -> NativePolicy:
+        """ A NativePolicy from per-action weights (memoryless; None = uniform) or an existing NativePolicy. """
+        if isinstance(scheduler, NativePolicy):
+            if scheduler.model is not self:
+                raise ValueError("the policy was built for another model")
+            return scheduler
+        return NativePolicy(self, scheduler)
+
+    def simulate(self, n_runs: int, horizon: int, goal: str, scheduler: "Scheduling" = None,
                  seed: int = 1, start: Optional[np.ndarray] = None) -> tuple[int, int]:
-        """ Native batch runs under a memoryless action-weight scheduler; returns (goal hits, total steps). """
-        w = np.array([(action_weights or {}).get(a, 0.0) for a in self.edge_actions], dtype=np.float64)
+        """ Native batch runs under a scheduler (see policy()); returns (goal hits, total steps). """
+        pol = self.policy(scheduler)
         s0 = self.initial_state() if start is None else np.ascontiguousarray(start, dtype=np.int32)
         steps = ctypes.c_int64(0)
-        hits = self.lib.jm_simulate(_ptr(s0), n_runs, horizon, w.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                                    self.goal_names.index(goal), seed, ctypes.byref(steps))
-        if hits < 0:
-            raise RuntimeError("assignment out of variable bounds during simulation")
+        hits = self.lib.jm_simulate(_ptr(s0), n_runs, horizon, pol.ref, self.goal_names.index(goal), seed,
+                                    ctypes.byref(steps))
+        _check(hits if hits < 0 else 0, pol)
         return hits, steps.value
 
-    def simulate_scores(self, n_runs: int, horizon: int, score_var: str, edge_weights: np.ndarray,
-                        seed: int = 1) -> tuple[np.ndarray, np.ndarray]:
-        """ Native batch runs under per-edge weights; returns (max of score_var per run, per-run edge choice counts). """
-        w = np.ascontiguousarray(edge_weights, dtype=np.float64)
+    def simulate_scores(self, n_runs: int, horizon: int, score_var: str,
+                        scheduler: Union[np.ndarray, NativePolicy], seed: int = 1) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Native batch runs under per-edge weights or a NativePolicy; returns (max of score_var per run, per-run edge
+        choice counts).
+        """
+        if isinstance(scheduler, NativePolicy):
+            pol = self.policy(scheduler)
+        else:
+            pol = NativePolicy(self)
+            pol.default = np.ascontiguousarray(scheduler, dtype=np.float64)
+            pol._s.w = _dptr(pol.default)
         scores = np.empty(n_runs, dtype=np.int32)
         counts = np.empty((n_runs, len(self.edges)), dtype=np.int32)
-        if self.lib.jm_simulate_scores(_ptr(self.initial_state()), n_runs, horizon,
-                                       w.ctypes.data_as(ctypes.POINTER(ctypes.c_double)), self.index[score_var], seed,
-                                       _ptr(scores), _ptr(counts)) < 0:
-            raise RuntimeError("assignment out of variable bounds during simulation")
+        _check(self.lib.jm_simulate_scores(_ptr(self.initial_state()), n_runs, horizon, pol.ref,
+                                           self.index[score_var], seed, _ptr(scores), _ptr(counts)), pol)
         return scores, counts
 
     def edge_weight_vector(self, action_weights: Optional[dict[str, float]]) -> np.ndarray:
         return np.array([(action_weights or {}).get(a, 0.0) for a in self.edge_actions], dtype=np.float64)
 
     def restart(self, n_runs: int, horizon: int, goal: str, importance: str, thresholds: list[int],
-                factors: list[int], action_weights: Optional[dict[str, float]] = None, seed: int = 1,
+                factors: list[int], scheduler: "Scheduling" = None, seed: int = 1,
                 max_trajectories: int = 10_000_000) -> tuple[np.ndarray, int]:
         """ n_runs independent RESTART runs (see jm_restart); returns (per-run estimates, total steps). """
         thr = np.ascontiguousarray(thresholds, dtype=np.int64)
         fac = np.ascontiguousarray(factors, dtype=np.int32)
         if len(thr) != len(fac) or np.any(np.diff(thr) <= 0) or np.any(fac < 1):
             raise ValueError("need increasing thresholds and factors >= 1 of the same length")
-        w, out, steps = self.edge_weight_vector(action_weights), np.empty(n_runs), ctypes.c_int64(0)
-        rc = self.lib.jm_restart(_ptr(self.initial_state()), n_runs, horizon, _dptr(w), self.goal_names.index(goal),
+        pol, out, steps = self.policy(scheduler), np.empty(n_runs), ctypes.c_int64(0)
+        rc = self.lib.jm_restart(_ptr(self.initial_state()), n_runs, horizon, pol.ref, self.goal_names.index(goal),
                                  self.importance_names.index(importance), len(thr), _lptr(thr), _ptr(fac), seed,
                                  max_trajectories, _dptr(out), ctypes.byref(steps))
-        _check(rc)
+        _check(rc, pol)
         return out, steps.value
 
     def fixed_effort(self, n_runs: int, horizon: int, goal: str, importance: str, thresholds: list[int],
-                     efforts: list[int], action_weights: Optional[dict[str, float]] = None, seed: int = 1,
+                     efforts: list[int], scheduler: "Scheduling" = None, seed: int = 1,
                      level_successes: bool = False):
         """
         n_runs independent fixed-effort runs (see jm_fixed_effort); efforts has len(thresholds)+1 entries.
@@ -751,13 +913,13 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
         eff = np.ascontiguousarray(efforts, dtype=np.int32)
         if len(eff) != len(thr) + 1 or np.any(np.diff(thr) <= 0) or np.any(eff < 1):
             raise ValueError("need increasing thresholds and len(thresholds)+1 positive efforts")
-        w, out, steps = self.edge_weight_vector(action_weights), np.empty(n_runs), ctypes.c_int64(0)
+        pol, out, steps = self.policy(scheduler), np.empty(n_runs), ctypes.c_int64(0)
         succ = np.empty((n_runs, len(eff)), dtype=np.int32) if level_successes else None
-        rc = self.lib.jm_fixed_effort(_ptr(self.initial_state()), n_runs, horizon, _dptr(w),
+        rc = self.lib.jm_fixed_effort(_ptr(self.initial_state()), n_runs, horizon, pol.ref,
                                       self.goal_names.index(goal), self.importance_names.index(importance), len(thr),
                                       _lptr(thr), _ptr(eff), seed, _dptr(out),
                                       _ptr(succ) if succ is not None else None, ctypes.byref(steps))
-        _check(rc)
+        _check(rc, pol)
         return (out, steps.value, succ) if level_successes else (out, steps.value)
 
 
@@ -773,13 +935,18 @@ def _lptr(a: np.ndarray):
     return a.ctypes.data_as(ctypes.POINTER(ctypes.c_int64))
 
 
-def _check(rc: int) -> None:
+def _check(rc: int, pol: Optional[NativePolicy] = None) -> None:
+    if rc == -4 and pol is not None and pol.error is not None:
+        err, pol.error = pol.error, None
+        raise err
     if rc == -1:
         raise RuntimeError("assignment out of variable bounds during simulation")
     if rc == -2:
         raise RuntimeError("RESTART: trajectory limit exceeded (splitting factors too large?) or out of memory")
     if rc == -3:
         raise ValueError("at most 64 splitting levels are supported")
+    if rc == -4:
+        raise RuntimeError("policy callback failed")
 
 
 def _const_eval(e: Expr, consts: dict) -> Union[int, float, bool]:

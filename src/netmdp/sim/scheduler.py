@@ -15,7 +15,8 @@ from typing import Any, Callable, Optional, Union
 
 import numpy as np
 
-from src.netmdp.sim.simulator import Simulator, SimState
+from src.netmdp.sim.jani_native import JaniModel, NativePolicy
+from src.netmdp.sim.simulator import NativeJaniSimulator, Simulator, SimState
 
 
 class Scheduler(ABC):
@@ -95,6 +96,36 @@ class PolicyScheduler(Scheduler):
 
     def distribution(self, sim, choices, memory):
         return np.asarray(self.policy(sim, choices, memory), dtype=float)
+
+
+def action_weights(model: JaniModel, scheduler: Scheduler) -> Optional[dict[str, float]]:
+    """ The per-action weights of a memoryless, state-independent scheduler (None = uniform), else ValueError. """
+    if isinstance(scheduler, UniformScheduler):
+        return None
+    if isinstance(scheduler, ActionWeightScheduler):
+        return {a: scheduler.weight_of(a) for a in set(model.edge_actions)}
+    raise ValueError(f"{type(scheduler).__name__} is not given by per-action weights")
+
+
+def native_policy(model: JaniModel, scheduler: Scheduler) -> NativePolicy:
+    """
+    The scheduler as a NativePolicy for the native batch simulators and splitting. Per-action weights stay native;
+    any other scheduler is called back from C with a NativeJaniSimulator placed at (state, t), about 1 µs per decision.
+    Schedulers with memory beyond the step count are not supported (splitting would have to copy the memory).
+    """
+    try:
+        return NativePolicy(model, action_weights(model, scheduler))
+    except ValueError:
+        pass
+    if type(scheduler).update_memory is not Scheduler.update_memory or scheduler.initial_memory() is not None:
+        raise ValueError("native policies cannot carry scheduler memory; use Rollout")
+    sim = NativeJaniSimulator(model)
+    actions = model.edge_actions
+
+    def fn(state: np.ndarray, t: int, enabled: np.ndarray) -> np.ndarray:
+        sim.place(state, t, enabled)
+        return scheduler.distribution(sim, [actions[e] for e in enabled], None)
+    return NativePolicy.callback(model, fn)
 
 
 @dataclass

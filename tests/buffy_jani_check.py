@@ -1,9 +1,12 @@
 """
-Runs the native JANI simulator on models emitted by the Buffy→JANI compiler (buffyc-mc, jani-backend branch) and
-compares with modes reference estimates. MDPs are resolved uniformly over enabled edges. Properties of the form filter(·, P(true U<=N goal), initial) are turned
-into native goals with horizon N.
+Runs the native JANI simulator on models emitted by the Buffy→JANI compiler (buffyc-mc, Buffy branch `features`) and
+compares with modes reference estimates. MDPs are resolved uniformly over enabled edges. Properties of the form
+filter(·, P(true U<=N goal), initial) are turned into native goals with horizon N.
 
-Usage: PYTHONPATH=. python tests/buffy_jani_check.py <models dir> [runs] [file ...]
+The models are generated into experiments/buffy_jani/models/ by experiments/buffy_jani/make_models.sh (from the
+buffy submodule; building it needs ANTLR: brew install antlr antlr4-cpp-runtime).
+
+Usage: PYTHONPATH=. python tests/buffy_jani_check.py experiments/buffy_jani/models [runs] [file ...]
 """
 import json
 import sys

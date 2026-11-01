@@ -182,8 +182,11 @@ consistent with the reference.
 
 ## 7. Buffy emitter output on the native simulator
 
-The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa worktree, buffy@e45184e) are checked by
-`tests/buffy_jani_check.py`; 1M runs per property.
+The emitted models (FQ) are checked by `tests/buffy_jani_check.py`, 1M runs per property.
+- **Where the models come from:**
+  - Generated into `experiments/buffy_jani/models/` by `experiments/buffy_jani/make_models.sh`, from the `buffy` submodule on Buffy branch `features`.
+  - The models and the compiler arrive with the Buffy-to-JANI branch `claude/buffy-to-jani-compiler-de318b`.
+  - Building the submodule needs ANTLR (`brew install antlr antlr4-cpp-runtime`).
 - **Agreement:** every DTMC property agrees with the Buffy session's modes references within about 2 standard
   errors, and native sync and staged layouts agree with each other to 3–4 digits. Examples:
   - P0 = 0.6: starve 0.01189 (modes 0.01191), cond_a 0.8675 (0.8670);
@@ -216,14 +219,47 @@ The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa wo
     - choose 5 × 95 ns ≈ 0.48 µs; staged 6 × 73 ns ≈ 0.44 µs; the old sync MDP 3.5 µs.
     - choose compiles in 0.6 s, against 84 s for the sync MDP.
 
+## 8. Native state- and step-dependent schedulers (`NativePolicy`)
+
+All native batch paths (`simulate`, `simulate_scores`, `restart`, `fixed_effort`, and through them
+`expected_success` and `NativeSplittingSampler`) now take a scheduler. That is either a per-action weight dict, as
+before, or a `NativePolicy`, which maps (state, step count t, enabled edges) to weights.
+
+- **Kinds of policy:**
+  - **Table:** an open-addressing hash on the key values. The key is all state variables (or a chosen projection) plus t, and each row holds (edge, weight) pairs; one edge index gives a deterministic choice.
+  - **Python callback:** `scheduler.native_policy(model, s)` turns any memoryless `Scheduler` into one.
+  - **Fallback:** table misses, and rows whose enabled edges sum to 0, fall back to the default per-action weights, then to uniform.
+- **Learner export:** `ShapedQLearning.greedy_native_policy()` exports the greedy policy as a table.
+- **Why splitting stays unbiased:** a policy depends only on (state, t), and splitting trajectories carry t. The induced process is a Markov chain on (state, t), and clones continue under the same scheduler. Schedulers with other memory still need `Rollout`.
+- **No cost on the weights path:** an A/B against the previous code under the same load gives 94 vs 96 ns/step (course FQ-CoDel) and 349 vs 345 ns/step (Buffy choose). The estimates are bit-identical to before.
+- **Tests** (`tests/test_native_policy.py`, on the 640-state toy, with exact values by backward induction over (state, t)):
+  - A random stochastic table over 11k (state, t) keys, with misses and zero rows: exact 0.55978; MC 0.55831 ± 0.0015, RESTART 0.55926 ± 0.0023, fixed effort 0.55911 ± 0.0017.
+  - Table and callback runs are bit-identical with the same seed, with full and projected keys.
+  - A Q-learner's greedy table: exact 0.998583; MC 0.99850 ± 0.00012, RESTART 0.99900 ± 0.0012. It is bit-identical to `native_policy(greedy_scheduler())`.
+- **Learned adversary on a Buffy model** (`tests/native_policy_experiment.py`, `tests/modes/results/native_policy.json`):
+  - Setup: mixed fq_buggy MDP, choose layout, P0 = 0.2, starve_violation. Step-aware Q-learning ran 20k episodes in 101 s and visited 651k decision states; the table builds in 18 s.
+  - Results under the greedy policy (the machine was heavily loaded, so absolute times are inflated):
+
+    | Path | Estimate | Cost |
+    |---|---|---|
+    | Python Rollout | 6.0e-4 ± 3.4e-4 | 56 µs/step |
+    | Native callback | 6.2e-4 ± 1.5e-4 | 8.3 µs/step |
+    | Native table | 6.25e-4 ± 3.5e-5 | 0.40 µs/step |
+    | Native RESTART on the table | 6.1e-4 ± 1.1e-4 | — |
+    | Uniform baseline | 3.47e-4 ± 2.6e-5 | 0.22 µs/step |
+
+  - **The paths agree**, and the native table is about 140× faster than Rollout.
+  - **The learner is weak:** it only doubles the violation probability. The reward is sparse, and success rates in training were at most 0.15%.
+  - **RESTART is not useful here.** Expected success put a single threshold at the goal level (`fq_deqs_bl` jumps straight to 4, and the goal is hit on the same step), so the run is only an unbiasedness check. The work-normalised variance ratio in the JSON (0.47) is timing noise from the load, not a splitting gain. Rare-event gains on these models need an importance function with intermediate values, for example on queue occupancy.
+
 ## Design decisions to review (made unattended)
 
 1. **Simulation engine: our own JANI → C compiler**, in C rather than Rust (clang already installed, no
    build/binding toolchain) and loaded with ctypes. stormpy stays as the reference backend. modes (closed) is used
    for cross-validation and for estimating under exported schedulers.
-2. **Native batch paths** (`simulate`, `simulate_scores`, `restart`, `fixed_effort`) accept only memoryless,
-   state-independent schedulers given as per-action weights. State-dependent and learned policies go through the
-   Python `Simulator`/`Rollout` path (about 9 µs/step).
+2. **Native batch paths** (`simulate`, `simulate_scores`, `restart`, `fixed_effort`) take a `NativePolicy` that
+   depends on the state and the step count, not only on per-action weights; this superseded the earlier design
+   (section 8). Schedulers with memory beyond the step count still need the Python `Rollout` path.
 3. **Q-learning updates run in reverse order** after each episode; the step count is part of the key by default;
    shaping is available but off by default (it hurt).
 4. **Cross-entropy** learns one arrival distribution per input queue (i.i.d. over time), elite quantile ρ = 0.05,
@@ -247,8 +283,10 @@ The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa wo
 
 ## Next steps
 
-1. Native splitting and learning on the Buffy emitter's models (staged MDP for RL; `imp` = `fq_deqs_bl`).
-2. Bounded-LTL monitors as extra JANI automata or indexed observer assignments. The compiler now supports both.
+1. Better adversaries on the Buffy MDPs: the tabular Q-learner barely beats uniform on the mixed model
+   (section 8), since the reward is sparse and the table is large. Try cross-entropy over per-source arrival weights,
+   which are native and memoryless.
+2. Bounded-LTL properties: the Buffy compiler already builds them, as one deterministic monitor variable
+   `mon_<query>` per query, by formula progression (Buffy `features` 39dfcde; user guide §4). The simulator needs
+   nothing new. The remaining decision is the LTL fragment, if more than bounded F/G/X/U is wanted.
 3. Compare the step-aware Q-learner and cross-entropy against LCRL on the same MDP and monitor.
-4. A native splitting path for state-dependent schedulers (for example a tabular policy compiled into C), if
-   learned policies need rare-event evaluation without exporting to modes.

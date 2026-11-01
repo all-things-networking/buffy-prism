@@ -87,6 +87,10 @@ class NativeJaniSimulator(Simulator):
     def get(self, var: str) -> int:
         return int(self._s[self._index[var]])
 
+    def place(self, state: np.ndarray, t: int, enabled: Optional[np.ndarray] = None) -> None:
+        """ Positions the simulator at (state, t) without copying; for evaluating schedulers from native code. """
+        self._s, self._t, self._enabled = state, t, enabled
+
     @property
     def state(self) -> np.ndarray:
         return self._s
