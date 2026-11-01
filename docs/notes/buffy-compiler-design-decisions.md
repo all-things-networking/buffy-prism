@@ -4,6 +4,8 @@ These were made while running unattended, and each one is open to revision. The 
 - branch `features` (= `jani-backend` + decisions 20–31, 34, 35): JANI and PRISM;
 - branch `fperf-backend` = `features` + the SMT-LIB and FPerf targets.
 
+Both are now merged into Buffy `main`, which the submodule tracks.
+
 The [user guide](../../buffy/docs/user-guide.md) (`buffy/docs/user-guide.md`) documents the result.
 
 Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-backend.md` and

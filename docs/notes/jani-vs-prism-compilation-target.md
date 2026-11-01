@@ -4,7 +4,7 @@ Status: discussion notes (2026-10-31), written to hand this thread to a new sess
 **(unverified)** were not checked against tool source or docs and should be confirmed before relying on them.
 **Update 2026-11-01:** open question 1 is answered and every (unverified) claim has been checked; see the
 corrections marked **[verified]** / **[corrected]** inline and the section "Results (2026-11-01)" at the end.
-A Buffy → JANI / PRISM / SMT-LIB compiler now exists (`buffyc-mc`, Buffy repo branch `jani-backend`, here as the
+A Buffy → JANI / PRISM / SMT-LIB compiler now exists (`buffyc-mc`, Buffy repo `main`, here as the
 `buffy` submodule).
 
 ## Question
@@ -222,7 +222,8 @@ now prints a note for sync-layout MDPs with more than 64 joint choices.
 
 ## Second round (2026-11-01): compiler branch `features`
 
-The `buffy` submodule now points at branch `features` (JANI/PRISM; `fperf-backend` adds SMT-LIB and FPerf).
+The `buffy` submodule pointed at branch `features` for this round (JANI/PRISM; `fperf-backend` adds SMT-LIB and
+FPerf); both branches have since been merged into Buffy `main`, which the submodule now tracks.
 `buffy/docs/user-guide.md` documents the language and every path; design decisions 20–34 are in
 `docs/notes/buffy-compiler-design-decisions.md`.
 

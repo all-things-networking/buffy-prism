@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build buffyc-mc (buffy submodule, branch jani-backend) and generate all models into ./models.
+# Build buffyc-mc (buffy submodule, Buffy main) and generate all models into ./models.
 set -e
 cd "$(dirname "$0")"
 make -C ../../buffy mc >/dev/null
