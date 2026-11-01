@@ -1,0 +1,1260 @@
+{
+ "experiments": {
+  "1": [
+   2,
+   0.7,
+   0.01
+  ],
+  "2": [
+   4,
+   0.011,
+   0.001
+  ],
+  "3": [
+   8,
+   0.00015,
+   0.0001
+  ]
+ },
+ "reps": 10,
+ "runs": {
+  "1": {
+   "base/SPRT": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.7084782608695652,
+     "variance": 0.2065368147448015,
+     "runs": 4600,
+     "time": 1.222,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.7353982300884956,
+     "variance": 0.1945876732712037,
+     "runs": 1130,
+     "time": 0.812,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.7153543307086614,
+     "variance": 0.2036225122450245,
+     "runs": 2540,
+     "time": 0.989,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.7086092715231788,
+     "variance": 0.20648217183456868,
+     "runs": 4530,
+     "time": 1.124,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.7152941176470589,
+     "variance": 0.20364844290657438,
+     "runs": 2550,
+     "time": 1.01,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.716,
+     "variance": 0.20334400000000002,
+     "runs": 2500,
+     "time": 1.025,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.7148854961832061,
+     "variance": 0.20382422353009733,
+     "runs": 2620,
+     "time": 0.992,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.712037037037037,
+     "variance": 0.2050402949245542,
+     "runs": 3240,
+     "time": 1.271,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.708803611738149,
+     "variance": 0.20640105172510434,
+     "runs": 4430,
+     "time": 1.264,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.731496062992126,
+     "variance": 0.19640957281914564,
+     "runs": 1270,
+     "time": 0.916,
+     "levels": null
+    }
+   ],
+   "base/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.7141112618724612,
+     "variance": 0.20416560162358183,
+     "runs": 22110,
+     "time": 3.006,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.7147711826008172,
+     "variance": 0.20388257712049326,
+     "runs": 22070,
+     "time": 3.16,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.7116561656165599,
+     "variance": 0.20521090297066988,
+     "runs": 22220,
+     "time": 3.421,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.7097309417040394,
+     "variance": 0.2060221707543049,
+     "runs": 22300,
+     "time": 3.473,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.7125845737483084,
+     "variance": 0.20481703748135738,
+     "runs": 22170,
+     "time": 3.721,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.7151927437641701,
+     "variance": 0.2037013211864032,
+     "runs": 22050,
+     "time": 3.733,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.7154264972776773,
+     "variance": 0.20360066205025656,
+     "runs": 22040,
+     "time": 2.866,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.7114260008996833,
+     "variance": 0.20530828178377228,
+     "runs": 22230,
+     "time": 2.877,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.7134658834161747,
+     "variance": 0.20444155482588228,
+     "runs": 22130,
+     "time": 3.763,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.7163636363636319,
+     "variance": 0.20319601304191576,
+     "runs": 22000,
+     "time": 3.429,
+     "levels": null
+    }
+   ],
+   "RESTART/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.7176845943482233,
+     "variance": 0.20262265269122823,
+     "runs": 21940,
+     "time": 3.657,
+     "levels": 1
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.7132339656729905,
+     "variance": 0.20454051438898835,
+     "runs": 22140,
+     "time": 3.214,
+     "levels": 1
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.7183021451392079,
+     "variance": 0.20235340909211555,
+     "runs": 21910,
+     "time": 2.872,
+     "levels": 1
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.7136980108499082,
+     "variance": 0.20434239806105461,
+     "runs": 22120,
+     "time": 2.906,
+     "levels": 1
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.7134658834161753,
+     "variance": 0.2044415548258829,
+     "runs": 22130,
+     "time": 3.063,
+     "levels": 1
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.7086314847942757,
+     "variance": 0.2064821379952023,
+     "runs": 22360,
+     "time": 3.049,
+     "levels": 1
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.7120270270270249,
+     "variance": 0.2050537764666778,
+     "runs": 22200,
+     "time": 2.968,
+     "levels": 1
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.7097309417040318,
+     "variance": 0.20602217075430376,
+     "runs": 22300,
+     "time": 2.87,
+     "levels": 1
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.7148164929768892,
+     "variance": 0.2038631114593561,
+     "runs": 22070,
+     "time": 2.686,
+     "levels": 1
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.7165000000000045,
+     "variance": 0.20313698349925075,
+     "runs": 22000,
+     "time": 2.703,
+     "levels": 1
+    }
+   ],
+   "WFE(8)/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.7178378378378385,
+     "variance": 0.02528101190592175,
+     "runs": 2775,
+     "time": 2.918,
+     "levels": 1
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.7131125226860255,
+     "variance": 0.025094656905579965,
+     "runs": 2755,
+     "time": 2.95,
+     "levels": 1
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.7180314821365396,
+     "variance": 0.02576573609274236,
+     "runs": 2827,
+     "time": 3.001,
+     "levels": 1
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.7133273703041147,
+     "variance": 0.025475503026546883,
+     "runs": 2795,
+     "time": 2.989,
+     "levels": 1
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.7136493228795442,
+     "variance": 0.02557209658955912,
+     "runs": 2806,
+     "time": 2.871,
+     "levels": 1
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.7085389495946416,
+     "variance": 0.025866544057147348,
+     "runs": 2837,
+     "time": 2.759,
+     "levels": 1
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.7121539014742899,
+     "variance": 0.025343236737470885,
+     "runs": 2781,
+     "time": 3.248,
+     "levels": 1
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.7099778679454096,
+     "variance": 0.024689150801504356,
+     "runs": 2711,
+     "time": 3.038,
+     "levels": 1
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.7139986018874507,
+     "variance": 0.026085439158883707,
+     "runs": 2861,
+     "time": 2.994,
+     "levels": 1
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.715686274509806,
+     "variance": 0.026044134816798747,
+     "runs": 2856,
+     "time": 2.892,
+     "levels": 1
+    }
+   ]
+  },
+  "2": {
+   "base/SPRT": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.012310730743910467,
+     "variance": 0.012159176652461405,
+     "runs": 15190,
+     "time": 1.723,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.012295618051013734,
+     "variance": 0.01214443582775732,
+     "runs": 15290,
+     "time": 1.779,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.012815884476534296,
+     "variance": 0.012651637581618424,
+     "runs": 11080,
+     "time": 1.356,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.013199105145413871,
+     "variance": 0.01302488876877418,
+     "runs": 8940,
+     "time": 1.141,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.012322274881516588,
+     "variance": 0.012170436423260933,
+     "runs": 14770,
+     "time": 1.822,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.013052415210688593,
+     "variance": 0.012882049667856377,
+     "runs": 9730,
+     "time": 1.335,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.012002069322296948,
+     "variance": 0.011858019654279727,
+     "runs": 19330,
+     "time": 2.082,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.01583710407239819,
+     "variance": 0.015586290206998218,
+     "runs": 4420,
+     "time": 0.961,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.01402439024390244,
+     "variance": 0.013827706722189173,
+     "runs": 6560,
+     "time": 0.923,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.015208333333333334,
+     "variance": 0.014977039930555556,
+     "runs": 4800,
+     "time": 0.795,
+     "levels": null
+    }
+   ],
+   "base/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.013111126971665122,
+     "variance": 0.01293931767233399,
+     "runs": 140110,
+     "time": 15.017,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.013002806361085105,
+     "variance": 0.01283382573743444,
+     "runs": 138970,
+     "time": 14.81,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.013039110154287673,
+     "variance": 0.012869184112190533,
+     "runs": 139350,
+     "time": 15.051,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.01234857662023027,
+     "variance": 0.012196181615036456,
+     "runs": 132080,
+     "time": 14.153,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.012507476076554985,
+     "variance": 0.012351131456753855,
+     "runs": 133760,
+     "time": 14.448,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.013150217035508498,
+     "variance": 0.012977381173411833,
+     "runs": 140530,
+     "time": 15.047,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.01237915407854997,
+     "variance": 0.01222600296426141,
+     "runs": 132400,
+     "time": 15.967,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.012926105522182733,
+     "variance": 0.012759113661801061,
+     "runs": 138170,
+     "time": 16.581,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.0128529839883552,
+     "variance": 0.012687877133578496,
+     "runs": 137400,
+     "time": 16.648,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.01274221961244858,
+     "variance": 0.012579947788465853,
+     "runs": 136240,
+     "time": 16.651,
+     "levels": null
+    }
+   ],
+   "RESTART/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.012973332121845368,
+     "variance": 0.011613816134075864,
+     "runs": 125780,
+     "time": 35.843,
+     "levels": 2
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.012535536902871432,
+     "variance": 0.011251870703999274,
+     "runs": 121870,
+     "time": 36.758,
+     "levels": 2
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.013422571639004576,
+     "variance": 0.011979145624878576,
+     "runs": 129740,
+     "time": 36.888,
+     "levels": 2
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.012698671448365716,
+     "variance": 0.011328498370270501,
+     "runs": 122690,
+     "time": 33.795,
+     "levels": 2
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.012588399503722078,
+     "variance": 0.011161833629560912,
+     "runs": 120900,
+     "time": 30.643,
+     "levels": 2
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.012668814777763668,
+     "variance": 0.011338357932583143,
+     "runs": 122810,
+     "time": 28.768,
+     "levels": 2
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.012523192050795783,
+     "variance": 0.011197027092846104,
+     "runs": 121270,
+     "time": 33.87,
+     "levels": 2
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.012827534929830714,
+     "variance": 0.01146296817498114,
+     "runs": 124150,
+     "time": 30.413,
+     "levels": 2
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.01254421321049594,
+     "variance": 0.011224680632842262,
+     "runs": 121570,
+     "time": 35.161,
+     "levels": 2
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.012896283198485467,
+     "variance": 0.01148879577153406,
+     "runs": 124420,
+     "time": 37.667,
+     "levels": 2
+    }
+   ],
+   "WFE(8)/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.012543272573453914,
+     "variance": 0.0013987019705626856,
+     "runs": 15821,
+     "time": 38.259,
+     "levels": 2
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.01293515643964678,
+     "variance": 0.0014619592313687237,
+     "runs": 16478,
+     "time": 44.756,
+     "levels": 2
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.012918397263620813,
+     "variance": 0.001451671504085587,
+     "runs": 16372,
+     "time": 46.481,
+     "levels": 2
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.012930919043997123,
+     "variance": 0.001461418172896984,
+     "runs": 16473,
+     "time": 46.823,
+     "levels": 2
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.012383753028451357,
+     "variance": 0.0013723076499115821,
+     "runs": 15547,
+     "time": 41.181,
+     "levels": 2
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.012904591007583942,
+     "variance": 0.0014477390673790242,
+     "runs": 16330,
+     "time": 39.344,
+     "levels": 2
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.012174813598630154,
+     "variance": 0.0013559868448265993,
+     "runs": 15379,
+     "time": 41.757,
+     "levels": 2
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.012787619609887732,
+     "variance": 0.001445175223547005,
+     "runs": 16303,
+     "time": 37.825,
+     "levels": 2
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.01330276872159653,
+     "variance": 0.0014996127787112762,
+     "runs": 16870,
+     "time": 48.842,
+     "levels": 2
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.012933946657237391,
+     "variance": 0.0014450838375503823,
+     "runs": 16303,
+     "time": 53.043,
+     "levels": 2
+    }
+   ]
+  },
+  "3": {
+   "base/SPRT": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.0007894736842105263,
+     "variance": 0.0007888504155124654,
+     "runs": 3800,
+     "time": 0.76,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.00025680534155110427,
+     "variance": 0.00025673939256765506,
+     "runs": 19470,
+     "time": 2.565,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.0005194805194805195,
+     "variance": 0.0005192106594703997,
+     "runs": 7700,
+     "time": 1.322,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.0003048780487804878,
+     "variance": 0.00030478509815585965,
+     "runs": 13120,
+     "time": 1.668,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.00034305317324185246,
+     "variance": 0.0003429354877621811,
+     "runs": 11660,
+     "time": 1.543,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.0009933774834437086,
+     "variance": 0.0009923906846190957,
+     "runs": 3020,
+     "time": 0.7,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.0004756242568370987,
+     "variance": 0.00047539803840340684,
+     "runs": 8410,
+     "time": 1.179,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.0004514672686230248,
+     "variance": 0.00045126344592838686,
+     "runs": 8860,
+     "time": 1.28,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.001176470588235294,
+     "variance": 0.0011750865051903113,
+     "runs": 2550,
+     "time": 0.667,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.00044004400440044003,
+     "variance": 0.00043985036567463124,
+     "runs": 9090,
+     "time": 1.512,
+     "levels": null
+    }
+   ],
+   "base/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.00046905972170430745,
+     "variance": 0.00046884062482511037,
+     "runs": 509530,
+     "time": 64.618,
+     "levels": null
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.00039290892932316836,
+     "variance": 0.0003927554704507659,
+     "runs": 427580,
+     "time": 52.409,
+     "levels": null
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.00041242169561050653,
+     "variance": 0.00041225252299270724,
+     "runs": 448570,
+     "time": 56.383,
+     "levels": null
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.0004079149012890989,
+     "variance": 0.00040774942565647686,
+     "runs": 443720,
+     "time": 53.268,
+     "levels": null
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.0003736112476649318,
+     "variance": 0.00037347258028447316,
+     "runs": 406840,
+     "time": 52.368,
+     "levels": null
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.0004406022259809026,
+     "variance": 0.00044040901530483135,
+     "runs": 478890,
+     "time": 58.267,
+     "levels": null
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.0004223910818872646,
+     "variance": 0.0004222135869357037,
+     "runs": 459290,
+     "time": 52.963,
+     "levels": null
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.00043532469728028566,
+     "variance": 0.0004351361092294543,
+     "runs": 473210,
+     "time": 52.447,
+     "levels": null
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.0003929089293231628,
+     "variance": 0.00039275547045076667,
+     "runs": 427580,
+     "time": 47.709,
+     "levels": null
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.0004010541996104026,
+     "variance": 0.00040089427388413667,
+     "runs": 436350,
+     "time": 48.387,
+     "levels": null
+    }
+   ],
+   "RESTART/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.0004056063832346844,
+     "variance": 2.099958304185115e-05,
+     "runs": 46180,
+     "time": 18.131,
+     "levels": 6
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.0004370046363447951,
+     "variance": 2.3871677086655425e-05,
+     "runs": 48260,
+     "time": 21.052,
+     "levels": 6
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.0004341251390985345,
+     "variance": 2.3203964848076643e-05,
+     "runs": 47770,
+     "time": 24.828,
+     "levels": 7
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.0004073067960112704,
+     "variance": 2.0940672250830096e-05,
+     "runs": 46130,
+     "time": 19.921,
+     "levels": 6
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.0004063287035882639,
+     "variance": 2.2386371276180175e-05,
+     "runs": 47180,
+     "time": 21.022,
+     "levels": 6
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.00036104584922185814,
+     "variance": 1.8848099447972877e-05,
+     "runs": 44650,
+     "time": 24.961,
+     "levels": 7
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.000423436408106217,
+     "variance": 2.3110654883869952e-05,
+     "runs": 47700,
+     "time": 21.361,
+     "levels": 5
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.00039939321542338616,
+     "variance": 2.179320385243187e-05,
+     "runs": 46740,
+     "time": 25.291,
+     "levels": 7
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.00041045930362047903,
+     "variance": 2.2881056193098345e-05,
+     "runs": 47540,
+     "time": 23.092,
+     "levels": 7
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.0004178983671171137,
+     "variance": 2.263103332340534e-05,
+     "runs": 47360,
+     "time": 18.655,
+     "levels": 6
+    }
+   ],
+   "WFE(8)/CR": [
+    {
+     "seed": 1,
+     "decision": null,
+     "estimate": 0.0004125652181394545,
+     "variance": 5.608519410375139e-06,
+     "runs": 36072,
+     "time": 91.307,
+     "levels": 6
+    },
+    {
+     "seed": 2,
+     "decision": null,
+     "estimate": 0.00042566044121191245,
+     "variance": 6.842435634251606e-06,
+     "runs": 36808,
+     "time": 91.169,
+     "levels": 6
+    },
+    {
+     "seed": 3,
+     "decision": null,
+     "estimate": 0.0004134880897170055,
+     "variance": 5.817580414130808e-06,
+     "runs": 36196,
+     "time": 101.733,
+     "levels": 7
+    },
+    {
+     "seed": 4,
+     "decision": null,
+     "estimate": 0.00040626298830158576,
+     "variance": 6.416094498373693e-06,
+     "runs": 36552,
+     "time": 90.527,
+     "levels": 6
+    },
+    {
+     "seed": 5,
+     "decision": null,
+     "estimate": 0.00042194099718570775,
+     "variance": 4.936496082420084e-06,
+     "runs": 35677,
+     "time": 97.248,
+     "levels": 6
+    },
+    {
+     "seed": 6,
+     "decision": null,
+     "estimate": 0.000416134486074928,
+     "variance": 4.785523333126602e-06,
+     "runs": 35589,
+     "time": 97.804,
+     "levels": 7
+    },
+    {
+     "seed": 7,
+     "decision": null,
+     "estimate": 0.0003926922746005182,
+     "variance": 5.573173161958757e-06,
+     "runs": 36051,
+     "time": 84.141,
+     "levels": 5
+    },
+    {
+     "seed": 8,
+     "decision": null,
+     "estimate": 0.0004191140554975755,
+     "variance": 5.500769910604991e-06,
+     "runs": 36008,
+     "time": 80.301,
+     "levels": 7
+    },
+    {
+     "seed": 9,
+     "decision": null,
+     "estimate": 0.00040895885050728505,
+     "variance": 5.606853042860103e-06,
+     "runs": 36071,
+     "time": 82.29,
+     "levels": 7
+    },
+    {
+     "seed": 10,
+     "decision": null,
+     "estimate": 0.00037274882895448053,
+     "variance": 4.642932922568647e-06,
+     "runs": 35506,
+     "time": 73.259,
+     "levels": 6
+    }
+   ]
+  }
+ },
+ "summary": {
+  "1": {
+   "base/SPRT": {
+    "N": 2941.0,
+    "time_s": 1.0625,
+    "estimate": 0.7166356418787478,
+    "R_err": 0.6288339238748069,
+    "a_N_course": 1162.9658173222276,
+    "a_t_course": 0.420146610304273,
+    "wnrv": 0.0001636723300949891,
+    "accept_H+": null
+   },
+   "base/CR": {
+    "N": 22132.0,
+    "time_s": 3.3449000000000004,
+    "estimate": 0.7134728887263522,
+    "R_err": 0.6337306166874631,
+    "a_N_course": 8888.531992873164,
+    "a_t_course": 1.3433603227436044,
+    "wnrv": 6.070062478914195e-05,
+    "accept_H+": null
+   },
+   "RESTART/CR": {
+    "N": 22117.0,
+    "time_s": 2.9988,
+    "estimate": 0.7138090545928731,
+    "R_err": 0.6332109965663928,
+    "a_N_course": 8867.94752723949,
+    "a_t_course": 1.202387351118406,
+    "wnrv": 5.4359611997298005e-05,
+    "accept_H+": null
+   },
+   "WFE(8)/CR": {
+    "N": 2800.4,
+    "time_s": 2.966,
+    "estimate": 0.713631413125566,
+    "R_err": 0.2238566883156964,
+    "a_N_course": 140.33313205703985,
+    "a_t_course": 0.14863164893628775,
+    "wnrv": 5.307888459329856e-05,
+    "accept_H+": null
+   }
+  },
+  "2": {
+   "base/SPRT": {
+    "N": 11011.0,
+    "time_s": 1.3916999999999997,
+    "estimate": 0.013306792548100846,
+    "R_err": 8.637920158502657,
+    "a_N_course": 821571.0616226436,
+    "a_t_course": 103.83983711381644,
+    "wnrv": 0.01006721763587033,
+    "accept_H+": null
+   },
+   "base/CR": {
+    "N": 136901.0,
+    "time_s": 15.437300000000002,
+    "estimate": 0.012805977642086814,
+    "R_err": 8.781686950220742,
+    "a_N_course": 10557534.83521631,
+    "a_t_course": 1190.4940980101298,
+    "wnrv": 0.00870268641150642,
+    "accept_H+": null
+   },
+   "RESTART/CR": {
+    "N": 123520.0,
+    "time_s": 33.9806,
+    "estimate": 0.012767854978318074,
+    "R_err": 8.365549957676524,
+    "a_N_course": 8644229.271178028,
+    "a_t_course": 2378.0448281427466,
+    "wnrv": 0.019246703292042457,
+    "accept_H+": null
+   },
+   "WFE(8)/CR": {
+    "N": 16187.6,
+    "time_s": 43.831100000000006,
+    "estimate": 0.012781523794410572,
+    "R_err": 2.963071685046635,
+    "a_N_course": 142123.79029049372,
+    "a_t_course": 384.82802049727326,
+    "wnrv": 0.023740094590488404,
+    "accept_H+": null
+   }
+  },
+  "3": {
+   "base/SPRT": {
+    "N": 8768.0,
+    "time_s": 1.3195999999999999,
+    "estimate": 0.0005750674368804056,
+    "R_err": 45.4482965389639,
+    "a_N_course": 18110721.867918268,
+    "a_t_course": 2725.6966898842315,
+    "wnrv": 0.33462927505239304,
+    "accept_H+": null
+   },
+   "base/CR": {
+    "N": 451156.0,
+    "time_s": 53.881899999999995,
+    "estimate": 0.0004148197629674031,
+    "R_err": 49.161926798902996,
+    "a_N_course": 1090396701.6351607,
+    "a_t_course": 130226.89721035642,
+    "wnrv": 0.28889649262458644,
+    "accept_H+": null
+   },
+   "RESTART/CR": {
+    "N": 46951.0,
+    "time_s": 21.8314,
+    "estimate": 0.0004102604801766603,
+    "R_err": 11.455745844794112,
+    "a_N_course": 6161572.832914161,
+    "a_t_course": 2865.0244115031032,
+    "wnrv": 0.06130512792542493,
+    "accept_H+": null
+   },
+   "WFE(8)/CR": {
+    "N": 36053.0,
+    "time_s": 88.9779,
+    "estimate": 0.0004089566230190453,
+    "R_err": 5.765473499628897,
+    "a_N_course": 1198426.404585002,
+    "a_t_course": 2957.6863169368394,
+    "wnrv": 0.08199968590481263,
+    "accept_H+": null
+   }
+  }
+ }
+}
