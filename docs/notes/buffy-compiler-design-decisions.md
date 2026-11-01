@@ -1,10 +1,11 @@
 # Buffy compiler: design decisions to review (2026-11-01)
 
-These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule:
-- branch `features` (= `jani-backend` + decisions 20–31, 34, 35): JANI and PRISM;
-- branch `fperf-backend` = `features` + the SMT-LIB and FPerf targets.
+These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule,
+which tracks Buffy `main`. It was developed on branches that are now merged and deleted: `jani-backend`
+(decisions 1–19), `features` (20–31, 34, 35) and `fperf-backend` (32, 33, and the SMT-LIB and FPerf targets).
 
-Both are now merged into Buffy `main`, which the submodule tracks.
+The decisions are numbered in the order they were made. A later one can replace an earlier one; such entries
+are marked *Superseded*, and the current behaviour is in the decision named there.
 
 The [user guide](../../buffy/docs/user-guide.md) (`buffy/docs/user-guide.md`) documents the result.
 
@@ -20,7 +21,8 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
      instead of ANTLR (which would have added a dependency);
    - BuffyImmut as a hash-consed DSA expression DAG (`include/immut/`) rather than an AST of `:=` statements.
 
-   *Revisit:* migrating the old visitor/SMTIR skeleton onto this front end, or deleting it.
+   *Superseded* in two parts: the old skeleton was deleted (34), and the hand-written parser was replaced by an
+   ANTLR 4 grammar (35). The syntax AST and BuffyImmut are unchanged.
 2. **One elaboration for all backends, by symbolic execution of one time step.** This does loop unrolling (for
    loops have an *exclusive* upper bound, as the paper's `for (i in 0..N)` over `ibs[i]` requires), array
    flattening with switch-read/switch-assign, DSA and ite-joins in one walk. The result is a single simultaneous
@@ -72,8 +74,8 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     per joint choice (`tick_k1_..`), up to 4096 combinations, beyond which `--staged` is required. DTMCs use a
     single `tick`. For simulation and RL, the staged layout's factored choices are much cheaper (63 ns/step vs
     3.5 µs/step natively on the FQ MDP), and the compiler recommends it above 64 joint choices.
-    *Alternative* (suggested by the netmdp session): a sync-like layout in which each traffic automaton chooses
-    on its own interleaved edge before the synchronised step.
+    *Superseded* in part by 30: that alternative became the `choose` layout, which is now the default above 64
+    joint choices instead of the recommendation to use `--staged`. Per-choice action naming is unchanged.
 15. **`G` is emitted as `<name>_violation` = `F ¬φ`, with min/max swapped**, in JANI, PRISM and SMT alike. Neither
     Storm nor modes accepts bounded G in JANI, and Storm's PRISM parser lacks bounded G.
     *Alternative:* emit native `G` in the PRISM files for PRISM-only use.
@@ -81,13 +83,18 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     PRISM and stormpy expand formulas at parse time. Temp stages cost L extra PRISM steps per time step: 40 for FQ,
     46 steps per time step in total. *Alternative:* multi-level merging, i.e. putting independent levels in one
     stage. A stage already holds all temporaries of one level, so the count is the DAG depth.
+    *Superseded* by 29: that alternative became `merged` temp stages, which `auto` now picks above 2·10⁶ tree
+    nodes (11 PRISM steps per time step on FQ). Per-level stages remain available as `--prism-temps stages`.
 17. **SMT-LIB semantics are qualitative:** traffic is a symbolic workload over the distribution's support, and a
     query asks "sat ⇔ some workload realises it" (⇔ Pmax > 0). FPerf-style workload constraints in Buffy syntax
     are not yet available. You can add assertions by hand, or use the FPerf backend.
+    *Superseded* in part by 33: network `assume`s and `given assumptions` now constrain the workload.
 18. **The FPerf backend evaluates the DSA DAG directly over FPerf's queue variables**, instead of the URF's
     wp + `$IN_*`/`$OUT_*` substitution. Output packet identity comes from recorded `move-p` events. Only one
     instance per contention point is supported so far, and Buffy `traffic` is ignored (FPerf's workload drives
     the inputs).
+    *Superseded* in part by 32: several instances per contention point are now supported. Buffy `traffic` is
+    still ignored.
 
 ## Testing policy
 
@@ -96,7 +103,7 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     FQ-size models are compared **only by SMC** (modes, `prism -sim`) and with a direct Python Monte Carlo of the
     paper's Fig. 2, always under `timeout`.
 
-## Additions on branch `features` (2026-11-01, second round)
+## Second round (2026-11-01): additions on branch `features`
 
 20. **Packet classes.** `packet { int<lo..hi> field; ... }` makes every combination of field values a class
     (at most 4096). Filters are `B |> pred` over fields, constants and program variables, allowed in move
@@ -153,7 +160,7 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
 31. **JANI properties never reference step temporaries** (a latent bug: a query atom identical to a shared
     step node was printed as the transient's name, which Storm rejects in the staged layout).
 
-## Additions on branch `fperf-backend`
+## Second round: additions on branch `fperf-backend`
 
 32. **Multi-instance FPerf:** one queuing module per instance, linked with FPerf queue edges as `connect`
     says. FPerf's queue semantics (an output's enqueues land at the tail of the linked queue at the next step,
@@ -174,7 +181,7 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
 ## Independent review (2026-11-01)
 
 A separate reviewer (Fable) read the whole compiler on `fperf-backend`, ran every suite and probed it
-with small programs. Accepted and fixed (Buffy `features` c9dcbd0, `fperf-backend` d322fac):
+with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-backend` d322fac, both in `main`):
 - **Unsound `%` interval rule** in `immut/Bounds` (a model could violate its inferred range), and a
   too-coarse `/` rule (bounded halving counters were rejected as unbounded).
 - **SMT queries referenced step temporaries** at the last position; z3 rejected the assertion and
