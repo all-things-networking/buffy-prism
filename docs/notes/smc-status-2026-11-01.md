@@ -205,7 +205,16 @@ The emitted models (FQ, `experiments/buffy_jani/models/` in the goofy-kapitsa wo
   - Each traffic automaton makes its own arrival choice, in a fixed order, into a persistent bounded variable; then one `tick` sync runs the step block.
   - It becomes the default for MDPs whose sync layout would exceed 64 joint choices. DTMC layouts are unchanged, and `--staged` stays recommended for RL.
   - Step bounds then count choice steps too. The Buffy session is asked to scale them by (sources + 1) or bound by a time counter.
-  - Requested from the Buffy session; native validation follows when it sends emitted files.
+  - Implemented as `buffyc-mc --layout choose` (Buffy `features` d7ff54e). It is the `--layout auto` default above 64 joint choices. Step bounds are scaled by (K+1) and goals are evaluated at `turn = 0`.
+  - **Native validation** (`tests/buffy_jani_check.py`, 1M runs, uniform over enabled edges). Mixed model: queues 0–3 nondet, queue 4 at P0.
+    - P0=0.6 starve: choose 0.01190 ± 0.00021, staged 0.01207 ± 0.00021.
+      - modes, 100k runs: 0.01245, 99% CI [0.01177, 0.01316].
+      - DTMC references: 0.0119–0.0120.
+    - P0=0.2 starve: native 3.37e-4 ± 3.6e-5; modes 4.2e-4 (about ±1.7e-4).
+    - The remaining properties agree within modes' error. cond_a and early at P0=0.2 sit about 2σ below native on one shared modes seed. The native value matches the earlier all-nondet uniform runs (0.99841 / 0.99809).
+  - **Cost per time step:**
+    - choose 5 × 95 ns ≈ 0.48 µs; staged 6 × 73 ns ≈ 0.44 µs; the old sync MDP 3.5 µs.
+    - choose compiles in 0.6 s, against 84 s for the sync MDP.
 
 ## Design decisions to review (made unattended)
 

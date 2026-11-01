@@ -1,6 +1,6 @@
 """
 Runs the native JANI simulator on models emitted by the Buffy→JANI compiler (buffyc-mc, jani-backend branch) and
-compares with modes reference estimates. Properties of the form filter(·, P(true U<=N goal), initial) are turned
+compares with modes reference estimates. MDPs are resolved uniformly over enabled edges. Properties of the form filter(·, P(true U<=N goal), initial) are turned
 into native goals with horizon N.
 
 Usage: PYTHONPATH=. python tests/buffy_jani_check.py <models dir> [runs] [file ...]
@@ -23,6 +23,13 @@ MODES_REF = {
                  "gap_violation": 0.98953},
     "bfy_p0.6_staged": {"starve_violation": 0.01175, "cond_a_violation": 0.86894, "early_violation": 0.85917,
                         "gap_violation": 0.99009},
+    # MDPs with queues 0-3 nondet(0,4) resolved uniformly (modes -R Uniform -N 100000 -J 1 --seed 1), 2026-11-01.
+    "bfy_mdp_mixed_p0.2_choose": {"starve_violation": 0.00042, "cond_a_violation": 0.99818,
+                                  "early_violation": 0.99781, "gap_violation": 1.0},
+    "bfy_mdp_mixed_p0.6_choose": {"starve_violation": 0.01245, "cond_a_violation": 0.86641,
+                                  "early_violation": 0.85595, "gap_violation": 0.98989},
+    "bfy_mdp_mixed_p0.6_staged": {"starve_violation": 0.01245, "cond_a_violation": 0.86641,
+                                  "early_violation": 0.85595, "gap_violation": 0.98989},
 }
 
 
@@ -50,9 +57,10 @@ def check(path: Path, runs: int) -> dict:
     result = {"file": path.name, "type": model["type"], "compile_s": compile_s, "edges": len(native.edges),
               "variables": len(native.variables), "transients": len(native.transients), "properties": {}}
     ref = MODES_REF.get(path.stem.replace("_imp", ""), {})
+    weights = {a: 1.0 for a in native.edge_actions} if model["type"] == "mdp" else None
     for name, (_, bound) in props.items():
         t = time.perf_counter()
-        hits, steps = native.simulate(runs, bound, name, seed=1)
+        hits, steps = native.simulate(runs, bound, name, weights, seed=1)
         dt = time.perf_counter() - t
         p = hits / runs
         half = 1.96 * np.sqrt(max(p * (1 - p), 1e-12) / runs)
