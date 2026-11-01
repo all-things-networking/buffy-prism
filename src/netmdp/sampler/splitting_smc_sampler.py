@@ -40,8 +40,8 @@ class SplittingSMCSampler(BaseSymbolicSMCSampler):
         return state, trace
 
     def expected_success(self, user_effort):
-        import src.smc.sampler.splitting.expected_success_method
-        es = src.smc.sampler.splitting.expected_success_method.ExpectedSuccess(
+        import src.netmdp.sampler.splitting.expected_success_method
+        es = src.netmdp.sampler.splitting.expected_success_method.ExpectedSuccess(
             self.model_name, self.program, self.phi, self.trace_len,
             self.goal_deq, self.importance, user_effort)
         imp_to_level, splits, max_level = es.get_levels_splits()
@@ -49,6 +49,6 @@ class SplittingSMCSampler(BaseSymbolicSMCSampler):
 
     def make_program_simulator(self):
         simulator = stormpy.simulator.create_simulator(self.program)
-        simulator.set_action_mode(stormpy.simulator.SimulatorActionMode.GLOBAL_NAMES)
+        simulator.set_action_mode(stormpy.simulator.SimulatorActionMode.INDEX_LEVEL)
         simulator.set_observation_mode(stormpy.simulator.SimulatorObservationMode.PROGRAM_LEVEL)
         return simulator

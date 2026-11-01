@@ -62,9 +62,10 @@ class FixedEffortSMCSampler(SplittingSMCSampler):
                         # print([f"(s={state["s"]}, d={state["d"]})" for state in trace])
                         # print([f"(deqs={state["iq5_deqs_bl"]})" for state in trace])
                         s[l_idx] += 1
-                        if all([ts.get_actions() != actions for ts in next_level_start_points]):
-                            next_level_start_points.append(TraceSnapshot(t, actions))
-                            break
+                        # Keep every entrance state, duplicates included: the next level must start from the
+                        # empirical entrance distribution, and dropping duplicates would bias the estimator.
+                        next_level_start_points.append(TraceSnapshot(t, actions))
+                        break
             if s[l_idx] == 0:
                 return 0, s # no traces reached the next level
             level_start_points = next_level_start_points

@@ -1,0 +1,6296 @@
+{
+ "actions": [
+  {
+   "name": "DEQ_FROM_NEW_IQ1_DROP"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ1_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ2_DROP"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ2_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ3_DROP"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ3_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ4_DROP"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ4_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ5_DROP_BL"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ5_DROP_NOBL"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ5_TO_OLD_BL"
+  },
+  {
+   "name": "DEQ_FROM_NEW_IQ5_TO_OLD_NOBL"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ1_DROP"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ1_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ2_DROP"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ2_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ3_DROP"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ3_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ4_DROP"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ4_TO_OLD"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ5_DROP_BL"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ5_DROP_NOBL"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ5_TO_OLD_BL"
+  },
+  {
+   "name": "DEQ_FROM_OLD_IQ5_TO_OLD_NOBL"
+  },
+  {
+   "name": "DEQ_NOP"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ1_ADD"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ1_NOP"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ2_ADD"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ2_NOP"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ3_ADD"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ3_NOP"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ4_ADD"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ4_NOP"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ5_ADD"
+  },
+  {
+   "name": "REC_UPD_NEW_IQ5_NOP"
+  }
+ ],
+ "automata": [
+  {
+   "edges": [
+    {
+     "action": "DEQ_FROM_NEW_IQ1_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- 0",
+         "ref": "iq1_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- 0",
+         "ref": "iq1_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq1_new_rank = 1)) & ((new_list_len != 0) & (iq1_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq1_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq1_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ1_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (max(0, (iq1_contents - 1)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- 0",
+         "ref": "iq1_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq1_new_rank = 1)) & ((new_list_len != 0) & (iq1_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq1_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq1_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ2_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- 0",
+         "ref": "iq2_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- 0",
+         "ref": "iq2_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq2_new_rank = 1)) & ((new_list_len != 0) & (iq2_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq2_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq2_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ2_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (max(0, (iq2_contents - 1)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- 0",
+         "ref": "iq2_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq2_new_rank = 1)) & ((new_list_len != 0) & (iq2_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq2_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq2_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ3_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- 0",
+         "ref": "iq3_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- 0",
+         "ref": "iq3_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq3_new_rank = 1)) & ((new_list_len != 0) & (iq3_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq3_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq3_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ3_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (max(0, (iq3_contents - 1)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- 0",
+         "ref": "iq3_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq3_new_rank = 1)) & ((new_list_len != 0) & (iq3_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq3_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq3_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ4_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- 0",
+         "ref": "iq4_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- 0",
+         "ref": "iq4_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq4_new_rank = 1)) & ((new_list_len != 0) & (iq4_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq4_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq4_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ4_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (max(0, (iq4_contents - 1)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- 0",
+         "ref": "iq4_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq5_new_rank <- (max(0, (iq5_new_rank - 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((stage = 11) & (iq4_new_rank = 1)) & ((new_list_len != 0) & (iq4_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": "new_list_len",
+         "op": "\u2260",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq4_new_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq4_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ5_DROP_BL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- 0",
+         "ref": "iq5_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- 0",
+         "ref": "iq5_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        },
+        {
+         "comment": "iq5_deqs_bl <- (min(14, (iq5_deqs_bl + 1)))",
+         "ref": "iq5_deqs_bl",
+         "value": {
+          "left": 14,
+          "op": "min",
+          "right": {
+           "left": "iq5_deqs_bl",
+           "op": "+",
+           "right": 1
+          }
+         }
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq1_contents != 0) & (iq5_new_rank = 1)) & ((new_list_len != 0) & (iq2_contents != 0))) & (((stage = 11) & (iq4_contents != 0)) & ((iq3_contents != 0) & (iq5_contents = 1))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "iq3_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_new_rank",
+          "op": "=",
+          "right": 1
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "iq4_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "new_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": {
+          "left": "iq5_contents",
+          "op": "=",
+          "right": 1
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq1_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq2_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ5_DROP_NOBL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- 0",
+         "ref": "iq5_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- 0",
+         "ref": "iq5_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq5_contents = 1) & (iq5_new_rank = 1)) & (stage = 11)) & ((new_list_len != 0) & !((((iq3_contents != 0) & (iq2_contents != 0)) & ((iq1_contents != 0) & (iq4_contents != 0))))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_new_rank",
+          "op": "=",
+          "right": 1
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "exp": {
+          "left": {
+           "left": {
+            "left": "iq1_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq2_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          },
+          "op": "\u2227",
+          "right": {
+           "left": {
+            "left": "iq4_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq3_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          }
+         },
+         "op": "\u00ac"
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq5_contents",
+         "op": "=",
+         "right": 1
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ5_TO_OLD_BL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (max(0, (iq5_contents - 1)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- 0",
+         "ref": "iq5_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq5_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        },
+        {
+         "comment": "iq5_deqs_bl <- (min(14, (iq5_deqs_bl + 1)))",
+         "ref": "iq5_deqs_bl",
+         "value": {
+          "left": 14,
+          "op": "min",
+          "right": {
+           "left": "iq5_deqs_bl",
+           "op": "+",
+           "right": 1
+          }
+         }
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq1_contents != 0) & (iq5_new_rank = 1)) & ((new_list_len != 0) & (iq2_contents != 0))) & (((stage = 11) & (iq4_contents != 0)) & ((iq3_contents != 0) & (iq5_contents > 1))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "iq3_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_new_rank",
+          "op": "=",
+          "right": 1
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "iq4_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "new_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": {
+          "left": "iq5_contents",
+          "op": ">",
+          "right": 1
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq1_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq2_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_NEW_IQ5_TO_OLD_NOBL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (max(0, (iq5_contents - 1)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_new_rank <- (max(0, (iq1_new_rank - 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_new_rank <- (max(0, (iq2_new_rank - 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_new_rank <- (max(0, (iq3_new_rank - 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_new_rank <- (max(0, (iq4_new_rank - 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_new_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_new_rank <- 0",
+         "ref": "iq5_new_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq5_old_rank <- (min(5, (old_list_len + 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (max(0, (new_list_len - 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "new_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (min(5, (old_list_len + 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "old_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq5_contents > 1) & (iq5_new_rank = 1)) & (stage = 11)) & ((new_list_len != 0) & !((((iq3_contents != 0) & (iq2_contents != 0)) & ((iq1_contents != 0) & (iq4_contents != 0))))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_new_rank",
+          "op": "=",
+          "right": 1
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "exp": {
+          "left": {
+           "left": {
+            "left": "iq1_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq2_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          },
+          "op": "\u2227",
+          "right": {
+           "left": {
+            "left": "iq4_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq3_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          }
+         },
+         "op": "\u00ac"
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq5_contents",
+         "op": ">",
+         "right": 1
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ1_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- 0",
+         "ref": "iq1_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- 0",
+         "ref": "iq1_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq1_old_rank = 1)) & ((new_list_len = 0) & (iq1_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq1_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq1_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ1_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (max(0, (iq1_contents - 1)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- old_list_len",
+         "ref": "iq1_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq1_old_rank = 1)) & ((new_list_len = 0) & (iq1_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq1_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq1_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ2_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- 0",
+         "ref": "iq2_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- 0",
+         "ref": "iq2_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq2_old_rank = 1)) & ((new_list_len = 0) & (iq2_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq2_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq2_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ2_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (max(0, (iq2_contents - 1)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- old_list_len",
+         "ref": "iq2_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq2_old_rank = 1)) & ((new_list_len = 0) & (iq2_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq2_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq2_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ3_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- 0",
+         "ref": "iq3_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- 0",
+         "ref": "iq3_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq3_old_rank = 1)) & ((new_list_len = 0) & (iq3_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq3_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq3_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ3_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (max(0, (iq3_contents - 1)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- old_list_len",
+         "ref": "iq3_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq3_old_rank = 1)) & ((new_list_len = 0) & (iq3_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq3_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq3_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ4_DROP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- 0",
+         "ref": "iq4_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- 0",
+         "ref": "iq4_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq4_old_rank = 1)) & ((new_list_len = 0) & (iq4_contents = 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq4_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq4_contents",
+         "op": "=",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ4_TO_OLD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (max(0, (iq4_contents - 1)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- old_list_len",
+         "ref": "iq4_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "iq5_old_rank <- (max(0, (iq5_old_rank - 1)))",
+         "ref": "iq5_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((stage = 11) & (old_list_len != 0)) & (iq4_old_rank = 1)) & ((new_list_len = 0) & (iq4_contents > 1)))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq4_old_rank",
+         "op": "=",
+         "right": 1
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq4_contents",
+         "op": ">",
+         "right": 1
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "stage",
+         "op": "=",
+         "right": 11
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ5_DROP_BL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- 0",
+         "ref": "iq5_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- 0",
+         "ref": "iq5_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        },
+        {
+         "comment": "iq5_deqs_bl <- (min(14, (iq5_deqs_bl + 1)))",
+         "ref": "iq5_deqs_bl",
+         "value": {
+          "left": 14,
+          "op": "min",
+          "right": {
+           "left": "iq5_deqs_bl",
+           "op": "+",
+           "right": 1
+          }
+         }
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((((iq2_contents != 0) & (old_list_len != 0)) & (iq1_contents != 0)) & ((iq3_contents != 0) & (iq5_contents = 1))) & (((stage = 11) & (iq4_contents != 0)) & ((new_list_len = 0) & (iq5_old_rank = 1))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": {
+           "left": "new_list_len",
+           "op": "=",
+           "right": 0
+          },
+          "op": "\u2227",
+          "right": {
+           "left": "old_list_len",
+           "op": "\u2260",
+           "right": 0
+          }
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq3_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq1_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": {
+          "left": "iq5_old_rank",
+          "op": "=",
+          "right": 1
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq2_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "iq4_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_contents",
+          "op": "=",
+          "right": 1
+         }
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ5_DROP_NOBL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- 0",
+         "ref": "iq5_contents",
+         "value": 0
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- 0",
+         "ref": "iq5_old_rank",
+         "value": 0
+        },
+        {
+         "comment": "old_list_len <- (max(0, (old_list_len - 1)))",
+         "ref": "old_list_len",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "old_list_len",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq5_contents = 1) & (old_list_len != 0)) & ((stage = 11) & (iq5_old_rank = 1))) & ((new_list_len = 0) & !((((iq3_contents != 0) & (iq2_contents != 0)) & ((iq1_contents != 0) & (iq4_contents != 0))))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_old_rank",
+          "op": "=",
+          "right": 1
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "exp": {
+          "left": {
+           "left": {
+            "left": "iq1_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq2_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          },
+          "op": "\u2227",
+          "right": {
+           "left": {
+            "left": "iq4_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq3_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          }
+         },
+         "op": "\u00ac"
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq5_contents",
+         "op": "=",
+         "right": 1
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ5_TO_OLD_BL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (max(0, (iq5_contents - 1)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- old_list_len",
+         "ref": "iq5_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        },
+        {
+         "comment": "iq5_deqs_bl <- (min(14, (iq5_deqs_bl + 1)))",
+         "ref": "iq5_deqs_bl",
+         "value": {
+          "left": 14,
+          "op": "min",
+          "right": {
+           "left": "iq5_deqs_bl",
+           "op": "+",
+           "right": 1
+          }
+         }
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "(((((iq2_contents != 0) & (old_list_len != 0)) & (iq1_contents != 0)) & ((iq3_contents != 0) & (iq5_contents > 1))) & (((stage = 11) & (iq4_contents != 0)) & ((new_list_len = 0) & (iq5_old_rank = 1))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": {
+           "left": "new_list_len",
+           "op": "=",
+           "right": 0
+          },
+          "op": "\u2227",
+          "right": {
+           "left": "old_list_len",
+           "op": "\u2260",
+           "right": 0
+          }
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq3_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq1_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": {
+          "left": "iq5_old_rank",
+          "op": "=",
+          "right": 1
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq2_contents",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "iq4_contents",
+          "op": "\u2260",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_contents",
+          "op": ">",
+          "right": 1
+         }
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_FROM_OLD_IQ5_TO_OLD_NOBL",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (max(0, (iq5_contents - 1)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq5_contents",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq1_old_rank <- (max(0, (iq1_old_rank - 1)))",
+         "ref": "iq1_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq1_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq2_old_rank <- (max(0, (iq2_old_rank - 1)))",
+         "ref": "iq2_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq2_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq3_old_rank <- (max(0, (iq3_old_rank - 1)))",
+         "ref": "iq3_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq3_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq4_old_rank <- (max(0, (iq4_old_rank - 1)))",
+         "ref": "iq4_old_rank",
+         "value": {
+          "left": 0,
+          "op": "max",
+          "right": {
+           "left": "iq4_old_rank",
+           "op": "-",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "iq5_old_rank <- old_list_len",
+         "ref": "iq5_old_rank",
+         "value": "old_list_len"
+        },
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((((iq5_contents > 1) & (old_list_len != 0)) & ((stage = 11) & (iq5_old_rank = 1))) & ((new_list_len = 0) & !((((iq3_contents != 0) & (iq2_contents != 0)) & ((iq1_contents != 0) & (iq4_contents != 0))))))",
+      "exp": {
+       "left": {
+        "left": {
+         "left": {
+          "left": "new_list_len",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "old_list_len",
+          "op": "\u2260",
+          "right": 0
+         }
+        },
+        "op": "\u2227",
+        "right": {
+         "left": {
+          "left": "stage",
+          "op": "=",
+          "right": 11
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_old_rank",
+          "op": "=",
+          "right": 1
+         }
+        }
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "exp": {
+          "left": {
+           "left": {
+            "left": "iq1_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq2_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          },
+          "op": "\u2227",
+          "right": {
+           "left": {
+            "left": "iq4_contents",
+            "op": "\u2260",
+            "right": 0
+           },
+           "op": "\u2227",
+           "right": {
+            "left": "iq3_contents",
+            "op": "\u2260",
+            "right": 0
+           }
+          }
+         },
+         "op": "\u00ac"
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq5_contents",
+         "op": ">",
+         "right": 1
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "DEQ_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 1",
+         "ref": "stage",
+         "value": 1
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 11) & ((new_list_len = 0) & (old_list_len = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 11
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "new_list_len",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "old_list_len",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "location": "l",
+     "guard": {
+      "comment": "(stage = 1)",
+      "exp": {
+       "left": "stage",
+       "op": "=",
+       "right": 1
+      }
+     },
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 2",
+         "ref": "stage",
+         "value": 2
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 2,
+         "right": 5
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (min(8, (iq1_contents + 1)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq1_contents",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 6",
+         "ref": "stage",
+         "value": 6
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 39,
+         "right": 100
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (min(8, (iq1_contents + 2)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq1_contents",
+           "op": "+",
+           "right": 2
+          }
+         }
+        },
+        {
+         "comment": "stage <- 6",
+         "ref": "stage",
+         "value": 6
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 7,
+         "right": 50
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (min(8, (iq1_contents + 3)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq1_contents",
+           "op": "+",
+           "right": 3
+          }
+         }
+        },
+        {
+         "comment": "stage <- 6",
+         "ref": "stage",
+         "value": 6
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 20
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq1_contents <- (min(8, (iq1_contents + 4)))",
+         "ref": "iq1_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq1_contents",
+           "op": "+",
+           "right": 4
+          }
+         }
+        },
+        {
+         "comment": "stage <- 6",
+         "ref": "stage",
+         "value": 6
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 50
+        }
+       }
+      }
+     ]
+    },
+    {
+     "location": "l",
+     "guard": {
+      "comment": "(stage = 2)",
+      "exp": {
+       "left": "stage",
+       "op": "=",
+       "right": 2
+      }
+     },
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 3",
+         "ref": "stage",
+         "value": 3
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 2,
+         "right": 5
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (min(8, (iq2_contents + 1)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq2_contents",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 7",
+         "ref": "stage",
+         "value": 7
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 39,
+         "right": 100
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (min(8, (iq2_contents + 2)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq2_contents",
+           "op": "+",
+           "right": 2
+          }
+         }
+        },
+        {
+         "comment": "stage <- 7",
+         "ref": "stage",
+         "value": 7
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 7,
+         "right": 50
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (min(8, (iq2_contents + 3)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq2_contents",
+           "op": "+",
+           "right": 3
+          }
+         }
+        },
+        {
+         "comment": "stage <- 7",
+         "ref": "stage",
+         "value": 7
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 20
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq2_contents <- (min(8, (iq2_contents + 4)))",
+         "ref": "iq2_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq2_contents",
+           "op": "+",
+           "right": 4
+          }
+         }
+        },
+        {
+         "comment": "stage <- 7",
+         "ref": "stage",
+         "value": 7
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 50
+        }
+       }
+      }
+     ]
+    },
+    {
+     "location": "l",
+     "guard": {
+      "comment": "(stage = 3)",
+      "exp": {
+       "left": "stage",
+       "op": "=",
+       "right": 3
+      }
+     },
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 4",
+         "ref": "stage",
+         "value": 4
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 2,
+         "right": 5
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (min(8, (iq3_contents + 1)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq3_contents",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 8",
+         "ref": "stage",
+         "value": 8
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 39,
+         "right": 100
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (min(8, (iq3_contents + 2)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq3_contents",
+           "op": "+",
+           "right": 2
+          }
+         }
+        },
+        {
+         "comment": "stage <- 8",
+         "ref": "stage",
+         "value": 8
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 7,
+         "right": 50
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (min(8, (iq3_contents + 3)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq3_contents",
+           "op": "+",
+           "right": 3
+          }
+         }
+        },
+        {
+         "comment": "stage <- 8",
+         "ref": "stage",
+         "value": 8
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 20
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq3_contents <- (min(8, (iq3_contents + 4)))",
+         "ref": "iq3_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq3_contents",
+           "op": "+",
+           "right": 4
+          }
+         }
+        },
+        {
+         "comment": "stage <- 8",
+         "ref": "stage",
+         "value": 8
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 50
+        }
+       }
+      }
+     ]
+    },
+    {
+     "location": "l",
+     "guard": {
+      "comment": "(stage = 4)",
+      "exp": {
+       "left": "stage",
+       "op": "=",
+       "right": 4
+      }
+     },
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 5",
+         "ref": "stage",
+         "value": 5
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 2,
+         "right": 5
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (min(8, (iq4_contents + 1)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq4_contents",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 9",
+         "ref": "stage",
+         "value": 9
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 39,
+         "right": 100
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (min(8, (iq4_contents + 2)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq4_contents",
+           "op": "+",
+           "right": 2
+          }
+         }
+        },
+        {
+         "comment": "stage <- 9",
+         "ref": "stage",
+         "value": 9
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 7,
+         "right": 50
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (min(8, (iq4_contents + 3)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq4_contents",
+           "op": "+",
+           "right": 3
+          }
+         }
+        },
+        {
+         "comment": "stage <- 9",
+         "ref": "stage",
+         "value": 9
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 20
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq4_contents <- (min(8, (iq4_contents + 4)))",
+         "ref": "iq4_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq4_contents",
+           "op": "+",
+           "right": 4
+          }
+         }
+        },
+        {
+         "comment": "stage <- 9",
+         "ref": "stage",
+         "value": 9
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 50
+        }
+       }
+      }
+     ]
+    },
+    {
+     "location": "l",
+     "guard": {
+      "comment": "(stage = 5)",
+      "exp": {
+       "left": "stage",
+       "op": "=",
+       "right": 5
+      }
+     },
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 11",
+         "ref": "stage",
+         "value": 11
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 2,
+         "right": 5
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (min(8, (iq5_contents + 1)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq5_contents",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 10",
+         "ref": "stage",
+         "value": 10
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 39,
+         "right": 100
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (min(8, (iq5_contents + 2)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq5_contents",
+           "op": "+",
+           "right": 2
+          }
+         }
+        },
+        {
+         "comment": "stage <- 10",
+         "ref": "stage",
+         "value": 10
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 7,
+         "right": 50
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (min(8, (iq5_contents + 3)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq5_contents",
+           "op": "+",
+           "right": 3
+          }
+         }
+        },
+        {
+         "comment": "stage <- 10",
+         "ref": "stage",
+         "value": 10
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 20
+        }
+       }
+      },
+      {
+       "assignments": [
+        {
+         "comment": "iq5_contents <- (min(8, (iq5_contents + 4)))",
+         "ref": "iq5_contents",
+         "value": {
+          "left": 8,
+          "op": "min",
+          "right": {
+           "left": "iq5_contents",
+           "op": "+",
+           "right": 4
+          }
+         }
+        },
+        {
+         "comment": "stage <- 10",
+         "ref": "stage",
+         "value": 10
+        }
+       ],
+       "location": "l",
+       "probability": {
+        "exp": {
+         "op": "/",
+         "left": 1,
+         "right": 50
+        }
+       }
+      }
+     ]
+    },
+    {
+     "action": "REC_UPD_NEW_IQ1_ADD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq1_new_rank <- (min(5, (new_list_len + 1)))",
+         "ref": "iq1_new_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (min(5, (new_list_len + 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 2",
+         "ref": "stage",
+         "value": 2
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 6) & ((iq1_new_rank = 0) & (iq1_old_rank = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 6
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq1_new_rank",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq1_old_rank",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ1_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 2",
+         "ref": "stage",
+         "value": 2
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 6) & !(((iq1_new_rank = 0) & (iq1_old_rank = 0))))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 6
+       },
+       "op": "\u2227",
+       "right": {
+        "exp": {
+         "left": {
+          "left": "iq1_new_rank",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq1_old_rank",
+          "op": "=",
+          "right": 0
+         }
+        },
+        "op": "\u00ac"
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ2_ADD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq2_new_rank <- (min(5, (new_list_len + 1)))",
+         "ref": "iq2_new_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (min(5, (new_list_len + 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 3",
+         "ref": "stage",
+         "value": 3
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 7) & ((iq2_new_rank = 0) & (iq2_old_rank = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 7
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq2_new_rank",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq2_old_rank",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ2_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 3",
+         "ref": "stage",
+         "value": 3
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 7) & !(((iq2_new_rank = 0) & (iq2_old_rank = 0))))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 7
+       },
+       "op": "\u2227",
+       "right": {
+        "exp": {
+         "left": {
+          "left": "iq2_new_rank",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq2_old_rank",
+          "op": "=",
+          "right": 0
+         }
+        },
+        "op": "\u00ac"
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ3_ADD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq3_new_rank <- (min(5, (new_list_len + 1)))",
+         "ref": "iq3_new_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (min(5, (new_list_len + 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 4",
+         "ref": "stage",
+         "value": 4
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 8) & ((iq3_new_rank = 0) & (iq3_old_rank = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 8
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq3_new_rank",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq3_old_rank",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ3_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 4",
+         "ref": "stage",
+         "value": 4
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 8) & !(((iq3_new_rank = 0) & (iq3_old_rank = 0))))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 8
+       },
+       "op": "\u2227",
+       "right": {
+        "exp": {
+         "left": {
+          "left": "iq3_new_rank",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq3_old_rank",
+          "op": "=",
+          "right": 0
+         }
+        },
+        "op": "\u00ac"
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ4_ADD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq4_new_rank <- (min(5, (new_list_len + 1)))",
+         "ref": "iq4_new_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (min(5, (new_list_len + 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 5",
+         "ref": "stage",
+         "value": 5
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 9) & ((iq4_new_rank = 0) & (iq4_old_rank = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 9
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq4_new_rank",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq4_old_rank",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ4_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 5",
+         "ref": "stage",
+         "value": 5
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 9) & !(((iq4_new_rank = 0) & (iq4_old_rank = 0))))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 9
+       },
+       "op": "\u2227",
+       "right": {
+        "exp": {
+         "left": {
+          "left": "iq4_new_rank",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq4_old_rank",
+          "op": "=",
+          "right": 0
+         }
+        },
+        "op": "\u00ac"
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ5_ADD",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "iq5_new_rank <- (min(5, (new_list_len + 1)))",
+         "ref": "iq5_new_rank",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "new_list_len <- (min(5, (new_list_len + 1)))",
+         "ref": "new_list_len",
+         "value": {
+          "left": 5,
+          "op": "min",
+          "right": {
+           "left": "new_list_len",
+           "op": "+",
+           "right": 1
+          }
+         }
+        },
+        {
+         "comment": "stage <- 11",
+         "ref": "stage",
+         "value": 11
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 10) & ((iq5_new_rank = 0) & (iq5_old_rank = 0)))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 10
+       },
+       "op": "\u2227",
+       "right": {
+        "left": {
+         "left": "iq5_new_rank",
+         "op": "=",
+         "right": 0
+        },
+        "op": "\u2227",
+        "right": {
+         "left": "iq5_old_rank",
+         "op": "=",
+         "right": 0
+        }
+       }
+      }
+     },
+     "location": "l"
+    },
+    {
+     "action": "REC_UPD_NEW_IQ5_NOP",
+     "destinations": [
+      {
+       "assignments": [
+        {
+         "comment": "stage <- 11",
+         "ref": "stage",
+         "value": 11
+        }
+       ],
+       "location": "l"
+      }
+     ],
+     "guard": {
+      "comment": "((stage = 10) & !(((iq5_new_rank = 0) & (iq5_old_rank = 0))))",
+      "exp": {
+       "left": {
+        "left": "stage",
+        "op": "=",
+        "right": 10
+       },
+       "op": "\u2227",
+       "right": {
+        "exp": {
+         "left": {
+          "left": "iq5_new_rank",
+          "op": "=",
+          "right": 0
+         },
+         "op": "\u2227",
+         "right": {
+          "left": "iq5_old_rank",
+          "op": "=",
+          "right": 0
+         }
+        },
+        "op": "\u00ac"
+       }
+      }
+     },
+     "location": "l"
+    }
+   ],
+   "initial-locations": [
+    "l"
+   ],
+   "locations": [
+    {
+     "name": "l"
+    }
+   ],
+   "name": "fqcodel"
+  }
+ ],
+ "constants": [
+  {
+   "name": "TIME_STEPS",
+   "type": "int",
+   "value": 14
+  },
+  {
+   "name": "STAGES_PER_TIME_STEP",
+   "type": "int",
+   "value": 11
+  },
+  {
+   "name": "IQS",
+   "type": "int",
+   "value": 5
+  },
+  {
+   "name": "SZ",
+   "type": "int",
+   "value": 8
+  },
+  {
+   "name": "REC_PKT_ARR_IQ1",
+   "type": "int",
+   "value": 1
+  },
+  {
+   "name": "REC_PKT_ARR_IQ2",
+   "type": "int",
+   "value": 2
+  },
+  {
+   "name": "REC_PKT_ARR_IQ3",
+   "type": "int",
+   "value": 3
+  },
+  {
+   "name": "REC_PKT_ARR_IQ4",
+   "type": "int",
+   "value": 4
+  },
+  {
+   "name": "REC_PKT_ARR_IQ5",
+   "type": "int",
+   "value": 5
+  },
+  {
+   "name": "REC_UPD_NEW_IQ1",
+   "type": "int",
+   "value": 6
+  },
+  {
+   "name": "REC_UPD_NEW_IQ2",
+   "type": "int",
+   "value": 7
+  },
+  {
+   "name": "REC_UPD_NEW_IQ3",
+   "type": "int",
+   "value": 8
+  },
+  {
+   "name": "REC_UPD_NEW_IQ4",
+   "type": "int",
+   "value": 9
+  },
+  {
+   "name": "REC_UPD_NEW_IQ5",
+   "type": "int",
+   "value": 10
+  },
+  {
+   "name": "DEQ",
+   "type": "int",
+   "value": 11
+  }
+ ],
+ "features": [
+  "derived-operators",
+  "functions"
+ ],
+ "functions": [
+  {
+   "body": {
+    "left": "iq3_contents",
+    "op": "=",
+    "right": "SZ"
+   },
+   "name": "iq3_full",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq4_contents",
+    "op": "\u2260",
+    "right": 0
+   },
+   "name": "iq4_backlogged",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "args": [],
+     "function": "iq2_not_in_new_list",
+     "op": "call"
+    },
+    "op": "\u2227",
+    "right": {
+     "args": [],
+     "function": "iq2_not_in_old_list",
+     "op": "call"
+    }
+   },
+   "name": "iq2_add_to_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq1_contents",
+    "op": "=",
+    "right": "SZ"
+   },
+   "name": "iq1_full",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq5_contents",
+    "op": "=",
+    "right": "SZ"
+   },
+   "name": "iq5_full",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "args": [],
+      "function": "iq4_backlogged",
+      "op": "call"
+     },
+     "op": "\u2227",
+     "right": {
+      "args": [],
+      "function": "iq2_backlogged",
+      "op": "call"
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": {
+      "args": [],
+      "function": "iq3_backlogged",
+      "op": "call"
+     },
+     "op": "\u2227",
+     "right": {
+      "args": [],
+      "function": "iq1_backlogged",
+      "op": "call"
+     }
+    }
+   },
+   "name": "iqs_bl",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "\u2260",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq2_new_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq2_from_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "args": [],
+     "function": "iq1_not_in_new_list",
+     "op": "call"
+    },
+    "op": "\u2227",
+    "right": {
+     "args": [],
+     "function": "iq1_not_in_old_list",
+     "op": "call"
+    }
+   },
+   "name": "iq1_add_to_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "args": [],
+     "function": "iq3_not_in_new_list",
+     "op": "call"
+    },
+    "op": "\u2227",
+    "right": {
+     "args": [],
+     "function": "iq3_not_in_old_list",
+     "op": "call"
+    }
+   },
+   "name": "iq3_add_to_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq4_old_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq4_not_in_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq1_new_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq1_not_in_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "\u2260",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq5_new_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq5_from_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq3_contents",
+    "op": "\u2260",
+    "right": 0
+   },
+   "name": "iq3_backlogged",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq1_contents",
+    "op": "\u2260",
+    "right": 0
+   },
+   "name": "iq1_backlogged",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq4_contents",
+    "op": "=",
+    "right": "SZ"
+   },
+   "name": "iq4_full",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq4_new_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq4_not_in_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq5_new_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq5_not_in_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq3_new_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq3_not_in_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq2_old_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq2_not_in_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq2_contents",
+    "op": "=",
+    "right": "SZ"
+   },
+   "name": "iq2_full",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq3_old_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq3_not_in_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq2_contents",
+    "op": "\u2260",
+    "right": 0
+   },
+   "name": "iq2_backlogged",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "\u2260",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq3_new_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq3_from_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "args": [],
+     "function": "iq4_not_in_new_list",
+     "op": "call"
+    },
+    "op": "\u2227",
+    "right": {
+     "args": [],
+     "function": "iq4_not_in_old_list",
+     "op": "call"
+    }
+   },
+   "name": "iq4_add_to_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "args": [],
+     "function": "iq5_not_in_new_list",
+     "op": "call"
+    },
+    "op": "\u2227",
+    "right": {
+     "args": [],
+     "function": "iq5_not_in_old_list",
+     "op": "call"
+    }
+   },
+   "name": "iq5_add_to_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq5_old_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq5_not_in_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "left": "new_list_len",
+      "op": "=",
+      "right": 0
+     },
+     "op": "\u2227",
+     "right": {
+      "left": "old_list_len",
+      "op": "\u2260",
+      "right": 0
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq4_old_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq4_from_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "left": "new_list_len",
+      "op": "=",
+      "right": 0
+     },
+     "op": "\u2227",
+     "right": {
+      "left": "old_list_len",
+      "op": "\u2260",
+      "right": 0
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq1_old_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq1_from_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "=",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "old_list_len",
+     "op": "=",
+     "right": 0
+    }
+   },
+   "name": "lists_empty",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "left": "new_list_len",
+      "op": "=",
+      "right": 0
+     },
+     "op": "\u2227",
+     "right": {
+      "left": "old_list_len",
+      "op": "\u2260",
+      "right": 0
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq3_old_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq3_from_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "\u2260",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq4_new_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq4_from_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq2_new_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq2_not_in_new_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "left": "new_list_len",
+      "op": "=",
+      "right": 0
+     },
+     "op": "\u2227",
+     "right": {
+      "left": "old_list_len",
+      "op": "\u2260",
+      "right": 0
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq5_old_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq5_from_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": "iq1_old_rank",
+    "op": "=",
+    "right": 0
+   },
+   "name": "iq1_not_in_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": {
+      "left": "new_list_len",
+      "op": "=",
+      "right": 0
+     },
+     "op": "\u2227",
+     "right": {
+      "left": "old_list_len",
+      "op": "\u2260",
+      "right": 0
+     }
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq2_old_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq2_from_old_list",
+   "parameters": [],
+   "type": "bool"
+  },
+  {
+   "body": {
+    "left": {
+     "left": "new_list_len",
+     "op": "\u2260",
+     "right": 0
+    },
+    "op": "\u2227",
+    "right": {
+     "left": "iq1_new_rank",
+     "op": "=",
+     "right": 1
+    }
+   },
+   "name": "deq_iq1_from_new_list",
+   "parameters": [],
+   "type": "bool"
+  }
+ ],
+ "jani-version": 1,
+ "name": "jani_from_prism_weibull",
+ "properties": [
+  {
+   "name": "p_gt2",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 2
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "p_gt3",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 3
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "p_gt4",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 4
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "p_gt5",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 5
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "p_gt8",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 8
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "p_gt9",
+   "expression": {
+    "op": "filter",
+    "fun": "values",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": "Pmax",
+     "exp": {
+      "op": "U",
+      "left": true,
+      "right": {
+       "op": ">",
+       "left": "iq5_deqs_bl",
+       "right": 9
+      },
+      "step-bounds": {
+       "upper": 154
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "h_gt2",
+   "expression": {
+    "op": "filter",
+    "fun": "\u2200",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": ">",
+     "left": {
+      "op": "Pmax",
+      "exp": {
+       "op": "U",
+       "left": true,
+       "right": {
+        "op": ">",
+        "left": "iq5_deqs_bl",
+        "right": 2
+       },
+       "step-bounds": {
+        "upper": 154
+       }
+      }
+     },
+     "right": 0.7
+    }
+   }
+  },
+  {
+   "name": "h_gt4",
+   "expression": {
+    "op": "filter",
+    "fun": "\u2200",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": ">",
+     "left": {
+      "op": "Pmax",
+      "exp": {
+       "op": "U",
+       "left": true,
+       "right": {
+        "op": ">",
+        "left": "iq5_deqs_bl",
+        "right": 4
+       },
+       "step-bounds": {
+        "upper": 154
+       }
+      }
+     },
+     "right": 0.011
+    }
+   }
+  },
+  {
+   "name": "h_gt8",
+   "expression": {
+    "op": "filter",
+    "fun": "\u2200",
+    "states": {
+     "op": "initial"
+    },
+    "values": {
+     "op": ">",
+     "left": {
+      "op": "Pmax",
+      "exp": {
+       "op": "U",
+       "left": true,
+       "right": {
+        "op": ">",
+        "left": "iq5_deqs_bl",
+        "right": 8
+       },
+       "step-bounds": {
+        "upper": 154
+       }
+      }
+     },
+     "right": 0.00015
+    }
+   }
+  },
+  {
+   "name": "imp",
+   "expression": "iq5_deqs_bl"
+  }
+ ],
+ "restrict-initial": {
+  "exp": true
+ },
+ "system": {
+  "elements": [
+   {
+    "automaton": "fqcodel"
+   }
+  ],
+  "syncs": [
+   {
+    "result": "DEQ_FROM_NEW_IQ1_DROP",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ1_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ1_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ1_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ2_DROP",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ2_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ2_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ2_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ3_DROP",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ3_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ3_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ3_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ4_DROP",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ4_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ4_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ4_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ5_DROP_BL",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ5_DROP_BL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ5_DROP_NOBL",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ5_DROP_NOBL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ5_TO_OLD_BL",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ5_TO_OLD_BL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_NEW_IQ5_TO_OLD_NOBL",
+    "synchronise": [
+     "DEQ_FROM_NEW_IQ5_TO_OLD_NOBL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ1_DROP",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ1_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ1_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ1_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ2_DROP",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ2_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ2_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ2_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ3_DROP",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ3_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ3_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ3_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ4_DROP",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ4_DROP"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ4_TO_OLD",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ4_TO_OLD"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ5_DROP_BL",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ5_DROP_BL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ5_DROP_NOBL",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ5_DROP_NOBL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ5_TO_OLD_BL",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ5_TO_OLD_BL"
+    ]
+   },
+   {
+    "result": "DEQ_FROM_OLD_IQ5_TO_OLD_NOBL",
+    "synchronise": [
+     "DEQ_FROM_OLD_IQ5_TO_OLD_NOBL"
+    ]
+   },
+   {
+    "result": "DEQ_NOP",
+    "synchronise": [
+     "DEQ_NOP"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ1_ADD",
+    "synchronise": [
+     "REC_UPD_NEW_IQ1_ADD"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ1_NOP",
+    "synchronise": [
+     "REC_UPD_NEW_IQ1_NOP"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ2_ADD",
+    "synchronise": [
+     "REC_UPD_NEW_IQ2_ADD"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ2_NOP",
+    "synchronise": [
+     "REC_UPD_NEW_IQ2_NOP"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ3_ADD",
+    "synchronise": [
+     "REC_UPD_NEW_IQ3_ADD"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ3_NOP",
+    "synchronise": [
+     "REC_UPD_NEW_IQ3_NOP"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ4_ADD",
+    "synchronise": [
+     "REC_UPD_NEW_IQ4_ADD"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ4_NOP",
+    "synchronise": [
+     "REC_UPD_NEW_IQ4_NOP"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ5_ADD",
+    "synchronise": [
+     "REC_UPD_NEW_IQ5_ADD"
+    ]
+   },
+   {
+    "result": "REC_UPD_NEW_IQ5_NOP",
+    "synchronise": [
+     "REC_UPD_NEW_IQ5_NOP"
+    ]
+   }
+  ]
+ },
+ "type": "dtmc",
+ "variables": [
+  {
+   "initial-value": 0,
+   "name": "iq1_contents",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 8
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq2_contents",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 8
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq3_contents",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 8
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq4_contents",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 8
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq5_contents",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 8
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq1_new_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq2_new_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq3_new_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq4_new_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq5_new_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq1_old_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq2_old_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq3_old_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq4_old_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq5_old_rank",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "new_list_len",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "old_list_len",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 5
+   }
+  },
+  {
+   "initial-value": 1,
+   "name": "stage",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 1,
+    "upper-bound": 11
+   }
+  },
+  {
+   "initial-value": 0,
+   "name": "iq5_deqs_bl",
+   "type": {
+    "base": "int",
+    "kind": "bounded",
+    "lower-bound": 0,
+    "upper-bound": 14
+   }
+  }
+ ]
+}
