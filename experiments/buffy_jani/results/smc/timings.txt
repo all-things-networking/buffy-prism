@@ -1,0 +1,9 @@
+modes_sync_p0.2 rc=0 wall_s=11.468697071075439
+modes_staged_p0.2 rc=0 wall_s=73.26691198348999
+prism_bfy_p0.2 rc=0 wall_s=400.58959698677063
+prism_hand_p0.2 rc=0 wall_s=125.32451510429382
+modes_sync_p0.6 rc=0 wall_s=13.195970058441162
+modes_staged_p0.6 rc=0 wall_s=75.114621162414551
+prism_bfy_p0.6 rc=0 wall_s=546.7160758972168
+prism_hand_p0.6 rc=0 wall_s=186.46081495285034
+done

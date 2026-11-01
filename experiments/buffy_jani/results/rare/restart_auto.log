@@ -1,0 +1,25 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes models/rare_p0.2_imp.jani --props starve_violation -C 0.95 -W 0.1 --relative-width -J 1 --seed 1 --rare Restart
+
+
+
+
+rare_p0.2_imp.jani:model: info: rare_p0 is a DTMC model and will be simulated as an MDP with uniform resolution of nondeterminism.
+rare_p0.2_imp.jani:model: error: Array index out of range.
+
+Analysis results for rare_p0.2_imp.jani
+Status:          Error
+Simulation time: 0.5 s
+
++ Compositional state space
+  Components:       6
+  Exploration time: 0.0 s
+
++ starve_violation
+  Distribution support: {0, 1}
+  Status:               Error
+
+  + Importance function
+    Type:               Automatic compositional
+    Level calc. method: Expected success (1)
+

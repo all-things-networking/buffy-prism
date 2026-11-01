@@ -1,0 +1,1 @@
+P0=0.2: P(deqs_bl reaches 4 within 14 steps) = 0.000330  (n=200000, 99% half-width ~ 0.000105)

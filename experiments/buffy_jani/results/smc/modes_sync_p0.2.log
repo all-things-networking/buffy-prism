@@ -1,0 +1,65 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes bfy_p0.2.jani -N 100000 -J 1 --seed 1
+
+
+
+
+bfy_p0.2.jani:model: info: bfy_p0 is a DTMC model and will be simulated as an MDP with uniform resolution of nondeterminism.
+bfy_p0.2.jani: info: Using default confidence level of 0.95.
+
+Analysis results for bfy_p0.2.jani
+Status:          Finished
+Simulation time: 10.1 s
+
++ Properties "starve_violation", "cond_a_violation", "early_violation" and "gap_violation"
+  Run type: MDP
+  Status:   Finished
+
+  + Property starve_violation
+    Estimated probability: 0.00044
+    Confidence interval:   [0.00031972230723422535, 0.0005906349587275642]
+    Interval half-width:   0.0001354563257466694
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property cond_a_violation
+    Estimated probability: 0.99813
+    Confidence interval:   [0.9978422316209564, 0.9983882272553902]
+    Interval half-width:   0.0002729978172169023
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property early_violation
+    Estimated probability: 0.99775
+    Confidence interval:   [0.9974364013093793, 0.9980341416910795]
+    Interval half-width:   0.0002988701908501201
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property gap_violation
+    Estimated probability: 1
+    Confidence interval:   [0.9999631118858421, 1]
+    Interval half-width:   1.844405707895902E-05
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+

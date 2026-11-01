@@ -1,0 +1,3 @@
+merged rc=0 wall_s=19
+stages rc=0 wall_s=47
+hand rc=0 wall_s=19

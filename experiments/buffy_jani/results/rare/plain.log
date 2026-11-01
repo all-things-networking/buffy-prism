@@ -1,0 +1,26 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes models/rare_p0.2_imp.jani --props starve_violation -C 0.95 -W 0.1 --relative-width -J 1 --seed 1
+
+
+
+
+rare_p0.2_imp.jani:model: info: rare_p0 is a DTMC model and will be simulated as an MDP with uniform resolution of nondeterminism.
+
+Analysis results for rare_p0.2_imp.jani
+Status:          Finished
+Simulation time: 218.7 s
+
++ Property starve_violation
+  Estimated probability: 0.00037097629996462683
+  Runs used:             2261600
+  Distribution support:  {0, 1}
+  Run type:              MDP
+  Status:                Finished
+
+  + Statistical guarantees
+    Method:    Adaptive method
+    Statement: P(error > εp) < δ
+    Caveats:   The statement is not proven for true probability p close to 0.5
+    ε:         0.1
+    δ:         0.050000000000000044
+
