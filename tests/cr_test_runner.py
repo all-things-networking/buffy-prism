@@ -24,7 +24,7 @@ CROneHypParams = namedtuple('CROneHypParams',
 
 def run_cr_simulation_two_hyp(theta, alpha, beta, zeta, sampler_minus, sampler_plus, N, seed):
     """SPRT simulation."""
-    cr_runner = ChowRobbins(theta, ErrTols(alpha, beta), zeta, 1)
+    cr_runner = ChowRobbins(theta, ErrTols(alpha, beta), zeta, None, mode="fixed_width")
 
     stopping_times = np.zeros(N, dtype=np.int64)
     decisions_h_minus = np.zeros(N, dtype=np.bool_)
@@ -79,7 +79,7 @@ def run_cr_two_hyp(params, sampler_generator):
 
 def run_cr_simulation_one_hyp(theta, alpha, beta, zeta, sampler, N, seed):
     """SPRT simulation."""
-    cr_runner = ChowRobbins(theta, ErrTols(alpha, beta), zeta, 1)
+    cr_runner = ChowRobbins(theta, ErrTols(alpha, beta), zeta, None, mode="fixed_width")
 
     stopping_times = np.zeros(N, dtype=np.int64)
     wall_times = np.zeros(N, dtype=np.float64)
