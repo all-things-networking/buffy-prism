@@ -36,7 +36,7 @@ tool behaviour it relies on.
   `choose` (per-source choice edges for MDPs; the default above 64 joint choices).
 - **PRISM:** temporaries as formulas, per-level stages, or merged stages (the default for large programs).
 
-Tests: `test/jani/run_tests.sh` checks 10 small examples in every layout and mode, in Storm and `mcsta`,
+Tests: `test/jani/run_tests.sh` checks 11 small examples in every layout and mode, in Storm and `mcsta`,
 against independent exact Python references (to 1e-9). The large FQ examples are compile-only;
 they are validated by statistical model checking in buffy-prism.
 
@@ -66,7 +66,7 @@ Builds on `features`.
   wp/`$IN_*` substitution plan of the URF report.
 
 Tests:
-- `test/smt/run_tests.sh`: SMT answers agree with Storm on 10 programs.
+- `test/smt/run_tests.sh`: SMT answers agree with Storm on 11 programs.
 - `make test-fperf`: identical SAT/UNSAT answers to FPerf's `PrioScheduler` (64 queries) and to a
   hand-written two-`PriorityQM` composition (144 queries); priority-reversed mutants disagree.
 
