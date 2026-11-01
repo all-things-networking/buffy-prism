@@ -1,0 +1,4 @@
+N=2 dag=203 tree=428592 | PRISM formulas 0.6s rc=0 | stormpy formulas 0.6s rc=0 | PRISM stages 0.4s rc=0
+N=3 dag=389 tree=3.40255e+08 | PRISM formulas 50.1s rc=0 | stormpy formulas 60.0s rc=124 | PRISM stages 0.6s rc=0
+N=4 dag=635 tree=4.21326e+11 | PRISM formulas 60.0s rc=124 | stormpy formulas 60.0s rc=124 | PRISM stages 0.3s rc=0
+N=5 dag=941 tree=7.48945e+14 | PRISM formulas 60.0s rc=124 | stormpy formulas 60.0s rc=124 | PRISM stages 0.7s rc=0

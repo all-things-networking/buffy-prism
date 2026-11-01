@@ -1,0 +1,84 @@
+PRISM
+=====
+
+Version: 4.10.1
+Date: Sun Nov 01 01:17:00 PDT 2026
+Hostname: Jamies-MacBook-Air-2.local
+Memory limits: cudd=1g, java(heap)=2g
+Command line: prism hand_p0.6.pm hand.props -sim -simmethod ci -simsamples 100000 -simpathlen 400
+
+Parsing PRISM model file "hand_p0.6.pm"...
+
+Type:        DTMC
+Modules:     fqcodel
+Actions:     [REC_PKT_GET_IQ1] [REC_PKT_ARR_IQ1_K0] [REC_PKT_ARR_IQ1_K1] [REC_PKT_ARR_IQ1_K2] [REC_PKT_ARR_IQ1_K3] [REC_PKT_ARR_IQ1_K4] [REC_UPD_NEW_IQ1_NOP] [REC_UPD_NEW_IQ1_ADD] [REC_PKT_GET_IQ2] [REC_PKT_ARR_IQ2_K0] [REC_PKT_ARR_IQ2_K1] [REC_PKT_ARR_IQ2_K2] [REC_PKT_ARR_IQ2_K3] [REC_PKT_ARR_IQ2_K4] [REC_UPD_NEW_IQ2_NOP] [REC_UPD_NEW_IQ2_ADD] [REC_PKT_GET_IQ3] [REC_PKT_ARR_IQ3_K0] [REC_PKT_ARR_IQ3_K1] [REC_PKT_ARR_IQ3_K2] [REC_PKT_ARR_IQ3_K3] [REC_PKT_ARR_IQ3_K4] [REC_UPD_NEW_IQ3_NOP] [REC_UPD_NEW_IQ3_ADD] [REC_PKT_GET_IQ4] [REC_PKT_ARR_IQ4_K0] [REC_PKT_ARR_IQ4_K1] [REC_PKT_ARR_IQ4_K2] [REC_PKT_ARR_IQ4_K3] [REC_PKT_ARR_IQ4_K4] [REC_UPD_NEW_IQ4_NOP] [REC_UPD_NEW_IQ4_ADD] [REC_PKT_GET_IQ5] [REC_PKT_ARR_IQ5_K0] [REC_PKT_ARR_IQ5_K1] [REC_PKT_ARR_IQ5_K2] [REC_PKT_ARR_IQ5_K3] [REC_PKT_ARR_IQ5_K4] [REC_UPD_NEW_IQ5_NOP] [REC_UPD_NEW_IQ5_ADD] [DEQ_FROM_NEW_IQ1_DROP] [DEQ_FROM_NEW_IQ2_DROP] [DEQ_FROM_NEW_IQ3_DROP] [DEQ_FROM_NEW_IQ4_DROP] [DEQ_FROM_NEW_IQ1_TO_OLD] [DEQ_FROM_NEW_IQ2_TO_OLD] [DEQ_FROM_NEW_IQ3_TO_OLD] [DEQ_FROM_NEW_IQ4_TO_OLD] [DEQ_FROM_NEW_IQ5_DROP_NOBL] [DEQ_FROM_NEW_IQ5_TO_OLD_NOBL] [DEQ_FROM_NEW_IQ5_DROP_BL] [DEQ_FROM_NEW_IQ5_TO_OLD_BL] [DEQ_FROM_OLD_IQ1_DROP] [DEQ_FROM_OLD_IQ1_TO_OLD] [DEQ_FROM_OLD_IQ2_DROP] [DEQ_FROM_OLD_IQ2_TO_OLD] [DEQ_FROM_OLD_IQ3_DROP] [DEQ_FROM_OLD_IQ3_TO_OLD] [DEQ_FROM_OLD_IQ4_DROP] [DEQ_FROM_OLD_IQ4_TO_OLD] [DEQ_FROM_OLD_IQ5_DROP_NOBL] [DEQ_FROM_OLD_IQ5_TO_OLD_NOBL] [DEQ_FROM_OLD_IQ5_DROP_BL] [DEQ_FROM_OLD_IQ5_TO_OLD_BL] [DEQ_NOP]
+Variables:   iq1_contents iq2_contents iq3_contents iq4_contents iq5_contents iq1_new_rank iq2_new_rank iq3_new_rank iq4_new_rank iq5_new_rank iq1_old_rank iq2_old_rank iq3_old_rank iq4_old_rank iq5_old_rank new_list_len old_list_len iq1_arrivals iq2_arrivals iq3_arrivals iq4_arrivals iq5_arrivals iq5_cenq iq5_aipg stage time iq5_deqs_bl
+
+Parsing properties file "hand.props"...
+
+4 properties:
+(1) "starve_violation": P=? [ F<=400 (stage=1&time<=14&!(iq5_deqs_bl<4)) ]
+(2) "cond_a_violation": P=? [ F<=400 (stage=1&time<=14&!((iq5_deqs_bl<4)&((time>5)|(iq5_cenq<2)))) ]
+(3) "early_violation": P=? [ F<=400 (stage=1&time<=14&!((time>5)|(iq5_cenq<2))) ]
+(4) "gap_violation": P=? [ F<=400 (stage=1&time<=14&!((time<7)|(iq5_aipg>1))) ]
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F<=400 (stage=1&time<=14&!(iq5_deqs_bl<4)) ]
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=100000
+Simulation parameters: max path length=400
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 100000 iterations in 97.646 seconds (average 0.00098)
+Path length statistics: average 4e+02, min 116, max 401
+
+Result: 0.01158 (+/- 8.714536495001883E-4 with probability 0.99; rel err 0.07525506472367775)
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F<=400 (stage=1&time<=14&!((iq5_deqs_bl<4)&((time>5)|(iq5_cenq<2)))) ]
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=100000
+Simulation parameters: max path length=400
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 100000 iterations in 24.581 seconds (average 0.00025)
+Path length statistics: average 85, min 12, max 401
+
+Result: 0.86737 (+/- 0.002762754750675346 with probability 0.99; rel err 0.0031852090234563636)
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F<=400 (stage=1&time<=14&!((time>5)|(iq5_cenq<2))) ]
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=100000
+Simulation parameters: max path length=400
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 100000 iterations in 26.006 seconds (average 0.00026)
+Path length statistics: average 86, min 12, max 401
+
+Result: 0.85854 (+/- 0.0028386793922967864 with probability 0.99; rel err 0.0033064031871511946)
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F<=400 (stage=1&time<=14&!((time<7)|(iq5_aipg>1))) ]
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=100000
+Simulation parameters: max path length=400
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 100000 iterations in 37.572 seconds (average 0.00038)
+Path length statistics: average 1.2e+02, min 91, max 401
+
+Result: 0.98968 (+/- 8.232021511910671E-4 with probability 0.99; rel err 8.317861846163074E-4)
+
