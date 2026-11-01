@@ -5,17 +5,21 @@ A state is a flat int32 vector (one slot per variable, plus the location if the 
 and restoring a simulation anchor is an array copy, and states can be hashed and compared by value.
 
 Supported JANI subset (anything else raises JaniUnsupported instead of being silently mistranslated):
-  - one automaton (synchronisation vectors over a single automaton only rename actions), any number of locations;
+  - networks of automata composed by synchronisation vectors (silent edges interleave), any number of locations;
   - bounded int and bool variables with constant initial values; constants with values;
   - expressions: literals, identifiers, + - * / % min max abs floor ceil, = ≠ < ≤ > ≥, ∧ ∨ ¬ ⇒, ite;
-  - edges with guards, probabilistic destinations, assignments without indices (simultaneous update).
-Semantics follow JANI: assignments read the old state, and an assignment outside a variable's bounds is an error.
+  - edges with guards, probabilistic destinations, assignments with optional indices (ordered levels);
+  - transient variables (bool/int): reset every step, readable at later assignment levels, initial value elsewhere.
+Semantics follow JANI: assignment levels run in index order, each level updating simultaneously from the state left
+by the previous levels; an assignment outside a variable's bounds is an error.
 """
 import ctypes
 import hashlib
+import itertools
 import json
 import os
 import subprocess
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
@@ -129,14 +133,143 @@ static double jm_uniform(uint64_t s[4]) { uint64_t r = jm_rotl(s[1] * 5, 7) * 9,
 """
 
 
+# Native importance splitting. Levels: thresholds thr[0] < ... < thr[nlev-1] on an importance function;
+# level(s) = number of thresholds <= imp(s). Choices are resolved by per-edge weights, as in jm_simulate.
+_SPLITTING = r"""
+static int jm_level(int64_t v, int nlev, const int64_t *thr) { int l = 0; while (l < nlev && v >= thr[l]) l++; return l; }
+static int jm_choose(const int32_t *s, const double *w, uint64_t rng[4], int32_t *en) {
+  int k = jm_enabled(s, en); if (k == 0) return -1; if (k == 1) return en[0];
+  double tot = 0.0; for (int i = 0; i < k; i++) tot += w[en[i]];
+  double u = jm_uniform(rng);
+  if (tot <= 0.0) return en[(int)(u * k)];
+  double acc = 0.0; u *= tot;
+  for (int i = 0; i < k; i++) { acc += w[en[i]]; if (u < acc) return en[i]; }
+  return en[k - 1];
+}
+typedef struct { int32_t s[NV]; int32_t t; int32_t clev; } jm_traj;
+
+/* RESTART (Villen-Altamirano): a trajectory that up-crosses threshold i (from below) splits into fac[i] copies
+   (itself + fac[i]-1 retrials created at level i+1); a retrial created at level c > 0 is killed when its level
+   drops below c. Re-crossings split again. A goal hit at level l adds 1/prod_{i<l} fac[i]. Per-run estimates go to
+   out[r] (unbiased for P(goal within horizon)). Returns 0, or -1 (bounds error) / -2 (more than max_traj). */
+int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const double *w, int goal, int imp, int nlev,
+               const int64_t *thr, const int32_t *fac, uint64_t seed, int64_t max_traj, double *out, int64_t *steps_out) {
+  uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
+  double wl[65]; wl[0] = 1.0; for (int i = 0; i < nlev && i < 64; i++) wl[i + 1] = wl[i] / fac[i];
+  if (nlev > 64) return -3;
+  int64_t cap = 1024, steps = 0; jm_traj *stk = malloc(cap * sizeof(jm_traj)); int32_t en[NE];
+  if (!stk) return -2;
+  for (int64_t r = 0; r < n_runs; r++) {
+    int64_t top = 0; double est = 0.0;
+    memcpy(stk[0].s, s0, sizeof stk[0].s); stk[0].t = 0; stk[0].clev = 0; top = 1;
+    while (top > 0) {
+      jm_traj cur = stk[--top];
+      int lvl = jm_level(jm_imp(cur.s, imp), nlev, thr);
+      for (;;) {
+        if (jm_goal(cur.s, goal)) { est += wl[lvl]; break; }
+        if (cur.t >= horizon) break;
+        int e = jm_choose(cur.s, w, rng, en); if (e < 0) break;
+        if (jm_step(cur.s, e, jm_uniform(rng)) < 0) { free(stk); return -1; }
+        cur.t++; steps++;
+        int nl = jm_level(jm_imp(cur.s, imp), nlev, thr);
+        if (nl < cur.clev) break;                      /* retrial fell below its creation level */
+        if (nl > lvl) {                                /* split once per crossed threshold */
+          int64_t group = 1;
+          for (int i = lvl; i < nl; i++) {
+            int64_t add = group * (fac[i] - 1);
+            if (top + add > max_traj) { free(stk); return -2; }
+            while (top + add > cap) { cap *= 2; jm_traj *g = realloc(stk, cap * sizeof(jm_traj));
+                                      if (!g) { free(stk); return -2; } stk = g; }
+            for (int64_t j = 0; j < add; j++) { stk[top] = cur; stk[top].clev = i + 1; top++; }
+            group *= fac[i];
+          }
+        }
+        lvl = nl;
+      }
+    }
+    out[r] = est;
+  }
+  free(stk);
+  if (steps_out) *steps_out = steps;
+  return 0;
+}
+
+/* Fixed effort: at level i, eff[i] trials, each from an entrance state of level i drawn uniformly with replacement
+   (entrance states kept with multiplicity); a trial succeeds on reaching level i+1 (or the goal, at the last level)
+   before the horizon. Estimate prod_i succ_i / eff[i]. Per-level success counts go to succ[r*(nlev+1)+i] if succ is
+   not NULL (used by the expected-success level selection). */
+int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const double *w, int goal, int imp, int nlev,
+                    const int64_t *thr, const int32_t *eff, uint64_t seed, double *out, int32_t *succ,
+                    int64_t *steps_out) {
+  uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
+  int32_t maxeff = 1; for (int i = 0; i <= nlev; i++) if (eff[i] > maxeff) maxeff = eff[i];
+  jm_traj *cur = malloc((size_t)maxeff * sizeof(jm_traj)), *nxt = malloc((size_t)maxeff * sizeof(jm_traj));
+  int32_t en[NE]; int64_t steps = 0;
+  if (!cur || !nxt) { free(cur); free(nxt); return -2; }
+  for (int64_t r = 0; r < n_runs; r++) {
+    int ncur = 1; memcpy(cur[0].s, s0, sizeof cur[0].s); cur[0].t = 0;
+    double est = 1.0;
+    for (int i = 0; i <= nlev; i++) {
+      int ok = 0, nn = 0;
+      for (int j = 0; j < eff[i]; j++) {
+        jm_traj tr = cur[(int)(jm_uniform(rng) * ncur)];
+        int hit = 0;
+        for (;;) {
+          if (jm_goal(tr.s, goal)) { hit = 1; break; }
+          if (i < nlev && jm_level(jm_imp(tr.s, imp), nlev, thr) > i) { hit = 1; break; }
+          if (tr.t >= horizon) break;
+          int e = jm_choose(tr.s, w, rng, en); if (e < 0) break;
+          if (jm_step(tr.s, e, jm_uniform(rng)) < 0) { free(cur); free(nxt); return -1; }
+          tr.t++; steps++;
+        }
+        if (hit) { ok++; if (i < nlev) nxt[nn++] = tr; }
+      }
+      if (succ) succ[r * (nlev + 1) + i] = ok;
+      est *= (double)ok / eff[i];
+      if (ok == 0) { if (succ) for (int k = i + 1; k <= nlev; k++) succ[r * (nlev + 1) + k] = 0; break; }
+      jm_traj *tmp = cur; cur = nxt; nxt = tmp; ncur = nn;
+    }
+    out[r] = est;
+  }
+  free(cur); free(nxt);
+  if (steps_out) *steps_out = steps;
+  return 0;
+}
+"""
+
+
+@dataclass
+class _Part:
+    instance: int   # index into JaniModel.instances
+    edge: dict
+
+
+@dataclass
+class _Edge:
+    """ A (possibly synchronised) transition of the network: one edge per participating automaton instance. """
+    action: str
+    parts: list[_Part]
+
+    def destinations(self) -> list[tuple[tuple[_Part, dict], ...]]:
+        return list(itertools.product(*[[(p, d) for d in p.edge["destinations"]] for p in self.parts]))
+
+
 class JaniModel:
     """ A compiled JANI model. Use NativeJaniSimulator for the Simulator interface. """
     def __init__(self, jani: Union[str, Path, dict], goals: Optional[dict[str, Expr]] = None,
-                 constants: Optional[dict[str, Union[int, float, bool]]] = None):
+                 constants: Optional[dict[str, Union[int, float, bool]]] = None,
+                 importance: Optional[dict[str, Expr]] = None):
+        """
+        goals / importance: named JANI expressions compiled into the library; goals are predicates for the batch
+        simulators, importance functions (integer-valued) drive the native splitting methods (splitting.py).
+
+        Networks of several automata are composed as in the JANI spec: silent edges (no action) interleave, and an
+        edge with an action fires only as part of a synchronisation vector, jointly with one matching edge of every
+        participating instance (guards conjoined, probabilities multiplied, assignments combined; two instances
+        assigning the same variable in one joint step is an error). For a single automaton, an action that appears
+        in no synchronisation vector fires on its own under its own name (as Storm's PRISM export expects).
+        """
         model = json.loads(Path(jani).read_text()) if not isinstance(jani, dict) else jani
-        if len(model["automata"]) != 1:
-            raise JaniUnsupported("only single-automaton networks are supported")
-        automaton = model["automata"][0]
         self.model_type = model["type"]
         consts = {c["name"]: c["value"] for c in model.get("constants", []) if "value" in c}
         consts.update(constants or {})
@@ -145,13 +278,19 @@ class JaniModel:
             raise JaniUnsupported(f"undefined constants {missing}")
         self.constants = consts
 
-        raw_vars = model.get("variables", []) + automaton.get("variables", [])
-        tr = _Translator({}, consts)
+        automata = {a["name"]: a for a in model["automata"]}
+        elements = model.get("system", {}).get("elements") or [{"automaton": a["name"]} for a in model["automata"]]
+        names = [el["automaton"] for el in elements]
+        self.instances = [automata[n] for n in names]
+        self.instance_names = [n if names.count(n) == 1 else f"{n}#{i}" for i, n in enumerate(names)]
+        local_names = [v["name"] for a in self.instances for v in a.get("variables", []) if not v.get("transient")]
+        global_names = {v["name"] for v in model.get("variables", []) if not v.get("transient")}
+
         self.variables: list[Variable] = []
-        var_types = {}
-        for v in raw_vars:
-            if v.get("transient"):
-                continue
+        var_types: dict[str, str] = {}
+        scopes: list[dict[str, int]] = [dict() for _ in self.instances]   # per-instance: identifier -> slot
+
+        def declare(v: dict, display: str) -> int:
             t = v["type"]
             if t == "bool":
                 lo, hi, typ = 0, 1, "bool"
@@ -159,73 +298,218 @@ class JaniModel:
                 lo, hi, typ = int(_const_eval(t["lower-bound"], consts)), int(_const_eval(t["upper-bound"], consts)), "int"
             else:
                 raise JaniUnsupported(f"variable {v['name']}: unsupported type {t!r}")
-            init = int(_const_eval(v.get("initial-value", lo), consts))
-            self.variables.append(Variable(v["name"], lo, hi, init))
-            var_types[v["name"]] = typ
-        self.locations = [loc["name"] for loc in automaton["locations"]]
-        if len(self.locations) > 1:
-            self.variables.append(Variable("__location", 0, len(self.locations) - 1,
-                                           self.locations.index(automaton["initial-locations"][0])))
-            var_types["__location"] = "int"
-        self.index = {v.name: i for i, v in enumerate(self.variables)}
-        tr.variables, tr.var_types = self.index, var_types
-        self._tr = tr
+            self.variables.append(Variable(display, lo, hi, int(_const_eval(v.get("initial-value", lo), consts))))
+            var_types[display] = typ
+            return len(self.variables) - 1
 
-        self.edges = automaton["edges"]
-        if any(a.get("index", 0) != 0 for e in self.edges for d in e["destinations"] for a in d.get("assignments", [])):
-            raise JaniUnsupported("assignment indices (sequential assignments) are not supported yet")
-        # In a single-automaton network, a sync vector only renames the action.
-        rename = {s["synchronise"][0]: s.get("result", s["synchronise"][0])
-                  for s in model.get("system", {}).get("syncs", []) if s["synchronise"][0] is not None}
-        self.edge_actions = [rename.get(e.get("action"), e.get("action")) or "τ" for e in self.edges]
+        global_slots = {v["name"]: declare(v, v["name"]) for v in model.get("variables", []) if not v.get("transient")}
+        for i, a in enumerate(self.instances):
+            scopes[i].update(global_slots)
+            for v in a.get("variables", []):
+                if v.get("transient"):
+                    continue
+                unique = local_names.count(v["name"]) == 1 and v["name"] not in global_names
+                scopes[i][v["name"]] = declare(v, v["name"] if unique else f"{self.instance_names[i]}.{v['name']}")
+
+        self.location_slot: list[Optional[int]] = []
+        self.location_names = [[loc["name"] for loc in a["locations"]] for a in self.instances]
+        for i, a in enumerate(self.instances):
+            locs = self.location_names[i]
+            if len(locs) > 1:
+                name = "__location" if len(self.instances) == 1 else f"__location.{self.instance_names[i]}"
+                self.location_slot.append(len(self.variables))
+                self.variables.append(Variable(name, 0, len(locs) - 1, locs.index(a["initial-locations"][0])))
+                var_types[name] = "int"
+            else:
+                self.location_slot.append(None)
+        self.index = {v.name: i for i, v in enumerate(self.variables)}
+        # Transient variables: per-step temporaries, reset to their initial values at every step. Inside a step's
+        # assignment levels they live in extra working slots after the persistent state; everywhere else (guards,
+        # probabilities, goals, importance) they read as their initial values.
+        self.transients: list[Variable] = []
+        transient_init: list[dict[str, int]] = [dict() for _ in self.instances]
+        transient_scope: list[dict[str, int]] = [dict() for _ in self.instances]
+
+        def declare_transient(v: dict, scopes_: list[int]):
+            t = v["type"]
+            if t == "bool":
+                lo, hi, typ = 0, 1, "bool"
+            elif t == "int":
+                lo, hi, typ = -2 ** 31, 2 ** 31 - 1, "int"
+            elif isinstance(t, dict) and t.get("kind") == "bounded" and t.get("base") == "int":
+                lo, hi, typ = int(_const_eval(t["lower-bound"], consts)), int(_const_eval(t["upper-bound"], consts)), "int"
+            else:
+                raise JaniUnsupported(f"transient variable {v['name']}: unsupported type {t!r}")
+            init = int(_const_eval(v.get("initial-value", 0 if lo <= 0 <= hi else lo), consts))
+            slot = len(self.variables) + len(self.transients)
+            self.transients.append(Variable(v["name"], lo, hi, init))
+            var_types[v["name"]] = typ
+            for i in scopes_:
+                transient_init[i][v["name"]] = init
+                transient_scope[i][v["name"]] = slot
+
+        for v in model.get("variables", []):
+            if v.get("transient"):
+                declare_transient(v, list(range(len(self.instances))))
+        for i, a in enumerate(self.instances):
+            for v in a.get("variables", []):
+                if v.get("transient"):
+                    declare_transient(v, [i])
+        # Location transient-values (e.g. PRISM labels exported by Storm): outside assignment levels a transient
+        # variable reads as its value in the instance's current location, else its initial value.
+        for i, a in enumerate(self.instances):
+            slot = self.location_slot[i]
+            if slot is not None:
+                scopes[i]["__loc"] = slot
+                var_types.setdefault(self.variables[slot].name, "int")
+            for name in {tv["ref"] for loc in a["locations"] for tv in loc.get("transient-values", [])}:
+                if name not in transient_init[i]:
+                    raise JaniUnsupported(f"transient-value for unknown transient variable {name!r}")
+                expr: Expr = transient_init[i][name]
+                for li, loc in reversed(list(enumerate(a["locations"]))):
+                    value = next((tv["value"] for tv in loc.get("transient-values", []) if tv["ref"] == name), None)
+                    if value is None:
+                        continue
+                    expr = value if slot is None else {"op": "ite", "if": {"op": "=", "left": "__loc", "right": li},
+                                                       "then": value, "else": expr}
+                transient_init[i][name] = expr
+        self._trs, self._trs_read = [], []   # per instance: inside assignment levels / guards and probabilities
+        for i, scope in enumerate(scopes):
+            tr = _Translator({**scope, **transient_scope[i]}, consts)
+            tr.var_types = {k: var_types[self.variables[slot].name] for k, slot in scope.items()}
+            tr.var_types.update({k: var_types[k] for k in transient_scope[i]})
+            self._trs.append(tr)
+            read = _Translator(scope, {**consts, **transient_init[i]})
+            read.var_types = {k: var_types[self.variables[slot].name] for k, slot in scope.items()}
+            self._trs_read.append(read)
+        global_transients = {v.name: v.initial for v in self.transients}
+        if len(self.instances) == 1:   # goals and importance may then refer to labels / location-derived values
+            global_transients.update({k: v for k, v in transient_init[0].items() if isinstance(v, dict)})
+        global_scope = dict(self.index)
+        if len(self.instances) == 1 and self.location_slot[0] is not None:
+            global_scope["__loc"] = self.location_slot[0]
+        self._tr = _Translator(global_scope, {**consts, **global_transients})   # goals and importance
+        self._tr.var_types = {**var_types, "__loc": "int"}
+
+        self.edges = self._compose(model)
+        self.edge_actions = [e.action for e in self.edges]
         self.goals = dict(goals or {})
         self.goal_names = list(self.goals)
+        self.importance = dict(importance or {})
+        self.importance_names = list(self.importance)
         source = self._generate()
         self.lib = _compile(source)
         self._bind()
 
+    def _compose(self, model: dict) -> list[_Edge]:
+        syncs = model.get("system", {}).get("syncs", [])
+        n = len(self.instances)
+        edges: list[_Edge] = []
+        if n == 1:
+            # Keep the automaton's edge order (it fixes the order of choices, which matches Storm's simulator).
+            rename = {s["synchronise"][0]: s.get("result") for s in syncs if s["synchronise"][0] is not None}
+            for e in self.instances[0]["edges"]:
+                act = e.get("action")
+                name = "τ" if act is None else (rename.get(act) or ("τ" if act in rename else act))
+                edges.append(_Edge(name, [_Part(0, e)]))
+            return edges
+        for i, a in enumerate(self.instances):
+            edges += [_Edge("τ", [_Part(i, e)]) for e in a["edges"] if e.get("action") is None]
+        synced = set()
+        for v in syncs:
+            slots = [(i, act) for i, act in enumerate(v["synchronise"]) if act is not None]
+            synced.update(slots)
+            choices = [[_Part(i, e) for e in self.instances[i]["edges"] if e.get("action") == act] for i, act in slots]
+            for parts in itertools.product(*choices):
+                edges.append(_Edge(v.get("result") or "τ", list(parts)))
+        dropped = {(self.instance_names[i], e["action"]) for i, a in enumerate(self.instances) for e in a["edges"]
+                   if e.get("action") is not None and (i, e["action"]) not in synced}
+        if dropped:
+            warnings.warn(f"actions in no synchronisation vector can never fire (JANI semantics): {sorted(dropped)}")
+        return edges
+
     # ---- code generation -------------------------------------------------------------------------------------------
+    def _guard_c(self, edge: _Edge) -> str:
+        conds = []
+        for p in edge.parts:
+            slot = self.location_slot[p.instance]
+            if slot is not None:
+                conds.append(f"(s[{slot}] == {self.location_names[p.instance].index(p.edge['location'])})")
+            conds.append(self._trs_read[p.instance].c(p.edge.get("guard", {}).get("exp", True)))
+        return " && ".join(conds)
+
+    def _probability_c(self, combo: tuple[tuple[_Part, dict], ...]) -> str:
+        return " * ".join(f"(double)({self._trs_read[p.instance].c(d.get('probability', {}).get('exp', 1))})"
+                          for p, d in combo)
+
+    def _destination_c(self, combo: tuple[tuple[_Part, dict], ...]) -> str:
+        """
+        JANI assignment semantics: levels (the "index" field, default 0) run in increasing order; within a level all
+        assignments (of all participating instances) read the state left by the previous levels (simultaneous
+        update). Level 0 reads the source state s; later levels read a snapshot u of the partially updated state t
+        (the inner `s` shadows the parameter). Location updates come last.
+        """
+        levels: dict[int, list[tuple[_Translator, int, Expr]]] = {}
+        for p, d in combo:
+            scope = self._trs[p.instance].variables
+            for a in d.get("assignments", []):
+                if a["ref"] not in scope:
+                    raise JaniUnsupported(f"assignment to unknown or transient variable {a['ref']!r}")
+                levels.setdefault(int(a.get("index", 0)), []).append((self._trs[p.instance], scope[a["ref"]], a["value"]))
+        body = ""
+        for n, level in enumerate(sorted(levels)):
+            targets = [slot for _, slot, _ in levels[level]]
+            if len(targets) != len(set(targets)):
+                raise JaniUnsupported("a variable is assigned twice in one step (conflicting synchronised edges)")
+            writes = "".join(f" t[{slot}] = (int32_t)({tr.c(value)});" for tr, slot, value in levels[level])
+            # Level 0 may read the source state directly unless transients exist (their slots live only in t).
+            direct = n == 0 and not self.transients
+            body += writes if direct else f" {{ int32_t u[NW]; memcpy(u, t, sizeof u); {{ const int32_t *s = u;{writes} }} }}"
+        for p, d in combo:
+            slot = self.location_slot[p.instance]
+            if slot is not None:
+                body += f" t[{slot}] = {self.location_names[p.instance].index(d['location'])};"
+        return body
+
     def _generate(self) -> str:
         tr, nv, ne = self._tr, len(self.variables), len(self.edges)
-        loc = self.index.get("__location")
-        out = [_PRELUDE, f"#define NV {nv}", f"#define NE {ne}",
+        dests = [e.destinations() for e in self.edges]
+        stride = max([len(d) for d in dests] + [1])
+        out = [_PRELUDE, f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
+               f"#define STRIDE {stride}",
                "int jm_nvars(void) { return NV; }", "int jm_nedges(void) { return NE; }"]
         out.append("void jm_init(int32_t *s) {" + "".join(f" s[{i}] = {v.initial};" for i, v in
                                                           enumerate(self.variables)) + " }")
         out.append("int jm_enabled(const int32_t *s, int32_t *out) {\n  int k = 0;")
         for i, e in enumerate(self.edges):
-            cond = tr.c(e.get("guard", {}).get("exp", True))
-            if loc is not None:
-                cond = f"(s[{loc}] == {self.locations.index(e['location'])}) && {cond}"
-            out.append(f"  if ({cond}) out[k++] = {i};")
+            out.append(f"  if ({self._guard_c(e)}) out[k++] = {i};")
         out.append("  return k;\n}")
-        out.append("static const int jm_nd[NE] = {" + ", ".join(str(len(e["destinations"])) for e in self.edges) + "};")
+        out.append("static const int jm_nd[NE] = {" + ", ".join(str(len(d)) for d in dests) + "};")
         out.append("int jm_ndest(int e) { return jm_nd[e]; }")
-        out.append("double jm_prob(const int32_t *s, int e, int d) {\n  switch (e * 64 + d) {")
-        for i, e in enumerate(self.edges):
-            if len(e["destinations"]) > 64:
-                raise JaniUnsupported("more than 64 destinations per edge")
-            for j, d in enumerate(e["destinations"]):
-                out.append(f"    case {i * 64 + j}: return (double)({tr.c(d.get('probability', {}).get('exp', 1))});")
+        out.append("double jm_prob(const int32_t *s, int e, int d) {\n  switch ((int64_t)e * STRIDE + d) {")
+        for i, ds in enumerate(dests):
+            for j, combo in enumerate(ds):
+                out.append(f"    case {i * stride + j}: return {self._probability_c(combo)};")
         out.append("  }\n  return 0.0;\n}")
         bounds = " ".join(f"if (t[{i}] < {v.lower} || t[{i}] > {v.upper}) return -1;"
-                          for i, v in enumerate(self.variables))
-        out.append("int jm_apply(int32_t *s, int e, int d) {\n  int32_t t[NV]; memcpy(t, s, sizeof t);\n"
-                   "  switch (e * 64 + d) {")
-        for i, e in enumerate(self.edges):
-            for j, d in enumerate(e["destinations"]):
-                body = "".join(f" t[{self.index[a['ref']]}] = (int32_t)({tr.c(a['value'])});"
-                               for a in d.get("assignments", []))
-                if loc is not None:
-                    body += f" t[{loc}] = {self.locations.index(d['location'])};"
-                out.append(f"    case {i * 64 + j}:{body} break;")
-        out.append(f"    default: return -2;\n  }}\n  {bounds}\n  memcpy(s, t, sizeof t);\n  return 0;\n}}")
+                          for i, v in enumerate(self.variables + self.transients) if (v.lower, v.upper) != (-2 ** 31, 2 ** 31 - 1))
+        init_transients = "".join(f" t[{nv + j}] = {v.initial};" for j, v in enumerate(self.transients))
+        out.append("int jm_apply(int32_t *s, int e, int d) {\n  int32_t t[NW]; memcpy(t, s, NV * sizeof(int32_t));"
+                   f"{init_transients}\n  switch ((int64_t)e * STRIDE + d) {{")
+        for i, ds in enumerate(dests):
+            for j, combo in enumerate(ds):
+                out.append(f"    case {i * stride + j}:{self._destination_c(combo)} break;")
+        out.append(f"    default: return -2;\n  }}\n  {bounds}\n  memcpy(s, t, NV * sizeof(int32_t));\n  return 0;\n}}")
         out.append("int jm_step(int32_t *s, int e, double u) {\n  int nd = jm_nd[e], d = 0;\n"
                    "  if (nd > 1) { double acc = 0.0; for (d = 0; d < nd - 1; d++) { acc += jm_prob(s, e, d);"
                    " if (u < acc) break; } }\n  int r = jm_apply(s, e, d);\n  return r < 0 ? r : d;\n}")
         out.append("int jm_goal(const int32_t *s, int g) {\n  switch (g) {")
         for g, name in enumerate(self.goal_names):
             out.append(f"    case {g}: return {tr.c(self.goals[name])};")
+        out.append("  }\n  return 0;\n}")
+        out.append("int64_t jm_imp(const int32_t *s, int f) {\n  switch (f) {")
+        for f, name in enumerate(self.importance_names):
+            out.append(f"    case {f}: return (int64_t)({tr.c(self.importance[name])});")
         out.append("  }\n  return 0;\n}")
         # Batch simulation under a memoryless scheduler given as one weight per edge (choices are drawn among the
         # enabled edges in proportion to their weights; uniformly if all enabled weights are zero).
@@ -284,6 +568,7 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
   }
   return 0;
 }""")
+        out.append(_SPLITTING)
         return "\n".join(out) + "\n"
 
     def _bind(self):
@@ -293,12 +578,21 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
         lib.jm_prob.argtypes, lib.jm_prob.restype = [i32p, ctypes.c_int, ctypes.c_int], dbl
         lib.jm_step.argtypes, lib.jm_step.restype = [i32p, ctypes.c_int, dbl], ctypes.c_int
         lib.jm_goal.argtypes, lib.jm_goal.restype = [i32p, ctypes.c_int], ctypes.c_int
+        lib.jm_apply.argtypes, lib.jm_apply.restype = [i32p, ctypes.c_int, ctypes.c_int], ctypes.c_int
+        lib.jm_ndest.argtypes, lib.jm_ndest.restype = [ctypes.c_int], ctypes.c_int
         lib.jm_simulate.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, ctypes.POINTER(dbl), ctypes.c_int,
                                     ctypes.c_uint64, ctypes.POINTER(ctypes.c_int64)]
         lib.jm_simulate.restype = ctypes.c_int64
         lib.jm_simulate_scores.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, ctypes.POINTER(dbl), ctypes.c_int,
                                            ctypes.c_uint64, i32p, i32p]
         lib.jm_simulate_scores.restype = ctypes.c_int
+        i64p, dblp = ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(dbl)
+        lib.jm_restart.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, dblp, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                   i64p, i32p, ctypes.c_uint64, ctypes.c_int64, dblp, i64p]
+        lib.jm_restart.restype = ctypes.c_int
+        lib.jm_fixed_effort.argtypes = [i32p, ctypes.c_int64, ctypes.c_int, dblp, ctypes.c_int, ctypes.c_int,
+                                        ctypes.c_int, i64p, i32p, ctypes.c_uint64, dblp, i32p, i64p]
+        lib.jm_fixed_effort.restype = ctypes.c_int
 
     # ---- low-level API on explicit state vectors --------------------------------------------------------------------
     def initial_state(self) -> np.ndarray:
@@ -316,6 +610,16 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
         if d < 0:
             raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): assignment out of variable bounds")
         return d
+
+    def successors(self, s: np.ndarray, edge: int) -> list[tuple[float, np.ndarray]]:
+        """ The probabilistic outcomes of taking `edge` from s: [(probability, successor state)]. """
+        out = []
+        for d in range(self.lib.jm_ndest(int(edge))):
+            t = s.copy()
+            if self.lib.jm_apply(_ptr(t), int(edge), d) < 0:
+                raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): assignment out of variable bounds")
+            out.append((self.lib.jm_prob(_ptr(s), int(edge), d), t))
+        return out
 
     def goal(self, s: np.ndarray, name: str) -> bool:
         return bool(self.lib.jm_goal(_ptr(s), self.goal_names.index(name)))
@@ -344,9 +648,64 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const dou
             raise RuntimeError("assignment out of variable bounds during simulation")
         return scores, counts
 
+    def edge_weight_vector(self, action_weights: Optional[dict[str, float]]) -> np.ndarray:
+        return np.array([(action_weights or {}).get(a, 0.0) for a in self.edge_actions], dtype=np.float64)
+
+    def restart(self, n_runs: int, horizon: int, goal: str, importance: str, thresholds: list[int],
+                factors: list[int], action_weights: Optional[dict[str, float]] = None, seed: int = 1,
+                max_trajectories: int = 10_000_000) -> tuple[np.ndarray, int]:
+        """ n_runs independent RESTART runs (see jm_restart); returns (per-run estimates, total steps). """
+        thr = np.ascontiguousarray(thresholds, dtype=np.int64)
+        fac = np.ascontiguousarray(factors, dtype=np.int32)
+        if len(thr) != len(fac) or np.any(np.diff(thr) <= 0) or np.any(fac < 1):
+            raise ValueError("need increasing thresholds and factors >= 1 of the same length")
+        w, out, steps = self.edge_weight_vector(action_weights), np.empty(n_runs), ctypes.c_int64(0)
+        rc = self.lib.jm_restart(_ptr(self.initial_state()), n_runs, horizon, _dptr(w), self.goal_names.index(goal),
+                                 self.importance_names.index(importance), len(thr), _lptr(thr), _ptr(fac), seed,
+                                 max_trajectories, _dptr(out), ctypes.byref(steps))
+        _check(rc)
+        return out, steps.value
+
+    def fixed_effort(self, n_runs: int, horizon: int, goal: str, importance: str, thresholds: list[int],
+                     efforts: list[int], action_weights: Optional[dict[str, float]] = None, seed: int = 1,
+                     level_successes: bool = False):
+        """
+        n_runs independent fixed-effort runs (see jm_fixed_effort); efforts has len(thresholds)+1 entries.
+        Returns (per-run estimates, total steps) or, with level_successes, also the (n_runs, levels) success counts.
+        """
+        thr = np.ascontiguousarray(thresholds, dtype=np.int64)
+        eff = np.ascontiguousarray(efforts, dtype=np.int32)
+        if len(eff) != len(thr) + 1 or np.any(np.diff(thr) <= 0) or np.any(eff < 1):
+            raise ValueError("need increasing thresholds and len(thresholds)+1 positive efforts")
+        w, out, steps = self.edge_weight_vector(action_weights), np.empty(n_runs), ctypes.c_int64(0)
+        succ = np.empty((n_runs, len(eff)), dtype=np.int32) if level_successes else None
+        rc = self.lib.jm_fixed_effort(_ptr(self.initial_state()), n_runs, horizon, _dptr(w),
+                                      self.goal_names.index(goal), self.importance_names.index(importance), len(thr),
+                                      _lptr(thr), _ptr(eff), seed, _dptr(out),
+                                      _ptr(succ) if succ is not None else None, ctypes.byref(steps))
+        _check(rc)
+        return (out, steps.value, succ) if level_successes else (out, steps.value)
+
 
 def _ptr(a: np.ndarray):
     return a.ctypes.data_as(ctypes.POINTER(ctypes.c_int32 if a.dtype == np.int32 else ctypes.c_double))
+
+
+def _dptr(a: np.ndarray):
+    return a.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+
+
+def _lptr(a: np.ndarray):
+    return a.ctypes.data_as(ctypes.POINTER(ctypes.c_int64))
+
+
+def _check(rc: int) -> None:
+    if rc == -1:
+        raise RuntimeError("assignment out of variable bounds during simulation")
+    if rc == -2:
+        raise RuntimeError("RESTART: trajectory limit exceeded (splitting factors too large?) or out of memory")
+    if rc == -3:
+        raise ValueError("at most 64 splitting levels are supported")
 
 
 def _const_eval(e: Expr, consts: dict) -> Union[int, float, bool]:

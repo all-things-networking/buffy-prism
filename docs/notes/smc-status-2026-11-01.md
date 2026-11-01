@@ -141,11 +141,72 @@ The MDP has no probabilistic branching, so Pmax ∈ {0, 1}. The Weibull DTMC sho
 
   Splitting does not yet beat SPRT for this test; it needs rarer events or cheaper splitting runs.
 
+## 6. Native splitting, and splitting vs SPRT (overnight, unattended)
+
+**Native splitting** (`JaniModel.restart` / `fixed_effort` in the generated C; `src/netmdp/sim/splitting.py` for
+expected-success levels and `NativeSplittingSampler`):
+- RESTART splits on every up-crossing (re-crossings included), once per crossed threshold, and kills retrials below
+  their creation level; a goal at level ℓ counts 1/∏_{i<ℓ} R_i.
+- Fixed effort resamples entrance states uniformly with replacement, keeping multiplicity.
+- Validated against the modes references:
+  - P(>4): RESTART 0.0128 ± 0.0005, fixed effort 0.0128 ± 0.0002, against 0.0129 [0.0128, 0.0131];
+  - P(>8): RESTART 4.24e-4 ± 0.28e-4, fixed effort 4.15e-4 ± 0.11e-4, against 4.09e-4 [4.01, 4.17]e-4.
+- Speed: a RESTART run costs 4–7 µs natively, against 449 µs in modes.
+- At P(>8) RESTART's work-normalised relative variance is 7.5× lower than base SMC's.
+
+**Splitting vs SPRT** at the same relative hypothesis as Exp 3 (θ = p/2.73, ζ = 2θ/3, α = β = 0.05).
+`tests/native_splitting_experiment.py` and `tests/native_crossover_experiment.py`; results in
+`tests/modes/results/native_{splitting,crossover}.json`. 20 reps each, all decisions correct.
+
+| goal | p | base SMC + SPRT | native RESTART + CR anytime |
+|---|---|---|---|
+| > 8 | 4.0e-4 | 9.0k runs, 37 ms | 9.4k runs, 76 ms |
+| > 9 | 1.0e-4 | 27.7k runs, 111 ms | 21.4k runs, 155 ms |
+| > 10 | 1.7e-5 | 169k runs, 681 ms | 75k runs, **582 ms** |
+| > 11 | 1.7e-6 | 2.19M runs, 10.7 s | 285k runs, **4.8 s** |
+
+Splitting with an anytime test overtakes SPRT below about p ≈ 2e-5, and the gap grows as p shrinks. Weighted fixed
+effort uses the fewest runs (4k at > 8), but each run costs about 70 µs, so it loses on time here.
+
+**Compiler extensions for the Buffy emitter** (requested by the Buffy-to-JANI session):
+- assignment `index` levels;
+- transient variables, plus location transient-values, so Storm-exported PRISM labels can be used as goals;
+- multi-automaton networks with synchronisation vectors.
+
+Validated exhaustively against Storm's explicit model on `tests/models/sync_toy.pm` (4 modules, 3-way sync; all 640
+states) and the die MDP: `tests/test_jani_native.py`. FQ-CoDel estimates are bit-identical with a fixed seed.
+
+**Smoke tests of the fixed stormpy samplers** (course model): the base sampler now gives P(>2) = 0.713 ± 0.023
+against the reference 0.7146, at 16 ms/run (native: 3.6 µs). The fixed-effort sampler runs and its estimate is
+consistent with the reference.
+
+## Design decisions to review (made unattended)
+
+1. **Simulation engine: our own JANI → C compiler**, in C rather than Rust (clang already installed, no
+   build/binding toolchain) and loaded with ctypes. stormpy stays as the reference backend. modes (closed) is used
+   for cross-validation and for estimating under exported schedulers.
+2. **Native batch paths** (`simulate`, `simulate_scores`, `restart`, `fixed_effort`) accept only memoryless,
+   state-independent schedulers given as per-action weights. State-dependent and learned policies go through the
+   Python `Simulator`/`Rollout` path (about 9 µs/step).
+3. **Q-learning updates run in reverse order** after each episode; the step count is part of the key by default;
+   shaping is available but off by default (it hurt).
+4. **Cross-entropy** learns one arrival distribution per input queue (i.i.d. over time), elite quantile ρ = 0.05,
+   smoothing 0.7. It is a distribution-learning method, not RL, and needs no reward design.
+5. **Chow-Robbins default is `mode="anytime"`**, with `mode="fixed_width"` kept for the course runners.
+   `min_nonzero` = 10 by default (30 helps at θ = 1.5e-4).
+6. **Splitting levels:** expected success with pilot effort 256. Importance is `min(iq5_deqs_bl, k+1)`, matching
+   the course `ImportanceFQCodel`.
+7. **Native fixed effort resamples entrance states uniformly with replacement**, the textbook unbiased version.
+   The course sampler cycles round-robin.
+8. **JANI composition follows the spec.** For a single automaton, an action in no sync vector still fires alone,
+   for compatibility with Storm's export. For networks, such actions never fire, with a warning.
+9. **Exact model checking is never used on the network models.** Storm explicit checks are used only for toy-model
+   compiler tests.
+
 ## Next steps
 
-1. Splitting on the native engine: a RESTART / fixed-effort sampler on `Rollout` anchors, so splitting runs cost
-   µs instead of modes' 0.45 ms. That changes the splitting-vs-SPRT trade-off above.
-2. Bounded-LTL monitors as JANI automata. This needs multi-automaton support in the native compiler, or a
-   monitor product built in Python over `Simulator`.
+1. Test the native compiler on the Buffy emitter's output (fq_buggy, sync and `--staged` layouts) against modes.
+2. Bounded-LTL monitors as extra JANI automata or indexed observer assignments. The compiler now supports both.
 3. Compare the step-aware Q-learner and cross-entropy against LCRL on the same MDP and monitor.
-4. Share the native compiler's supported JANI subset with the Buffy-to-JANI compiler session.
+4. A native splitting path for state-dependent schedulers (for example a tabular policy compiled into C), if
+   learned policies need rare-event evaluation without exporting to modes.
