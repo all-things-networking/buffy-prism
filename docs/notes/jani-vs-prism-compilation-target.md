@@ -201,5 +201,20 @@ Wall-clock times for 100k runs:
 So in modes, the sync layout's 1 step per time step is 6× faster than the staged layout. In PRISM, the compiled
 model's 40 temporary stages cost about 3× against the hand-optimised 11–16 stages.
 
-The netmdp session's native JANI simulator now supports levels, transient variables and synchronisation, and is
-validating against these files.
+**Independent check by the netmdp native JANI simulator** (branch `claude/netmdp-chernoff-hoeffding-6cb4b1`,
+`tests/buffy_jani_check.py`, 1M runs per property). Every property of the compiled FQ files agrees with the
+modes references, within about 2 modes standard errors. Starve violation: 0.011887 ± 0.00021 (P0 = 0.6, sync)
+and 0.000346 ± 0.000036 (P0 = 0.2, sync); sync and staged agree to 3–4 digits. The MDP under uniform choice
+resolution matches the P0 = 0.2 DTMC (0.000359 sync, 0.000333 staged).
+
+Cost per run, single thread:
+
+| layout | native simulator | modes |
+|---|---|---|
+| DTMC sync | 6.5 µs per 14-step run (470 ns/step: 42 levels, 234 transients) | 130 µs |
+| DTMC staged | 5.7 µs per 84-step run | |
+| MDP sync | 3.5 µs/step (3125 joint choices per step) | |
+| MDP staged | 63 ns/step | |
+
+Hence: use `--staged` for MDP simulation and RL. It gives a factored per-source action space, and the compiler
+now prints a note for sync-layout MDPs with more than 64 joint choices.

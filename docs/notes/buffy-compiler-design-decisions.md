@@ -68,7 +68,10 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     `--no-levels` gives a core-JANI single update for small programs, and is refused above 2·10⁶ tree nodes.
 14. **MDP action naming:** every nondeterministic choice gets its own action. The sync layout uses one sync vector
     per joint choice (`tick_k1_..`), up to 4096 combinations, beyond which `--staged` is required. DTMCs use a
-    single `tick`.
+    single `tick`. For simulation and RL, the staged layout's factored choices are much cheaper (63 ns/step vs
+    3.5 µs/step natively on the FQ MDP), and the compiler recommends it above 64 joint choices.
+    *Alternative* (suggested by the netmdp session): a sync-like layout in which each traffic automaton chooses
+    on its own interleaved edge before the synchronised step.
 15. **`G` is emitted as `<name>_violation` = `F ¬φ`, with min/max swapped**, in JANI, PRISM and SMT alike. Neither
     Storm nor modes accepts bounded G in JANI, and Storm's PRISM parser lacks bounded G.
     *Alternative:* emit native `G` in the PRISM files for PRISM-only use.
