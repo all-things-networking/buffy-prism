@@ -51,7 +51,9 @@ class BaseSymbolicSMCSampler(BaseSMCSampler):
             t += 1
             state, _, _, _ = self.step_simulator_weibull_traffic(simulator)
             trace.append(state)
-        if int(state["iq5_deqs_bl"]) == self.goal_deq: #self.trace_sat_property(f"trace_lte_{t}", trace, t):
+        # ">=": the property is "iq5_deqs_bl > goal_deq-1 within trace_len steps" and the counter only increases.
+        # (The STAT 535C runs used "==", which estimated P(exactly goal_deq at the end) instead.)
+        if int(state["iq5_deqs_bl"]) >= self.goal_deq: #self.trace_sat_property(f"trace_lte_{t}", trace, t):
             return 1
         else:
             return 0

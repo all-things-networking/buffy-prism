@@ -89,12 +89,63 @@ The MDP has no probabilistic branching, so Pmax ∈ {0, 1}. The Weibull DTMC sho
 - The gym wrapper uses the old gym API, drops step bounds, and mis-resolves labelled actions.
 - No checking without Storm or modes, and no LTL beyond syntax. Last release August 2024.
 
+## 5. Native simulation engine, schedulers and learning (later the same day)
+
+**Engine: `src/netmdp/sim/jani_native.py` (JANI → C → ctypes).**
+- Compiles a single-automaton JANI MDP or DTMC into a C step function, cached in `~/.cache/netmdp-jani`.
+- Supported subset: bounded int and bool variables, constants, `+ - * / % min max abs floor ceil`, comparisons,
+  `∧ ∨ ¬ ⇒`, `ite`, and probabilistic edges with simultaneous assignments. Anything else raises `JaniUnsupported`.
+  Assignment indices and multi-automaton synchronisation are not supported yet.
+- A state is an int32 vector, so anchors are copies and states hash by value.
+- Speed: 24 ns/step, about 3.3 µs per 154-step run in its batch path (`simulate`, `simulate_scores`). That is about
+  13× faster than modes and 1000× faster per step than stormpy. Through the Python `Simulator` interface it costs
+  about 9 µs/step.
+- Validated:
+  - identical choice lists and all 19 variables against stormpy's PRISM simulator over 3,080 random steps, with
+    save/restore anchors;
+  - P(>2) and P(>4) match the modes reference values.
+
+**Interfaces.**
+- `src/netmdp/sim/simulator.py`: the `Simulator` ABC (choices by action name, `step`, `save`/`restore`) with two
+  backends, `NativeJaniSimulator` and `StormpyPrismSimulator` (reference; Storm compressed-state anchors, no replay).
+- `src/netmdp/sim/scheduler.py`: `Scheduler` (state, choices, memory → distribution), plus `UniformScheduler`,
+  `ActionWeightScheduler`, `arrival_count_scheduler(WEIBULL_TRAFFIC)`, `PolicyScheduler`, and `Rollout`, whose
+  anchors include the scheduler memory.
+- `src/netmdp/sim/export.py::induced_dtmc_jani`: writes the DTMC a state-independent scheduler induces on a JANI
+  MDP, for modes. Validated: the Weibull export reproduces the hand-built DTMC (60 → 40 edges) and its probabilities.
+
+**Learning.** `tests/scheduler_learning_experiment.py`; results in
+`tests/modes/results/scheduler_learning.json`.
+- `src/netmdp/learn/shaped_qlearning.py`: tabular Q-learning, step-aware keys, reverse-order episode updates.
+  - It learns a witness for the 4× goal (greedy policy reaches it at step 126, P = 1) in 20k episodes (about 35 s).
+    modes' Q-learning failed there.
+  - Without reverse-order updates, or with memoryless keys, it does not retain the success.
+  - Potential shaping with Φ = `iq5_deqs_bl`/(k+1) made learning worse in every configuration. Shaping in a
+    zero-initialised table equals Q-initialisation with Φ (Wiewiora 2003), which changed exploration for the
+    worse here. It is off by default.
+- `src/netmdp/learn/cross_entropy.py`: rare-event cross-entropy method for an adversarial i.i.d. per-queue arrival
+  distribution (2 s with the native batch path).
+  - It learns IQ5 ∈ {0, 1} packets (0.54/0.46), with IQ1–4 near Weibull. That is the steady sparse flow that
+    triggers the FQ-CoDel bug.
+  - P(4× fair share) under it: modes RESTART 0.01161 [0.01138, 0.01184], native MC 0.01179. Under Weibull:
+    4.09e-4 (modes) and 3.90e-4 (native), so the learned distribution is about 28× more adversarial.
+
+**Item-3 follow-ups.**
+- `BaseSymbolicSMCSampler` now counts `iq5_deqs_bl >= goal_deq`, i.e. P(> k), not `==`.
+- `FixedEffortSMCSampler` keeps duplicate entrance states, since dropping them biased the estimator.
+- `tests/modes/cr_on_splitting.py` runs the tests on i.i.d. draws from the per-run RESTART distribution exported
+  by modes (`--cdf`), at θ = 1.5e-4, ζ = 1e-4, p ≈ 4.1e-4 (200 paths each):
+  - RESTART + CR anytime: P(H+) = 1.000, 7.7k runs, about 3.5 s;
+  - RESTART + CR fixed-width: P(H+) = 0.885, 20.7k runs (heavy-tailed RESTART estimates, sd/mean 11.5);
+  - base SMC + SPRT: P(H+) = 1.000, 8.0k runs, about 1.2 s.
+
+  Splitting does not yet beat SPRT for this test; it needs rarer events or cheaper splitting runs.
+
 ## Next steps
 
-1. The scheduler class (state, memory → distribution over named actions; frozen during estimation, with memory in
-   splitting anchors) and an RL loop with importance-function shaping. Candidate simulators: stormpy with saved-state
-   anchors (`restart(bitvector)`, about 480× faster than prefix replay), or a generated native step function.
-   Momba is out.
-2. Run CR anytime on splitting runs exported by modes.
-3. Fix the course base samplers' `==` check, or document it, before reusing their numbers.
-4. Compare modes Q-learning against LCRL on the same MDP with a bounded-LTL monitor.
+1. Splitting on the native engine: a RESTART / fixed-effort sampler on `Rollout` anchors, so splitting runs cost
+   µs instead of modes' 0.45 ms. That changes the splitting-vs-SPRT trade-off above.
+2. Bounded-LTL monitors as JANI automata. This needs multi-automaton support in the native compiler, or a
+   monitor product built in Python over `Simulator`.
+3. Compare the step-aware Q-learner and cross-entropy against LCRL on the same MDP and monitor.
+4. Share the native compiler's supported JANI subset with the Buffy-to-JANI compiler session.
