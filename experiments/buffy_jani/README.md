@@ -2,7 +2,8 @@
 
 This compares models compiled with `buffyc-mc` (the `buffy` submodule, branch `jani-backend`) from the Buffy
 paper's FQ scheduler (`buffy/examples/jani/fq_buggy.buffy`) against the hand-written 16-stage PRISM model
-(`tests/models/fqcodel_5i_dtmc_unif.pm`). Everything is **statistical**. Exact model checking is intractable at
+(`tests/models/fqcodel_5i_dtmc_unif.pm`). Building the compiler needs ANTLR 4 (`brew install antlr antlr4-cpp-runtime`; see
+`buffy/docs/parser.md`). Everything is **statistical**. Exact model checking is intractable at
 this size, so every run is capped with `timeout`.
 
 | script | does |
