@@ -1,7 +1,7 @@
 # Buffy compiler: design decisions to review (2026-11-01)
 
 These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule:
-- branch `features` (= `jani-backend` + decisions 20–31): JANI and PRISM;
+- branch `features` (= `jani-backend` + decisions 20–31, 34, 35): JANI and PRISM;
 - branch `fperf-backend` = `features` + the SMT-LIB and FPerf targets.
 
 The [user guide](../../buffy/docs/user-guide.md) (`buffy/docs/user-guide.md`) documents the result.
@@ -158,6 +158,38 @@ Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-b
     tail-dropped at its size) equal Buffy's flush. Connected inputs use their value before the flush for
     `deq_cnt`; modules share per-step state variables. Packet classes are rejected in FPerf for now.
 33. **SMT workload constraints** use network assumptions plus `given assumptions` rather than new syntax.
-34. **The old AST/visitor/SMTIR skeleton is kept**, documented as superseded, rather than deleted: it is the
-    starting point the URF report describes. *Revisit:* delete it once you agree.
+34. **The old AST/visitor/SMTIR skeleton is removed** (at your request): the old AST classes, visitors,
+    SMTIR, the wp/`fperfRunner` backend, its test harness, the hand-translated IR examples and the
+    Z3-4.8.11 build. The URF report's source examples moved to `examples/urf/`.
+35. **The parser is an ANTLR 4 grammar** (`grammar/Buffy.g4`, at your request), replacing the hand-written
+    recursive-descent parser behind the same `frontend::parse` API. Before the switch both parsers produced
+    identical ASTs (with source locations) on every example and edge case, byte-identical JANI/PRISM output,
+    and the same decisions on 25,500 fuzzed programs; golden AST dumps from the hand parser now guard the
+    grammar (`test/parser`). Semantic predicates keep Buffy's one-token decisions (no reserved words).
+    `make mc` now needs the ANTLR tool (Java) and C++ runtime. Syntax errors other than lexical ones are
+    ANTLR's messages.
+
+## Independent review (2026-11-01)
+
+A separate reviewer (Fable) read the whole compiler on `fperf-backend`, ran every suite and probed it
+with small programs. Accepted and fixed (Buffy `features` c9dcbd0, `fperf-backend` d322fac):
+- **Unsound `%` interval rule** in `immut/Bounds` (a model could violate its inferred range), and a
+  too-coarse `/` rule (bounded halving counters were rejected as unbounded).
+- **SMT queries referenced step temporaries** at the last position; z3 rejected the assertion and
+  answered `sat`. Queries are now printed over state variables only, and the SMT test fails on any
+  z3 error.
+- **`%` differed between paths** for negative operands (Storm/mcsta floor modulo vs C remainder in
+  Z3 and the constant folder). JANI and PRISM now emit C's remainder unless both operands are
+  provably non-negative.
+- `init` on queues/buffers rejected and initial values type-checked; literal overflow and bad
+  numeric options reported instead of aborting; errors carry source positions.
+- Design: the LTL machinery moved to `immut/Ltl`, range inference to `immut/Bounds`; an RAII guard
+  restores the elaborator's modes; connections are kept in network order; FPerf output queues are
+  sized from their enqueues.
+- Tests: `examples/jani/arith` (negative `%`/`/`, inference over them, a query atom shared with the
+  step), pruning in every layout, `-D` overrides, and 12 elaborator error cases (`test/elab`).
+
+36. **Declined: block-scoped locals.** The reviewer suggested lexical scoping for `local`. The paper's
+    `local x = e` re-assignment form implies method-scoped locals, so they stay method-scoped (a name is
+    declared once per method); the user guide now says so.
 

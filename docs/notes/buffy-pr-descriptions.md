@@ -1,8 +1,8 @@
 # Pull requests for the Buffy repository (drafts)
 
 The branches are pushed to `all-things-networking/buffy`. Open each PR from its compare link and paste
-the text. Suggested order: `features` first (it contains `jani-backend`), then `fperf-backend`, then
-`antlr-parser` once that session finishes.
+the text. Suggested order: `features` first (it contains `jani-backend` and the ANTLR parser from
+`antlr-parser`), then `fperf-backend`.
 
 ---
 
@@ -15,12 +15,14 @@ Compare: https://github.com/all-things-networking/buffy/compare/main...features?
 **Body:**
 
 Adds `buffyc-mc`, a compiler from Buffy programs to probabilistic models in JANI (Storm, Modest
-`mcsta`/`modes`) and PRISM. It needs only a C++17 compiler (`make mc`). `docs/user-guide.md`
+`mcsta`/`modes`) and PRISM. It needs a C++17 compiler and ANTLR 4 (`make mc`). `docs/user-guide.md`
 documents the language and every option; `docs/jani-backend.md` records the backend design and the
 tool behaviour it relies on.
 
-- **Front end:** a hand-written parser for the paper/URF syntax, plus a `network` block (instances,
-  capacities, traffic distributions, connections, horizon, assumptions), queries and importance hints.
+- **Front end:** an ANTLR 4 grammar (`grammar/Buffy.g4`) for the paper/URF syntax, plus a `network`
+  block (instances, capacities, traffic distributions, connections, horizon, assumptions), queries and
+  importance hints. `make mc` needs the ANTLR tool and C++ runtime (`brew install antlr
+  antlr4-cpp-runtime`). Golden AST dumps guard the grammar (`test/parser`).
 - **BuffyImmut:** one time step is symbolically executed into a hash-consed DSA expression DAG.
   Loops are unrolled, arrays flattened, queues become slots plus a length, and buffers are counts,
   per-class counts or FIFO sequences of packet classes.
@@ -38,7 +40,8 @@ Tests: `test/jani/run_tests.sh` checks 10 small examples in every layout and mod
 against independent exact Python references (to 1e-9). The large FQ examples are compile-only;
 they are validated by statistical model checking in buffy-prism.
 
-The old AST/visitor/SMTIR skeleton is untouched.
+It also removes the old AST/visitor/SMTIR skeleton, which this pipeline supersedes, and the Z3-4.8.11
+build; the URF examples move to `examples/urf/`.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
