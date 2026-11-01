@@ -37,8 +37,7 @@ k ≥ 8, 95 % CIs):
   course's 23,921 / 66,806 / 355,744.
 - Consequence: the course Exp 2 base-SMC rows tested 0.0063 < θ = 0.011, which is why SPRT accepted H−. Exp 3's
   "p ≈ 0.0003" is the same quantity.
-- Exact values: Storm's symbolic (DD) engine did not finish building the model within about 30 min
-  (`stormpy.build_symbolic_model`); the explicit (sparse) build had also failed to finish within 5 min.
+- Exact (explicit or symbolic) model checking is out of scope at this model size; reference values are statistical.
 
 ## 2. Sequential tests (base SMC, Bernoulli paths)
 
