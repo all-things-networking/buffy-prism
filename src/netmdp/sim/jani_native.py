@@ -250,9 +250,6 @@ class _Edge:
     action: str
     parts: list[_Part]
 
-    def destinations(self) -> list[tuple[tuple[_Part, dict], ...]]:
-        return list(itertools.product(*[[(p, d) for d in p.edge["destinations"]] for p in self.parts]))
-
 
 class JaniModel:
     """ A compiled JANI model. Use NativeJaniSimulator for the Simulator interface. """
@@ -429,80 +426,157 @@ class JaniModel:
         return edges
 
     # ---- code generation -------------------------------------------------------------------------------------------
-    def _guard_c(self, edge: _Edge) -> str:
-        conds = []
-        for p in edge.parts:
-            slot = self.location_slot[p.instance]
-            if slot is not None:
-                conds.append(f"(s[{slot}] == {self.location_names[p.instance].index(p.edge['location'])})")
-            conds.append(self._trs_read[p.instance].c(p.edge.get("guard", {}).get("exp", True)))
-        return " && ".join(conds)
+    # Code is generated once per automaton edge ("part edge": guard, destination probabilities, one assignment
+    # function per index level, location update). A network transition (_Edge) only calls its parts, so code size is
+    # additive in the participants, not multiplicative in their destination combinations. A transition's outcome is
+    # a mixed-radix index over its parts' destinations; the parts' choices are independent (probabilities multiply).
+    def _part_edges(self) -> list[_Part]:
+        seen: dict[tuple[int, int], int] = {}
+        parts: list[_Part] = []
+        self._part_id: list[list[int]] = []
+        for e in self.edges:
+            ids = []
+            for p in e.parts:
+                key = (p.instance, id(p.edge))
+                if key not in seen:
+                    seen[key] = len(parts)
+                    parts.append(p)
+                ids.append(seen[key])
+            self._part_id.append(ids)
+        return parts
 
-    def _probability_c(self, combo: tuple[tuple[_Part, dict], ...]) -> str:
-        return " * ".join(f"(double)({self._trs_read[p.instance].c(d.get('probability', {}).get('exp', 1))})"
-                          for p, d in combo)
-
-    def _destination_c(self, combo: tuple[tuple[_Part, dict], ...]) -> str:
-        """
-        JANI assignment semantics: levels (the "index" field, default 0) run in increasing order; within a level all
-        assignments (of all participating instances) read the state left by the previous levels (simultaneous
-        update). Level 0 reads the source state s; later levels read a snapshot u of the partially updated state t
-        (the inner `s` shadows the parameter). Location updates come last.
-        """
-        levels: dict[int, list[tuple[_Translator, int, Expr]]] = {}
-        for p, d in combo:
-            scope = self._trs[p.instance].variables
+    def _part_levels(self, p: _Part) -> dict[int, list[list[tuple[int, Expr]]]]:
+        """ level -> per destination, the (slot, value) assignments at that level. """
+        scope = self._trs[p.instance].variables
+        levels: dict[int, list[list[tuple[int, Expr]]]] = {}
+        dests = p.edge["destinations"]
+        for j, d in enumerate(dests):
             for a in d.get("assignments", []):
                 if a["ref"] not in scope:
-                    raise JaniUnsupported(f"assignment to unknown or transient variable {a['ref']!r}")
-                levels.setdefault(int(a.get("index", 0)), []).append((self._trs[p.instance], scope[a["ref"]], a["value"]))
-        body = ""
-        for n, level in enumerate(sorted(levels)):
-            targets = [slot for _, slot, _ in levels[level]]
-            if len(targets) != len(set(targets)):
-                raise JaniUnsupported("a variable is assigned twice in one step (conflicting synchronised edges)")
-            writes = "".join(f" t[{slot}] = (int32_t)({tr.c(value)});" for tr, slot, value in levels[level])
-            # Level 0 may read the source state directly unless transients exist (their slots live only in t).
-            direct = n == 0 and not self.transients
-            body += writes if direct else f" {{ int32_t u[NW]; memcpy(u, t, sizeof u); {{ const int32_t *s = u;{writes} }} }}"
-        for p, d in combo:
+                    raise JaniUnsupported(f"assignment to unknown variable {a['ref']!r}")
+                per_dest = levels.setdefault(int(a.get("index", 0)), [[] for _ in dests])
+                per_dest[j].append((scope[a["ref"]], a["value"]))
+        for level, per_dest in levels.items():
+            for writes in per_dest:
+                if len({slot for slot, _ in writes}) != len(writes):
+                    raise JaniUnsupported("a variable is assigned twice at one assignment level")
+        return levels
+
+    def _generate_parts(self, parts: list[_Part]) -> list[str]:
+        out = []
+        self._levels_of: list[dict[int, list]] = []
+        for k, p in enumerate(parts):
+            tr_read, tr = self._trs_read[p.instance], self._trs[p.instance]
             slot = self.location_slot[p.instance]
+            guard = tr_read.c(p.edge.get("guard", {}).get("exp", True))
             if slot is not None:
-                body += f" t[{slot}] = {self.location_names[p.instance].index(d['location'])};"
-        return body
+                guard = f"(s[{slot}] == {self.location_names[p.instance].index(p.edge['location'])}) && {guard}"
+            out.append(f"static inline int pg{k}(const int32_t *s) {{ return {guard}; }}")
+            dests = p.edge["destinations"]
+            probs = "".join(f" case {j}: return (double)({tr_read.c(d.get('probability', {}).get('exp', 1))});"
+                            for j, d in enumerate(dests))
+            out.append(f"static double pp{k}(const int32_t *s, int d) {{ switch (d) {{{probs} }} return 0.0; }}")
+            levels = self._part_levels(p)
+            self._levels_of.append(levels)
+            for level, per_dest in levels.items():
+                cases = "".join(f" case {j}:" + "".join(f" t[{slot_}] = (int32_t)({tr.c(v)});" for slot_, v in w)
+                                + " break;" for j, w in enumerate(per_dest) if w)
+                out.append(f"static inline void pa{k}_{level}(int32_t *t, const int32_t *s, int d) "
+                           f"{{ switch (d) {{{cases} }} }}")
+            if slot is not None:
+                cases = "".join(f" case {j}: t[{slot}] = {self.location_names[p.instance].index(d['location'])}; break;"
+                                for j, d in enumerate(dests))
+                out.append(f"static inline void pl{k}(int32_t *t, int d) {{ switch (d) {{{cases} }} }}")
+        return out
+
+    def _generate_transition(self, i: int, parts: list[_Part]) -> str:
+        """ ce<i>(t, s0, dd): applies network transition i with per-part destinations dd (levels in order). """
+        ids = self._part_id[i]
+        all_levels = sorted({lv for k in ids for lv in self._levels_of[k]})
+        for lv in all_levels:   # two participants may not write the same variable at the same level
+            seen: set[int] = set()
+            for k in ids:
+                slots = {slot for w in self._levels_of[k].get(lv, []) for slot, _ in w}
+                if slots & seen:
+                    raise JaniUnsupported(f"transition {self.edges[i].action}: synchronised edges write the same "
+                                          f"variable at level {lv}")
+                seen |= slots
+        body = ""
+        for n, lv in enumerate(all_levels):
+            calls = "".join(f" pa{k}_{lv}(t, SRC, dd[{pi}]);" for pi, k in enumerate(ids) if lv in self._levels_of[k])
+            if n == 0 and not self.transients:
+                body += calls.replace("SRC", "s0")
+            else:
+                body += f" {{ int32_t u[NW]; memcpy(u, t, sizeof u);{calls.replace('SRC', 'u')} }}"
+        body += "".join(f" pl{k}(t, dd[{pi}]);" for pi, k in enumerate(ids)
+                        if self.location_slot[parts[k].instance] is not None)
+        return f"static void ce{i}(int32_t *t, const int32_t *s0, const int *dd) {{{body} }}"
 
     def _generate(self) -> str:
         tr, nv, ne = self._tr, len(self.variables), len(self.edges)
-        dests = [e.destinations() for e in self.edges]
-        stride = max([len(d) for d in dests] + [1])
+        parts = self._part_edges()
+        nd_part = [len(p.edge["destinations"]) for p in parts]
+        nd_edge = [int(np.prod([nd_part[k] for k in ids])) for ids in self._part_id]
+        if max(nd_edge + [1]) > 2 ** 30:
+            raise JaniUnsupported("too many joint destinations in one synchronised transition")
+        max_parts = max([len(ids) for ids in self._part_id] + [1])
         out = [_PRELUDE, f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
-               f"#define STRIDE {stride}",
-               "int jm_nvars(void) { return NV; }", "int jm_nedges(void) { return NE; }"]
+               f"#define MAXP {max_parts}", "int jm_nvars(void) { return NV; }", "int jm_nedges(void) { return NE; }"]
         out.append("void jm_init(int32_t *s) {" + "".join(f" s[{i}] = {v.initial};" for i, v in
                                                           enumerate(self.variables)) + " }")
-        out.append("int jm_enabled(const int32_t *s, int32_t *out) {\n  int k = 0;")
-        for i, e in enumerate(self.edges):
-            out.append(f"  if ({self._guard_c(e)}) out[k++] = {i};")
+        out += self._generate_parts(parts)
+        out += [self._generate_transition(i, parts) for i in range(ne)]
+        # Each part guard is evaluated once per state; network transitions combine the cached results.
+        out.append(f"int jm_enabled(const int32_t *s, int32_t *out) {{\n  int k = 0; char g[{len(parts)}];")
+        out.append("".join(f"  g[{k}] = pg{k}(s);" for k in range(len(parts))))
+        for i, ids in enumerate(self._part_id):
+            out.append(f"  if ({' && '.join(f'g[{k}]' for k in ids)}) out[k++] = {i};")
         out.append("  return k;\n}")
-        out.append("static const int jm_nd[NE] = {" + ", ".join(str(len(d)) for d in dests) + "};")
+        flat = [k for ids in self._part_id for k in ids]
+        offsets = np.cumsum([0] + [len(ids) for ids in self._part_id])[:-1]
+        out.append("static const int jm_nd[NE] = {" + ", ".join(map(str, nd_edge)) + "};")
+        out.append("static const int jm_np[NE] = {" + ", ".join(str(len(ids)) for ids in self._part_id) + "};")
+        out.append("static const int jm_poff[NE] = {" + ", ".join(map(str, offsets)) + "};")
+        out.append(f"static const int jm_pk[{len(flat)}] = {{" + ", ".join(map(str, flat)) + "};")
+        out.append(f"static const int jm_pnd[{len(parts)}] = {{" + ", ".join(map(str, nd_part)) + "};")
+        out.append(f"static double (*const jm_pp[{len(parts)}])(const int32_t *, int) = {{"
+                   + ", ".join(f"pp{k}" for k in range(len(parts))) + "};")
+        out.append(f"static void (*const jm_ce[NE])(int32_t *, const int32_t *, const int *) = {{"
+                   + ", ".join(f"ce{i}" for i in range(ne)) + "};")
         out.append("int jm_ndest(int e) { return jm_nd[e]; }")
-        out.append("double jm_prob(const int32_t *s, int e, int d) {\n  switch ((int64_t)e * STRIDE + d) {")
-        for i, ds in enumerate(dests):
-            for j, combo in enumerate(ds):
-                out.append(f"    case {i * stride + j}: return {self._probability_c(combo)};")
-        out.append("  }\n  return 0.0;\n}")
+        out.append(r"""static void jm_digits(int e, int d, int *dd) {
+  for (int p = 0; p < jm_np[e]; p++) { int nd = jm_pnd[jm_pk[jm_poff[e] + p]]; dd[p] = d % nd; d /= nd; }
+}
+double jm_prob(const int32_t *s, int e, int d) {
+  int dd[MAXP]; double q = 1.0; jm_digits(e, d, dd);
+  for (int p = 0; p < jm_np[e]; p++) q *= jm_pp[jm_pk[jm_poff[e] + p]](s, dd[p]);
+  return q;
+}""")
         bounds = " ".join(f"if (t[{i}] < {v.lower} || t[{i}] > {v.upper}) return -1;"
                           for i, v in enumerate(self.variables + self.transients) if (v.lower, v.upper) != (-2 ** 31, 2 ** 31 - 1))
         init_transients = "".join(f" t[{nv + j}] = {v.initial};" for j, v in enumerate(self.transients))
-        out.append("int jm_apply(int32_t *s, int e, int d) {\n  int32_t t[NW]; memcpy(t, s, NV * sizeof(int32_t));"
-                   f"{init_transients}\n  switch ((int64_t)e * STRIDE + d) {{")
-        for i, ds in enumerate(dests):
-            for j, combo in enumerate(ds):
-                out.append(f"    case {i * stride + j}:{self._destination_c(combo)} break;")
-        out.append(f"    default: return -2;\n  }}\n  {bounds}\n  memcpy(s, t, NV * sizeof(int32_t));\n  return 0;\n}}")
-        out.append("int jm_step(int32_t *s, int e, double u) {\n  int nd = jm_nd[e], d = 0;\n"
-                   "  if (nd > 1) { double acc = 0.0; for (d = 0; d < nd - 1; d++) { acc += jm_prob(s, e, d);"
-                   " if (u < acc) break; } }\n  int r = jm_apply(s, e, d);\n  return r < 0 ? r : d;\n}")
+        out.append("int jm_apply(int32_t *s, int e, int d) {\n  int32_t t[NW]; int dd[MAXP];\n"
+                   f"  if (e < 0 || e >= NE || d < 0 || d >= jm_nd[e]) return -2;\n"
+                   f"  memcpy(t, s, NV * sizeof(int32_t));{init_transients}\n"
+                   f"  jm_digits(e, d, dd); jm_ce[e](t, s, dd);\n  {bounds}\n  memcpy(s, t, NV * sizeof(int32_t));\n"
+                   "  return 0;\n}")
+        # Sampling: each part's destination in turn by inverse CDF on one uniform, rescaled inside the chosen
+        # interval (exact, since u is uniform on that interval given the choice).
+        out.append(r"""int jm_step(int32_t *s, int e, double u) {
+  int d = 0, mult = 1;
+  for (int p = 0; p < jm_np[e]; p++) {
+    int k = jm_pk[jm_poff[e] + p], nd = jm_pnd[k], j = 0;
+    if (nd > 1) {
+      double acc = 0.0, q = 0.0;
+      for (j = 0; j < nd; j++) { q = jm_pp[k](s, j); if (u < acc + q || j == nd - 1) break; acc += q; }
+      u = q > 0.0 ? (u - acc) / q : 0.0;
+      if (u < 0.0) u = 0.0; if (u >= 1.0) u = 0x1.fffffffffffffp-1;
+    }
+    d += j * mult; mult *= nd;
+  }
+  int r = jm_apply(s, e, d);
+  return r < 0 ? r : d;
+}""")
         out.append("int jm_goal(const int32_t *s, int g) {\n  switch (g) {")
         for g, name in enumerate(self.goal_names):
             out.append(f"    case {g}: return {tr.c(self.goals[name])};")
