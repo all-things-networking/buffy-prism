@@ -252,6 +252,43 @@ before, or a `NativePolicy`, which maps (state, step count t, enabled edges) to 
   - **The learner is weak:** it only doubles the violation probability. The reward is sparse, and success rates in training were at most 0.15%.
   - **RESTART is not useful here.** Expected success put a single threshold at the goal level (`fq_deqs_bl` jumps straight to 4, and the goal is hit on the same step), so the run is only an unbiasedness check. The work-normalised variance ratio in the JSON (0.47) is timing noise from the load, not a splitting gain. Rare-event gains on these models need an importance function with intermediate values, for example on queue occupancy.
 
+## 9. Native expected rewards: `C<=k` and `I=k` (2026-11-02)
+
+Buffy 91aaee0 emits `reward r: e;` as a real transient variable `rew_<r>`, assigned on the step edge, and queries
+as JANI `Emax/Emin` properties: `C<=k` is `exp: rew_<r>, accumulate: [steps], step-instant: k`, and `I=k` is
+`exp: <state expression>, step-instant: k` (no reward variable).
+
+- **API:** `JaniModel.simulate_rewards(n, horizon, scheduler, seed, curve=False, start=None)` returns `RewardRuns` with per-run samples:
+  - `cumulative[rew_<r>]`: the transition reward summed over the steps (`C<=horizon`);
+  - `final[obs]`: an observable at step `horizon` (`I=horizon`);
+  - `state_cumulative[obs]`: an observable summed over steps 0..horizon-1 (`C<=horizon` of a state reward).
+- **Observables** are real-valued state expressions passed to the constructor (`observables=`).
+- **Curves:** with `curve=True`, the per-step means and variances give every bound 0..horizon from one batch.
+- **Schedulers and start states:** any scheduler works, including `NativePolicy` tables and callbacks. `start=` begins runs from a given state, for example a post-burst one.
+- **Semantics:**
+  - Reward variables reset to their initial value at each step and are set at their assignment level from the state the earlier levels left.
+  - A deadlock state is kept for the remaining steps and earns no transition reward, as with Storm's deadlock self-loops.
+  - Reading a reward variable in a guard, probability or assignment is still `JaniUnsupported`.
+- **Property helpers** in `tests/buffy_jani_check.py`: `expected_value_properties`, `reward_model` and `reward_samples` (C and I forms; F and S are skipped).
+- **Validation:**
+  - `tests/test_native_rewards.py`, on the Buffy bursty examples, now in `tests/models/`:
+    - **DTMC:** `C<=k` of three reward variables and `I=k` of the backlog for k = 1..6, all from one curve run, are within 2.0 SE of Storm.
+    - **MDP:** under a random (state, t) table policy, `C<=5`, `I=5` and the state-reward `C<=5` are within 0.4 SE of backward induction. The policy's value lies between Storm's Emin and Emax.
+  - **Full FQ model** (fq_buggy with rewards on queues 0 and 4, P0 = 0.6, T = 14; 2M native runs vs 200k modes runs):
+
+    | Query | Native (99% CI) | modes (95% DKW CI) |
+    |---|---|---|
+    | `C<=14` drops at queue 4 | 4.6426 ± 0.0081 | 4.638 [4.402, 4.808] |
+    | `C<=14` drops at queue 0 | 17.1570 ± 0.0095 | 17.151 [16.881, 17.316] |
+    | `C<=14` backlog at queue 4 | 67.775 ± 0.043 | 67.771 [67.239, 68.706] |
+    | `I=14` backlog at queue 4 | 7.0321 ± 0.0029 | 0 (wrong: modes returns the initial value) |
+
+  - **Cost:** native 6 µs/run against 100 µs/run for modes (about 17×). Reward tracking adds no measurable cost per step (412 vs 417 ns).
+- **Not covered yet:**
+  - `F` (reward until a goal) needs a step cap, because the value is infinite if the goal can be missed.
+  - `S` (long-run average) needs batch means or regeneration.
+  - Confidence intervals are normal approximations (`mean_ci`). The bounded-range sequential tests (`ChowRobbins` on real samples) apply as they are.
+
 ## Design decisions to review (made unattended)
 
 1. **Simulation engine: our own JANI → C compiler**, in C rather than Rust (clang already installed, no
