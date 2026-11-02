@@ -202,3 +202,28 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     `local x = e` re-assignment form implies method-scoped locals, so they stay method-scoped (a name is
     declared once per method); the user guide now says so.
 
+
+## Third round (2026-11-01): bursty traffic and model-checking efficiency
+
+37. **Bursty traffic as phases plus state-dependent distributions.** `phase x = init ~ D;` is a
+    network-level state variable redrawn from `D` every step, and `traffic b ~ c ? D1 : D2` makes a
+    distribution depend on the state. A phase is a source without a buffer whose drawn value the step
+    takes over (`Δ(x) = α_x`), so methods, monitors and other sources read its boundary value in every
+    layout, and the scheduler's information pattern is unchanged. Conditions may read globals,
+    monitors and phases, but not buffers (layout-dependent mid-step) or `arrivals-p`/`drops-p`.
+    Branches must be probabilistic. JANI/PRISM get probability expressions; SMT-LIB gets per-value
+    possibility conditions; FPerf rejects phases.
+    *Alternatives:* a dedicated `markov { ... }` source syntax (less general: no dependence on
+    globals or other phases); random globals updated inside methods (would break the deterministic
+    step).
+38. **Monitors are minimised** by Moore partition refinement whose signatures are reduced ordered
+    decision diagrams over the atoms, with `true` kept apart so that acceptance times are preserved.
+    Atoms are treated as independent inputs (sound, possibly incomplete).
+39. **`--auto-importance`** derives an importance function per query: the progress of the target
+    predicate (comparison gaps from interval analysis, `&&` adds, `||` takes the best), refined for
+    monitor queries by the monitor's distance to acceptance. Its target value is reached exactly at
+    the target states, as `modes --ifun-prop` requires; splitting stays unbiased whatever its quality.
+40. **The choose layout applies nondeterministic arrivals on their own edges** (as staged does) and
+    keeps a register only for a source that an earlier-declared probabilistic source precedes into the
+    same buffer (tail-drop order). It never has more states than the register version (`rr`: 1,479
+    against 4,320).
