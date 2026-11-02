@@ -115,12 +115,12 @@ at queue 4 is 7.032 where modes returns 0.
 
 | # | Study | Measures | Why modes can't | Compiler side | Native side |
 |---|---|---|---|---|---|
-| 1 | Bursty traffic at equal load (A) | `P[F<=T starve]`; per-flow `C<=T` drops and backlog; `I=k` backlog curve; long-run `S` | `I=k`, `S`; no common random numbers across models | parameterised bursty FQ models (phases exist) | sweep driver with common random numbers (same seed, one inverse-CDF uniform per step) for low-variance differences between burstiness levels; `S` estimators (batch means or regeneration) |
-| 2 | Worst-case expected loss, learned adversaries (B) | `Emax{drops_i}[C<=T]`, `Emax{backlog_i}[S]`, as statistical lower bounds from a re-simulated learned policy; Storm exact at N = 2-3 | no optimisation of expected rewards | per-flow rewards (exist); `once` phases for a family-based comparison | Q-learning or cross-entropy on the (dense) reward signal; `S` |
-| 3 | Rare worst-case starvation (C) | `Pmax[F<=T starve]` at P0 = 0.2 (i.i.d.: 3.3e-4) | RESTART needs a fully probabilistic model | `--auto-importance` (exists); possibly a finer importance function with occupancy terms, since a single counter gives splitting too few levels | learner, then native RESTART on the induced DTMC (exists) |
-| 4 | Tails of loss and CVaR (new) | quantiles and CVaR_0.99 of `C<=T` drops; `P(total loss >= x)` for rare x via RESTART on a loss monitor, under learned adversaries too | `--cdf` only for plain Monte Carlo; no splitting under schedulers | loss monitors (exist) | tail and CVaR estimators with DKW bands; splitting on the monitor |
-| 5 | Fairness (D) | finite horizon: Jain's index of per-flow `C<=T` served or dropped, from joint per-run samples (possible now); long run: per-flow `S` | Jain's index is nonlinear in per-flow totals, so it needs joint per-run samples; `S` | per-flow throughput rewards (expressible) | `S` estimators |
-| 6 | Transient recovery after a burst (E) | `I=k` backlog curves for all k from one batch; `E{steps}[F backlog_i <= b]` | `I=k` | network `init` of buffer contents, so the model starts post-burst and modes can cross-check the `F` part | `start=` already runs from a post-burst state; `F` with a step cap |
+| 1 | Bursty traffic at equal load (A) | `P[F<=T starve]`; per-flow `C<=T` drops and backlog; `I=k` backlog curve; long-run `S` | `I=k`, `S`; no common random numbers across models | parameterised bursty FQ models (phases exist) | sweep driver with common random numbers (see N3); regenerative `S` estimator (N2) |
+| 2 | Worst-case expected loss, learned adversaries (B) | `Emax{drops_i}[C<=T]`, `Emax{backlog_i}[S]`, as statistical lower bounds from a re-simulated learned policy; Storm exact at N = 2-3 | no optimisation of expected rewards | per-flow rewards (exist); `once` phases for a family-based comparison | native lightweight scheduler sampling as the baseline (N4); Q-learning or cross-entropy on the (dense) reward signal; lower bounds as in N5; `S` (N2) |
+| 3 | Rare worst-case starvation (C) | `Pmax[F<=T starve]` at P0 = 0.2 (i.i.d.: 3.3e-4) | RESTART needs a fully probabilistic model | `--auto-importance` (exists); possibly a finer importance function with occupancy terms, since a single counter gives splitting too few levels | learner, then native RESTART on the induced DTMC (exists), with a compositional importance function that has intermediate levels (N6) |
+| 4 | Tails of loss and CVaR (new) | quantiles and CVaR_0.99 of `C<=T` drops; `P(total loss >= x)` for rare x via RESTART on a loss monitor, under learned adversaries too | `--cdf` only for plain Monte Carlo; no splitting under schedulers | loss monitors (exist) | quantiles and CVaR by adaptive multilevel splitting; `P(total loss >= x)` by RESTART on the monitor (N7) |
+| 5 | Fairness (D) | finite horizon: Jain's index of per-flow `C<=T` served or dropped, from joint per-run samples (possible now); long run: per-flow `S` | Jain's index is nonlinear in per-flow totals, so it needs joint per-run samples; `S` | per-flow throughput rewards (expressible) | per-run Jain's index with DKW intervals (N8); `S` (N2) |
+| 6 | Transient recovery after a burst (E) | `I=k` backlog curves for all k from one batch; `E{steps}[F backlog_i <= b]` | `I=k` | network `init` of buffer contents, so the model starts post-burst and modes can cross-check the `F` part | `start=` already runs from a post-burst state; `F` as in N1 |
 
 Expected results: (1) bursts expose the FQ bug at loads where i.i.d. traffic hides it; (2) much
 more loss than uniform traffic, and possibly different loss-maximising and starvation-maximising
@@ -131,9 +131,78 @@ Shared validation: as above (N = 2-3 exact with Storm for every reward form; nat
 within confidence intervals; modes cross-checks at full size; worst cases backed by a concrete
 re-simulated policy).
 
-Suggested build order: native `S` estimators and `F` with a step cap (unblocks 1, 2, 5, 6), then
-reward-driven learning (2, 3), then tails (4). Compiler side: network `init` of buffers (6), then
-`once` phases (2, 3).
+Suggested build order: native `S` and `F` (N1, N2; unblocks 1, 2, 5, 6), then lightweight scheduler
+sampling and reward-driven learning (2, 3), then tails (4). Compiler side: network `init` of buffers
+(6), then `once` phases (2, 3). Models: an `S`-ready FQ example (e.g. `fq_buggy_lr.buffy`) for
+studies 1, 2 and 5 (see N2).
+
+### Native-side implementation details
+
+Statistics used throughout: decisions against a threshold use the betting test
+(`hyptest/betting.py`, valid at every sample size); fixed-sample intervals use Clopper-Pearson for
+probabilities and DKW for bounded rewards (`hyptest/intervals.py`); a family of reported intervals
+or tests gets per-interval levels from `per_test_level` (Bonferroni). Learning, pilot and evaluation
+runs use separate random streams (`derive_seed(seed, phase, i)`).
+
+- **N1. `E[F goal]` (reward until a goal).** The value is infinite if the goal can be missed, and
+  the per-run reward has no a-priori bound, so a simple step cap changes the query. Report:
+  (a) a sound lower bound by the limit-PAC DKW-E-Lower procedure of Budde, Hartmanns, Meggendorfer,
+  Weininger & Wienhöft (TACAS 2025), which needs no reward bound; and (b) where useful, the
+  truncated quantity `E[reward until min(goal, k)]`, which is bounded by k times the largest
+  per-step reward, gets a two-sided DKW interval, and is itself a lower bound on `E[F goal]`.
+- **N2. Long-run average `S`.** Use the regenerative method: a cycle starts each time the run is at
+  a step boundary (`turn = 0` in the choose layout) with all queues empty; the estimate is the ratio
+  of the summed cycle rewards to the summed cycle lengths. This handles the period K+1 of the choose
+  layout (batch means would need batch lengths that are multiples of K+1 and a mixing check).
+  Requirements: the model is recurrent. A network with `horizon T` has a bounded `time` counter, so
+  every run ends in an absorbing state and `S` is that state's value; monitors that saturate (FQ's
+  `cenq`, `aipg`, `deqs_bl`) leave their initial values for good, so a regeneration state that
+  includes them never recurs. An `S`-ready example (e.g.
+  `fq_buggy_lr.buffy`) drops `horizon` and replaces saturating monitors with wrapping ones or none;
+  no compiler change is needed. In the choose layout `turn = 0` holds at every time-step boundary,
+  and "all queues empty" is recurrent under any load below 1. Further, the
+  scheduler is stationary (`NativePolicy` keys without the step count); the regeneration state is
+  recurrent under that scheduler, which is checked by counting cycles (too few cycles: report no
+  value). The interval for the ratio is asymptotic (CLT for regenerative ratios) and labelled so;
+  a finite-sample alternative is the PAC mean-payoff method of Agarwal, Guha, Křetínský & Pazhamalai
+  (FMSD 2025), which needs the minimum transition probability and many more samples.
+- **N3. Common random numbers.** Each step uses one uniform for the destinations of all
+  synchronised participants (inverse CDF, rescaled within each chosen interval) and one for the
+  scheduler's choice when several edges are enabled. Runs with the same seed are therefore coupled
+  but not perfectly synchronised: changing one participant's probabilities shifts the uniform seen
+  by the later participants in that step, and a change in the number of enabled edges shifts the
+  stream. Each marginal estimate stays unbiased; the variance reduction of differences is measured
+  (paired against independent seeds), not assumed. Finite differences of a parameter are biased by
+  the step size (Glasserman & Yao 1992); report them as differences, not derivatives.
+- **N4. Lightweight scheduler sampling (baseline adversary).** A scheduler is a 64-bit seed; its
+  choice in a state is a hash of (seed, state, t) (or (seed, state) for stationary schedulers), as in
+  modes (D'Argenio, Legay, Sedwards & Traonouez, STTT 2015). It is a third `jm_pick` source next to
+  tables and callbacks. Screening many seeds with few runs each, then re-evaluating the best few on
+  fresh streams (smart sampling), gives the baseline that learned adversaries must beat.
+- **N5. Lower bounds on Pmax / Emax from a concrete scheduler.** Any fixed scheduler's value is at
+  most the optimum, so a valid lower confidence bound under a frozen scheduler (learned table, LSS
+  seed) is a valid lower bound on Pmax / Emax. The scheduler is frozen before evaluation and
+  evaluated on fresh streams; when the best of m candidates is reported, the bound uses
+  `per_test_level(level, m)`. Probabilities use Clopper-Pearson or the betting test; expected
+  rewards use DKW with the bound horizon × largest per-step reward.
+- **N6. Importance functions for splitting under a scheduler.** RESTART and fixed effort need
+  intermediate levels; `fq_deqs_bl` alone jumps to the goal in one step. Use a compositional
+  importance function built from the model structure and the property (Budde, D'Argenio &
+  Hartmanns, "Automated compositional importance splitting", SCP 2019), e.g. combining the
+  dequeue-backlog counter with queue occupancy, with levels by expected success. RESTART per-run
+  estimates can exceed 1 (re-crossings), so their bound for DKW or the betting test is the product
+  of the splitting factors; fixed-effort estimates lie in [0, 1] and are preferred when a
+  bounded-sample guarantee is needed.
+- **N7. Loss tails.** `P(total loss >= x)` for a given x: RESTART with importance = the loss monitor;
+  for several x, a per-x level from `per_test_level`. Quantiles (VaR) and CVaR: adaptive multilevel
+  splitting (Cérou & Guyader, Ann. Appl. Probab. 2016; Guyader, Hengartner & Matzner-Løber 2011),
+  whose quantile estimator has a known distribution; plug-in CVaR from a splitting-estimated tail is
+  a ratio of estimates and biased. Small DTMC instances get exact tails from Storm (or Dice) as
+  ground truth.
+- **N8. Fairness.** The reported measure is the expected per-run Jain's index E[J(x_1..x_N)] of the
+  per-flow totals (served or dropped, `C<=T`). J lies in [1/N, 1], so DKW gives a sound interval.
+  J of the expected totals is a different quantity (J is nonlinear) and is reported only as a
+  secondary figure, with an asymptotic (delta-method) interval.
 
 Note on study 4: a Dice back end (see `buffy-mdp-and-frontends.md`, section 6) could give the exact
 distribution of total loss on small DTMC instances, as ground truth for the native tail estimators.

@@ -210,14 +210,20 @@ typedef struct { int32_t s[NV]; int32_t t; int32_t clev; } jm_traj;
 
 /* RESTART (Villen-Altamirano): a trajectory that up-crosses threshold i (from below) splits into fac[i] copies
    (itself + fac[i]-1 retrials created at level i+1); a retrial created at level c > 0 is killed when its level
-   drops below c. Re-crossings split again. A goal hit at level l adds 1/prod_{i<l} fac[i]. Per-run estimates go to
+   drops below c. Re-crossings split again. A goal hit at level l adds 1/prod_{i<l} fac[i], where thresholds at or
+   below the initial state's level count with factor 1 (they are never up-crossed first). Per-run estimates go to
    out[r] (unbiased for P(goal within horizon)). Returns 0, or -1 (bounds error) / -2 (more than max_traj) /
    -4 (policy callback failed). */
 int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, int goal, int imp, int nlev,
                const int64_t *thr, const int32_t *fac, uint64_t seed, int64_t max_traj, double *out, int64_t *steps_out) {
   uint64_t rng[4], x = seed; for (int i = 0; i < 4; i++) rng[i] = jm_splitmix(&x);
-  double wl[65]; wl[0] = 1.0; for (int i = 0; i < nlev && i < 64; i++) wl[i + 1] = wl[i] / fac[i];
   if (nlev > 64) return -3;
+  double wl[65]; wl[0] = 1.0;
+  /* Thresholds at or below the initial state's level never split (factor 1): the root starts at that level with
+     weight 1, so a hit at level l weighs 1 / prod of the factors of the thresholds crossed above the start level. */
+  int32_t fac1[64]; int lvl0 = jm_level(jm_imp(s0, imp), nlev, thr);
+  for (int i = 0; i < nlev; i++) fac1[i] = i < lvl0 ? 1 : fac[i];
+  fac = fac1; for (int i = 0; i < nlev; i++) wl[i + 1] = wl[i] / fac[i];
   int64_t cap = 1024, steps = 0; jm_traj *stk = malloc(cap * sizeof(jm_traj)); int32_t en[NE];
   if (!stk) return -2;
   for (int64_t r = 0; r < n_runs; r++) {
@@ -232,7 +238,8 @@ int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *
         int e = jm_choose(cur.s, cur.t, pol, rng, en);
         if (e == -4) { free(stk); return -4; }
         if (e < 0) break;
-        if (jm_step(cur.s, e, jm_uniform(rng)) < 0) { free(stk); return -1; }
+        int rc = jm_step(cur.s, e, jm_uniform(rng));
+        if (rc < 0) { free(stk); return rc; }
         cur.t++; steps++;
         int nl = jm_level(jm_imp(cur.s, imp), nlev, thr);
         if (nl < cur.clev) break;                      /* retrial fell below its creation level */
@@ -284,7 +291,8 @@ int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const jm_pol
           int e = jm_choose(tr.s, tr.t, pol, rng, en);
           if (e == -4) { free(cur); free(nxt); return -4; }
           if (e < 0) break;
-          if (jm_step(tr.s, e, jm_uniform(rng)) < 0) { free(cur); free(nxt); return -1; }
+          int rc = jm_step(tr.s, e, jm_uniform(rng));
+          if (rc < 0) { free(cur); free(nxt); return rc; }
           tr.t++; steps++;
         }
         if (hit) { ok++; if (i < nlev) nxt[nn++] = tr; }
@@ -342,7 +350,7 @@ class NativePolicy:
     """
     def __init__(self, model: "JaniModel", default: Optional[dict[str, float]] = None):
         self.model = model
-        self.default = model.edge_weight_vector(default)
+        self.default = _weights(model.edge_weight_vector(default), "default action weights")
         self.error: Optional[BaseException] = None
         self._keep: list = []
         self._s = _PolicyStruct(w=_dptr(self.default), mask=-1, cb=_POLICY_CB())
@@ -353,6 +361,8 @@ class NativePolicy:
               default: Optional[dict[str, float]] = None) -> "NativePolicy":
         p = cls(model, default)
         names = list(key_vars) if key_vars is not None else [v.name for v in model.variables]
+        if len(set(names)) != len(names):
+            raise ValueError(f"repeated key variables: {names}")
         keyvar = np.array([model.index[n] for n in names] + ([-1] if step else []), dtype=np.int32)
         nkey, n = len(keyvar), len(rows)
         keys = np.zeros((max(n, 1), max(nkey, 1)), dtype=np.int32)
@@ -370,7 +380,7 @@ class NativePolicy:
         edge_arr = np.array(edges or [0], dtype=np.int32)
         if len(edges) and (edge_arr.min() < 0 or edge_arr.max() >= len(model.edges)):
             raise ValueError("policy table refers to an edge index outside the model")
-        w_arr = np.array(weights or [0.0], dtype=np.float64)
+        w_arr = _weights(np.array(weights or [0.0], dtype=np.float64), "policy table weights")
         cap = 1 << max(4, (2 * n).bit_length())     # load factor <= 1/2
         slot = np.empty(cap, dtype=np.int32)
         keys = np.ascontiguousarray(keys[:, :nkey]) if nkey else keys
@@ -394,7 +404,9 @@ class NativePolicy:
             try:
                 state = np.ctypeslib.as_array(s, (nv,))
                 state.flags.writeable = False
-                np.ctypeslib.as_array(w, (k,))[:] = fn(state, t, np.ctypeslib.as_array(en, (k,)).copy())
+                np.ctypeslib.as_array(w, (k,))[:] = _weights(
+                    np.asarray(fn(state, t, np.ctypeslib.as_array(en, (k,)).copy()), dtype=np.float64).reshape(k),
+                    f"callback weights at step {t}")
                 return 0
             except BaseException as e:          # re-raised by the caller once the C batch returns
                 p.error = e
@@ -412,11 +424,15 @@ class JaniModel:
     """ A compiled JANI model. Use NativeJaniSimulator for the Simulator interface. """
     def __init__(self, jani: Union[str, Path, dict], goals: Optional[dict[str, Expr]] = None,
                  constants: Optional[dict[str, Union[int, float, bool]]] = None,
-                 importance: Optional[dict[str, Expr]] = None, observables: Optional[dict[str, Expr]] = None):
+                 importance: Optional[dict[str, Expr]] = None, observables: Optional[dict[str, Expr]] = None,
+                 check_probabilities: bool = False):
         """
         goals / importance: named JANI expressions compiled into the library; goals are predicates for the batch
         simulators, importance functions (integer-valued) drive the native splitting methods (splitting.py).
         observables: named real-valued state expressions (state rewards) for simulate_rewards.
+        check_probabilities: also check at run time that every sampled edge's destination probabilities sum to 1
+        (up to 1e-9). Without it, constant probabilities are checked when compiling, and a draw that falls into
+        missing probability mass is an error, but state-dependent probabilities summing to more than 1 go unnoticed.
 
         Networks of several automata are composed as in the JANI spec: silent edges (no action) interleave, and an
         edge with an action fires only as part of a synchronisation vector, jointly with one matching edge of every
@@ -566,6 +582,7 @@ class JaniModel:
         self.observables = dict(observables or {})
         self.observable_names = list(self.observables)
         self._reward_init = reward_init
+        self.check_probabilities = check_probabilities
         source = self._generate()
         self.lib = _compile(source)
         self._bind()
@@ -655,6 +672,13 @@ class JaniModel:
                 guard = f"(s[{slot}] == {self.location_names[p.instance].index(p.edge['location'])}) && {guard}"
             out.append(f"static inline int pg{k}(const int32_t *s) {{ return {guard}; }}")
             dests = p.edge["destinations"]
+            try:
+                total = sum(float(_const_eval(d.get("probability", {}).get("exp", 1), self.constants)) for d in dests)
+            except (JaniUnsupported, KeyError):
+                total = None                               # state-dependent: checked while sampling
+            if total is not None and abs(total - 1.0) > 1e-9:
+                raise ValueError(f"edge {p.edge.get('action', 'τ')!r} in automaton "
+                                 f"{self.instance_names[p.instance]!r}: destination probabilities sum to {total}")
             probs = "".join(f" case {j}: return (double)({tr_read.c(d.get('probability', {}).get('exp', 1))});"
                             for j, d in enumerate(dests))
             out.append(f"static double pp{k}(const int32_t *s, int d) {{ switch (d) {{{probs} }} return 0.0; }}")
@@ -662,10 +686,10 @@ class JaniModel:
             self._levels_of.append(levels)
             self._rlevels_of.append(rlevels)
             for level, per_dest in levels.items():
-                cases = "".join(f" case {j}:" + "".join(f" t[{slot_}] = (int32_t)({tr.c(v)});" for slot_, v in w)
+                cases = "".join(f" case {j}:" + "".join(self._store(slot_, tr.c(v)) for slot_, v in w)
                                 + " break;" for j, w in enumerate(per_dest) if w)
-                out.append(f"static inline void pa{k}_{level}(int32_t *t, const int32_t *s, int d) "
-                           f"{{ switch (d) {{{cases} }} }}")
+                out.append(f"static inline int pa{k}_{level}(int32_t *t, const int32_t *s, int d) "
+                           f"{{ switch (d) {{{cases} }} return 0; }}")
             for level, per_dest in rlevels.items():
                 cases = "".join(f" case {j}:" + "".join(f" r[{ri}] = (double)({tr.c(v)});" for ri, v in w)
                                 + " break;" for j, w in enumerate(per_dest) if w)
@@ -676,6 +700,18 @@ class JaniModel:
                                 for j, d in enumerate(dests))
                 out.append(f"static inline void pl{k}(int32_t *t, int d) {{ switch (d) {{{cases} }} }}")
         return out
+
+    def _store(self, slot: int, value: str) -> str:
+        """
+        C statement storing value in working slot `slot`, returning -1 from the caller if the 64-bit value is out of
+        the variable's bounds. Unbounded int transients (JANI `int`) are stored unchecked: values beyond int32 are
+        outside the supported subset.
+        """
+        v = (self.variables + self.transients)[slot]
+        if (v.lower, v.upper) == (-2 ** 31, 2 ** 31 - 1):
+            return f" t[{slot}] = (int32_t)({value});"
+        return (f" {{ int64_t v_ = (int64_t)({value}); if (v_ < {v.lower}LL || v_ > {v.upper}LL) return -1;"
+                f" t[{slot}] = (int32_t)v_; }}")
 
     def _generate_transition(self, i: int, parts: list[_Part]) -> str:
         """
@@ -695,7 +731,8 @@ class JaniModel:
                     seen |= slots
         body = ""
         for n, lv in enumerate(all_levels):
-            calls = "".join(f" pa{k}_{lv}(t, SRC, dd[{pi}]);" for pi, k in enumerate(ids) if lv in self._levels_of[k])
+            calls = "".join(f" if (pa{k}_{lv}(t, SRC, dd[{pi}])) return -1;" for pi, k in enumerate(ids)
+                            if lv in self._levels_of[k])
             rcalls = "".join(f" pr{k}_{lv}(r, SRC, dd[{pi}]);" for pi, k in enumerate(ids)
                              if lv in self._rlevels_of[k])
             if rcalls:
@@ -706,7 +743,7 @@ class JaniModel:
                 body += f" {{ int32_t u[NW]; memcpy(u, t, sizeof u);{calls.replace('SRC', 'u')} }}"
         body += "".join(f" pl{k}(t, dd[{pi}]);" for pi, k in enumerate(ids)
                         if self.location_slot[parts[k].instance] is not None)
-        return f"static void ce{i}(int32_t *t, const int32_t *s0, const int *dd, double *r) {{{body} }}"
+        return f"static int ce{i}(int32_t *t, const int32_t *s0, const int *dd, double *r) {{{body} return 0; }}"
 
     def _generate(self) -> str:
         tr, nv, ne = self._tr, len(self.variables), len(self.edges)
@@ -716,7 +753,8 @@ class JaniModel:
         if max(nd_edge + [1]) > 2 ** 30:
             raise JaniUnsupported("too many joint destinations in one synchronised transition")
         max_parts = max([len(ids) for ids in self._part_id] + [1])
-        out = [_PRELUDE, f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
+        out = [_PRELUDE, "#define JM_PTOL 1e-9", "#define JM_CHECK_PROBS" if self.check_probabilities else "",
+               f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
                f"#define MAXP {max_parts}", "int jm_nvars(void) { return NV; }", "int jm_nedges(void) { return NE; }"]
         out.append("void jm_init(int32_t *s) {" + "".join(f" s[{i}] = {v.initial};" for i, v in
                                                           enumerate(self.variables)) + " }")
@@ -737,7 +775,7 @@ class JaniModel:
         out.append(f"static const int jm_pnd[{len(parts)}] = {{" + ", ".join(map(str, nd_part)) + "};")
         out.append(f"static double (*const jm_pp[{len(parts)}])(const int32_t *, int) = {{"
                    + ", ".join(f"pp{k}" for k in range(len(parts))) + "};")
-        out.append(f"static void (*const jm_ce[NE])(int32_t *, const int32_t *, const int *, double *) = {{"
+        out.append(f"static int (*const jm_ce[NE])(int32_t *, const int32_t *, const int *, double *) = {{"
                    + ", ".join(f"ce{i}" for i in range(ne)) + "};")
         out.append("int jm_ndest(int e) { return jm_nd[e]; }")
         out.append(r"""static void jm_digits(int e, int d, int *dd) {
@@ -748,8 +786,6 @@ double jm_prob(const int32_t *s, int e, int d) {
   for (int p = 0; p < jm_np[e]; p++) q *= jm_pp[jm_pk[jm_poff[e] + p]](s, dd[p]);
   return q;
 }""")
-        bounds = " ".join(f"if (t[{i}] < {v.lower} || t[{i}] > {v.upper}) return -1;"
-                          for i, v in enumerate(self.variables + self.transients) if (v.lower, v.upper) != (-2 ** 31, 2 ** 31 - 1))
         init_transients = "".join(f" t[{nv + j}] = {v.initial};" for j, v in enumerate(self.transients))
         init_rewards = "".join(f" r[{j}] = {x!r};" for j, x in enumerate(self._reward_init))
         out.append(f"#define NR {len(self.reward_variables)}")
@@ -758,7 +794,8 @@ double jm_prob(const int32_t *s, int e, int d) {
                    f"  if (e < 0 || e >= NE || d < 0 || d >= jm_nd[e]) return -2;\n"
                    f"  memcpy(t, s, NV * sizeof(int32_t));{init_transients}\n"
                    f"  if (r) {{{init_rewards} }}\n"
-                   f"  jm_digits(e, d, dd); jm_ce[e](t, s, dd, r);\n  {bounds}\n  memcpy(s, t, NV * sizeof(int32_t));\n"
+                   f"  jm_digits(e, d, dd); if (jm_ce[e](t, s, dd, r)) return -1;\n"
+                   f"  memcpy(s, t, NV * sizeof(int32_t));\n"
                    "  return 0;\n}\n"
                    "int jm_apply(int32_t *s, int e, int d) { return jm_apply_r(s, e, d, NULL); }")
         # Sampling: each part's destination in turn by inverse CDF on one uniform, rescaled inside the chosen
@@ -769,10 +806,23 @@ double jm_prob(const int32_t *s, int e, int d) {
     int k = jm_pk[jm_poff[e] + p], nd = jm_pnd[k], j = 0;
     if (nd > 1) {
       double acc = 0.0, q = 0.0;
-      for (j = 0; j < nd; j++) { q = jm_pp[k](s, j); if (u < acc + q || j == nd - 1) break; acc += q; }
+      for (j = 0; j < nd; j++) {
+        q = jm_pp[k](s, j);
+        if (!(q >= 0.0)) return -6;
+        if (u < acc + q) break;
+        if (j == nd - 1) { if (u < acc + q + JM_PTOL) break; return -6; }   /* mass missing */
+        acc += q;
+      }
+#ifdef JM_CHECK_PROBS
+      { double tot = acc + q; for (int jj = j + 1; jj < nd; jj++) tot += jm_pp[k](s, jj);
+        if (tot > 1.0 + JM_PTOL || tot < 1.0 - JM_PTOL) return -6; }
+#endif
       u = q > 0.0 ? (u - acc) / q : 0.0;
       if (u < 0.0) u = 0.0; if (u >= 1.0) u = 0x1.fffffffffffffp-1;
     }
+#ifdef JM_CHECK_PROBS
+    else { double q = jm_pp[k](s, 0); if (q > 1.0 + JM_PTOL || q < 1.0 - JM_PTOL) return -6; }
+#endif
     d += j * mult; mult *= nd;
   }
   int rc = jm_apply_r(s, e, d, r);
@@ -808,7 +858,8 @@ int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const jm_pol
       int k = jm_enabled(s, en); if (k == 0) break;
       int e = k > 1 ? jm_pick(pol, s, t, en, k, rng) : en[0];
       if (e == -4) return -4;
-      if (jm_step(s, e, jm_uniform(rng)) < 0) return -1;
+      int rc = jm_step(s, e, jm_uniform(rng));
+      if (rc < 0) return rc;
       steps++;
     }
   }
@@ -833,7 +884,8 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const jm_
         if ((e = jm_pick(pol, s, t, en, k, rng)) == -4) return -4;
         cnt[e]++;
       }
-      if (jm_step(s, e, jm_uniform(rng)) < 0) return -1;
+      int rc = jm_step(s, e, jm_uniform(rng));
+      if (rc < 0) return rc;
       if (s[score_var] > best) best = s[score_var];
     }
     scores[r] = best;
@@ -845,8 +897,9 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const jm_
    transition rewards. Per run r: cum[r*NR+j] = sum over the steps of reward variable j (C<=horizon);
    ocum[r*NO+f] = sum over t < horizon of observable f in the state at step t (state rewards, C<=horizon);
    oend[r*NO+f] = observable f at step horizon (I=horizon). If curve is not NULL, it accumulates over the runs, for
-   each step t = 0..horizon, the sum and sum of squares of each cumulative reward variable up to t and each observable
-   at t: curve[(t*(NR+NO) + i)*2 + {0, 1}] with i < NR for reward variables, NR + f for observables. Returns 0, or
+   each step t = 0..horizon, the mean and variance of each cumulative reward variable up to t and each observable
+   at t: curve[(t*(NR+NO) + i)*2 + {0, 1}] = (running mean, sum of squared deviations) over the runs so far (Welford),
+   with i < NR for reward variables, NR + f for observables. Returns 0, or
    -1 (bounds error) / -4 (policy callback failed). */
 int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *pol, uint64_t seed,
                         double *cum, double *ocum, double *oend, double *curve, int64_t *steps_out) {
@@ -859,9 +912,11 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
     int dead = 0;
     for (int t = 0; ; t++) {
       if (curve) {
-        double *cv = curve + (int64_t)t * (NR + NO) * 2;
-        for (int j = 0; j < NR; j++) { cv[2 * j] += c[j]; cv[2 * j + 1] += c[j] * c[j]; }
-        for (int f = 0; f < NO; f++) { double o = jm_obs(s, f); cv[2 * (NR + f)] += o; cv[2 * (NR + f) + 1] += o * o; }
+        double *cv = curve + (int64_t)t * (NR + NO) * 2, inv = 1.0 / (double)(r + 1);
+        for (int i = 0; i < NR + NO; i++) {
+          double v = i < NR ? c[i] : jm_obs(s, i - NR), d = v - cv[2 * i];
+          cv[2 * i] += d * inv; cv[2 * i + 1] += d * (v - cv[2 * i]);
+        }
       }
       if (t == horizon) break;
       for (int f = 0; f < NO; f++) oc[f] += jm_obs(s, f);
@@ -870,7 +925,8 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
       if (k == 0) { dead = 1; continue; }
       int e = k > 1 ? jm_pick(pol, s, t, en, k, rng) : en[0];
       if (e == -4) return -4;
-      if (jm_step_r(s, e, jm_uniform(rng), rw) < 0) return -1;
+      int rc = jm_step_r(s, e, jm_uniform(rng), rw);
+      if (rc < 0) return rc;
       for (int j = 0; j < NR; j++) c[j] += rw[j];
       steps++;
     }
@@ -930,7 +986,8 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
         """ In place: takes `edge` from s, choosing the destination with the uniform number u. Returns its index. """
         d = self.lib.jm_step(_ptr(s), int(edge), float(u))
         if d < 0:
-            raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): assignment out of variable bounds")
+            _check(d)
+            raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): step failed ({d})")
         return d
 
     def successors(self, s: np.ndarray, edge: int, rewards: bool = False) -> list[tuple]:
@@ -941,7 +998,8 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
         out = []
         for d in range(self.lib.jm_ndest(int(edge))):
             t, r = s.copy(), np.zeros(max(len(self.reward_variables), 1))
-            if self.lib.jm_apply_r(_ptr(t), int(edge), d, _dptr(r) if rewards else None) < 0:
+            rc = self.lib.jm_apply_r(_ptr(t), int(edge), d, _dptr(r) if rewards else None)
+            if rc < 0:
                 raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): assignment out of variable bounds")
             p = self.lib.jm_prob(_ptr(s), int(edge), d)
             out.append((p, t, r[:len(self.reward_variables)]) if rewards else (p, t))
@@ -961,11 +1019,23 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
             return scheduler
         return NativePolicy(self, scheduler)
 
+    def start_state(self, start: Optional[np.ndarray]) -> np.ndarray:
+        """ The initial state, or `start` checked against the variables' count and bounds. """
+        if start is None:
+            return self.initial_state()
+        s = np.asarray(start)
+        if s.shape != (len(self.variables),) or not np.issubdtype(s.dtype, np.integer):
+            raise ValueError(f"a start state is an integer vector of length {len(self.variables)}")
+        bad = [v.name for v, x in zip(self.variables, s) if not v.lower <= int(x) <= v.upper]
+        if bad:
+            raise ValueError(f"start state outside the bounds of {bad}")
+        return np.ascontiguousarray(s, dtype=np.int32)
+
     def simulate(self, n_runs: int, horizon: int, goal: str, scheduler: "Scheduling" = None,
                  seed: int = 1, start: Optional[np.ndarray] = None) -> tuple[int, int]:
         """ Native batch runs under a scheduler (see policy()); returns (goal hits, total steps). """
         pol = self.policy(scheduler)
-        s0 = self.initial_state() if start is None else np.ascontiguousarray(start, dtype=np.int32)
+        s0 = self.start_state(start)
         steps = ctypes.c_int64(0)
         hits = self.lib.jm_simulate(_ptr(s0), n_runs, horizon, pol.ref, self.goal_names.index(goal), seed,
                                     ctypes.byref(steps))
@@ -1002,7 +1072,7 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
         if curve and clash:
             raise ValueError(f"observables named like reward variables: {sorted(clash)}")
         pol = self.policy(scheduler)
-        s0 = self.initial_state() if start is None else np.ascontiguousarray(start, dtype=np.int32)
+        s0 = self.start_state(start)
         nr, no = len(self.reward_variables), len(self.observable_names)
         cum, ocum, oend = np.empty((n_runs, nr)), np.empty((n_runs, no)), np.empty((n_runs, no))
         cv = np.zeros((horizon + 1, nr + no, 2)) if curve else None
@@ -1012,8 +1082,7 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
                pol)
         means = variances = None
         if cv is not None:
-            m = cv[:, :, 0] / n_runs
-            v = np.maximum(cv[:, :, 1] / n_runs - m ** 2, 0.0) * n_runs / max(n_runs - 1, 1)
+            m, v = cv[:, :, 0], cv[:, :, 1] / max(n_runs - 1, 1)
             names = self.reward_variables + self.observable_names
             means = {name: m[:, i] for i, name in enumerate(names)}
             variances = {name: v[:, i] for i, name in enumerate(names)}
@@ -1080,9 +1149,29 @@ class RewardRuns:
 
 
 def mean_ci(x: np.ndarray, level: float = 0.99) -> tuple[float, float]:
-    """ Sample mean and the half-width of its normal-approximation confidence interval. """
+    """
+    Sample mean and the half-width of its normal-approximation (CLT) confidence interval: a quick diagnostic only;
+    it can under-cover for rare or heavy-tailed samples. For guarantees use hyptest.intervals.dkw_mean_ci (bounded
+    samples) or clopper_pearson (0/1 samples).
+    """
     z = NormalDist().inv_cdf(0.5 + level / 2)
     return float(np.mean(x)), float(z * np.std(x, ddof=1) / np.sqrt(len(x))) if len(x) > 1 else float("inf")
+
+
+def _weights(w: np.ndarray, what: str) -> np.ndarray:
+    """ Scheduler weights must be finite and non-negative (NaN or negative weights would silently skew choices). """
+    if not np.all(np.isfinite(w)) or np.any(w < 0):
+        raise ValueError(f"{what} must be finite and non-negative: {w}")
+    return w
+
+
+def derive_seed(seed: int, *tags) -> int:
+    """
+    A 64-bit seed for one phase of an experiment (e.g. derive_seed(seed, "pilot", m)), so that pilot, learning and
+    evaluation runs never share a random stream even when they start from the same user seed.
+    """
+    h = hashlib.sha256(repr((int(seed),) + tuple(tags)).encode()).digest()
+    return int.from_bytes(h[:8], "little")
 
 
 def _ptr(a: np.ndarray):
@@ -1109,6 +1198,8 @@ def _check(rc: int, pol: Optional[NativePolicy] = None) -> None:
         raise ValueError("at most 64 splitting levels are supported")
     if rc == -4:
         raise RuntimeError("policy callback failed")
+    if rc == -6:
+        raise ValueError("destination probabilities of a sampled edge are negative or do not sum to 1")
 
 
 def _const_eval(e: Expr, consts: dict) -> Union[int, float, bool]:

@@ -6,8 +6,10 @@ from src.netmdp.sampler.sampler import Sampler
 
 class WaldSprt(HypTest):
     """" Wald's SPRT (one-sided, Bernoulli trials) """
-    def __init__(self, theta: float, err_tols: ErrTols, indifference: float, max_samples: int):
+    def __init__(self, theta: float, err_tols: ErrTols, indifference: float, max_samples: int,
+                 verbose: bool = False):
         super().__init__(theta, err_tols, indifference, max_samples)
+        self.verbose = verbose
         if theta - indifference <= 0 or theta + indifference >= 1:
             raise HypTestError(self.__str__() + ": [θ-𝛿, θ+𝛿] must lie in (0,1).")
         self.slope, self.init_upper_bound, self.init_lower_bound = self.compute_sprt_params()
@@ -42,8 +44,11 @@ class WaldSprt(HypTest):
             n += 1
             upper_bound += slope
             lower_bound += slope
-            sn += sampler.sample() # ASSUME BERNOULLI SAMPLE
-            if n % 10000 == 0:
+            x = sampler.sample()
+            if x != 0 and x != 1:
+                raise HypTestError(self.__str__() + f": the SPRT needs Bernoulli (0/1) samples, got {x}.")
+            sn += x
+            if self.verbose and n % 10000 == 0:
                 print(f"n: {n}, p_hat: {sn / n:.6f}, upper_bound: {upper_bound/n:.6f}, lower_bound: {lower_bound/n:.6f}")
             if sn > upper_bound:
                 result = HypResult.ACCEPT_H_PLUS
