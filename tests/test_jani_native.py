@@ -95,7 +95,10 @@ def test_indexed_assignments():
 
 
 def test_real_transients():
-    """ Write-only real transients (Buffy reward variables rew_<r>) are dropped; reading one is unsupported. """
+    """
+    Real transients are transition rewards (Buffy's rew_<r>): set at their assignment level from the state left by
+    the earlier levels, summed by simulate_rewards; reading one is unsupported.
+    """
     def model(read_reward: bool) -> dict:
         x = {"name": "x", "type": {"kind": "bounded", "base": "int", "lower-bound": 0, "upper-bound": 9},
              "initial-value": 0}
@@ -111,7 +114,12 @@ def test_real_transients():
     m = JaniModel(model(False))
     s = m.initial_state()
     m.step(s, m.enabled_edges(s)[0], 0.5)
-    assert m.ignored_transients == {"rew_x"} and [v.name for v in m.variables] == ["x"] and s[0] == 1
+    assert m.reward_variables == ["rew_x"] and [v.name for v in m.variables] == ["x"] and s[0] == 1
+    (p, t, r), = m.successors(s, m.enabled_edges(s)[0], rewards=True)
+    assert p == 1 and t[0] == 2 and list(r) == [2.0]                     # rew_x = x after level 0
+    runs = m.simulate_rewards(3, 12, seed=1, curve=True)
+    assert list(runs.cumulative["rew_x"]) == [72.0] * 3                  # 1 + ... + 9 + 9 + 9 + 9
+    assert list(runs.curve_mean["rew_x"][:4]) == [0.0, 1.0, 3.0, 6.0] and runs.steps == 36
     try:
         JaniModel(model(True))
     except JaniUnsupported:

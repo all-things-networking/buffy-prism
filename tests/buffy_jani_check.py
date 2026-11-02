@@ -51,6 +51,41 @@ def reachability_properties(model: dict) -> dict[str, tuple[dict, int]]:
     return out
 
 
+def expected_value_properties(model: dict) -> dict[str, tuple[str, object, int]]:
+    """
+    name -> (kind, reward expression, step bound) for filter(·, E(exp, ...), initial) with kind "C" (accumulate steps,
+    step-instant k: C<=k) or "I" (step-instant k only: I=k). F (reach) and S properties are skipped.
+    """
+    out = {}
+    for p in model.get("properties", []):
+        e = p["expression"]
+        if not (isinstance(e, dict) and e.get("op") == "filter"):
+            continue
+        v = e["values"]
+        if not (isinstance(v, dict) and v.get("op") in ("Emin", "Emax") and "step-instant" in v and "reach" not in v):
+            continue
+        out[p["name"]] = ("C" if v.get("accumulate") == ["steps"] else "I", v["exp"], int(v["step-instant"]))
+    return out
+
+
+def reward_model(model: dict, props: dict, **kwargs) -> JaniModel:
+    """ A JaniModel with an observable for every expected-value property whose expression is not a reward variable. """
+    rewards = {v["name"] for v in model.get("variables", []) if v.get("transient") and v["type"] == "real"}
+    observables = {name: exp for name, (_, exp, _) in props.items() if exp not in rewards}
+    return JaniModel(model, observables=observables, **kwargs)
+
+
+def reward_samples(native: JaniModel, props: dict, runs: dict, name: str):
+    """ The per-run samples of expected-value property `name` from simulate_rewards results keyed by horizon. """
+    kind, exp, k = props[name]
+    r = runs[k]
+    if exp in native.reward_variables:
+        if kind == "I":
+            raise ValueError(f"{name}: I=k of a transition reward is undefined")
+        return r.cumulative[exp]
+    return r.state_cumulative[name] if kind == "C" else r.final[name]
+
+
 def check(path: Path, runs: int) -> dict:
     model = json.loads(path.read_text())
     props = reachability_properties(model)
