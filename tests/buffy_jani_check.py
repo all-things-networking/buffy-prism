@@ -1,5 +1,5 @@
 """
-Runs the native JANI simulator on models emitted by the Buffy→JANI compiler (buffyc-mc, Buffy branch `features`) and
+Runs the native JANI simulator on models emitted by the Buffy→JANI compiler (buffyc-mc, Buffy `main`) and
 compares with modes reference estimates. MDPs are resolved uniformly over enabled edges. Properties of the form
 filter(·, P(true U<=N goal), initial) are turned into native goals with horizon N.
 

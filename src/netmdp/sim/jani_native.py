@@ -9,7 +9,8 @@ Supported JANI subset (anything else raises JaniUnsupported instead of being sil
   - bounded int and bool variables with constant initial values; constants with values;
   - expressions: literals, identifiers, + - * / % min max abs floor ceil, = ≠ < ≤ > ≥, ∧ ∨ ¬ ⇒, ite;
   - edges with guards, probabilistic destinations, assignments with optional indices (ordered levels);
-  - transient variables (bool/int): reset every step, readable at later assignment levels, initial value elsewhere.
+  - transient variables (bool/int): reset every step, readable at later assignment levels, initial value elsewhere;
+    real transients (reward accumulators) must be write-only, and their assignments are dropped.
 Semantics follow JANI: assignment levels run in index order, each level updating simultaneously from the state left
 by the previous levels; an assignment outside a variable's bounds is an error.
 """
@@ -481,9 +482,16 @@ class JaniModel:
         self.transients: list[Variable] = []
         transient_init: list[dict[str, int]] = [dict() for _ in self.instances]
         transient_scope: list[dict[str, int]] = [dict() for _ in self.instances]
+        # Real transient variables (reward accumulators such as Buffy's rew_<r>) are only written, for reward
+        # properties the simulator does not evaluate: their assignments are dropped, and reading one anywhere is an
+        # unknown identifier (JaniUnsupported).
+        self.ignored_transients: set[str] = set()
 
         def declare_transient(v: dict, scopes_: list[int]):
             t = v["type"]
+            if t == "real":
+                self.ignored_transients.add(v["name"])
+                return
             if t == "bool":
                 lo, hi, typ = 0, 1, "bool"
             elif t == "int":
@@ -607,6 +615,8 @@ class JaniModel:
         dests = p.edge["destinations"]
         for j, d in enumerate(dests):
             for a in d.get("assignments", []):
+                if a["ref"] in self.ignored_transients and a["ref"] not in scope:
+                    continue
                 if a["ref"] not in scope:
                     raise JaniUnsupported(f"assignment to unknown variable {a['ref']!r}")
                 per_dest = levels.setdefault(int(a.get("index", 0)), [[] for _ in dests])

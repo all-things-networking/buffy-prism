@@ -15,7 +15,7 @@ from collections import Counter
 import numpy as np
 import stormpy
 
-from src.netmdp.sim.jani_native import JaniModel
+from src.netmdp.sim.jani_native import JaniModel, JaniUnsupported
 
 TOY_MODELS = ["tests/models/sync_toy.pm", "tests/models/die_mdp.pm"]
 
@@ -94,6 +94,33 @@ def test_indexed_assignments():
     print("indexed assignments OK")
 
 
+def test_real_transients():
+    """ Write-only real transients (Buffy reward variables rew_<r>) are dropped; reading one is unsupported. """
+    def model(read_reward: bool) -> dict:
+        x = {"name": "x", "type": {"kind": "bounded", "base": "int", "lower-bound": 0, "upper-bound": 9},
+             "initial-value": 0}
+        rew = {"name": "rew_x", "type": "real", "transient": True, "initial-value": 0.0}
+        value = {"op": "min", "left": 9, "right": {"op": "+", "left": "x", "right": 1}}
+        assignments = [{"ref": "x", "value": value}, {"ref": "rew_x", "value": "x", "index": 1}]
+        guard = {"op": "<", "left": "rew_x", "right": 5} if read_reward else True
+        return {"jani-version": 1, "name": "rew", "type": "dtmc", "variables": [x, rew],
+                "automata": [{"name": "A", "locations": [{"name": "l"}], "initial-locations": ["l"],
+                              "edges": [{"location": "l", "guard": {"exp": guard},
+                                         "destinations": [{"location": "l", "assignments": assignments}]}]}],
+                "system": {"elements": [{"automaton": "A"}]}, "properties": []}
+    m = JaniModel(model(False))
+    s = m.initial_state()
+    m.step(s, m.enabled_edges(s)[0], 0.5)
+    assert m.ignored_transients == {"rew_x"} and [v.name for v in m.variables] == ["x"] and s[0] == 1
+    try:
+        JaniModel(model(True))
+    except JaniUnsupported:
+        print("real transients OK")
+        return
+    raise AssertionError("a guard reading a real transient was accepted")
+
+
 if __name__ == "__main__":
     test_indexed_assignments()
+    test_real_transients()
     test_equivalence_with_storm()
