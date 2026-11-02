@@ -227,3 +227,13 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     keeps a register only for a source that an earlier-declared probabilistic source precedes into the
     same buffer (tail-drop order). It never has more states than the register version (`rr`: 1,479
     against 4,320).
+41. **Rewards and expected values.** `reward r: e;` is earned once per time step, with `e`
+    evaluated at the end of the step (state after the step, the step's own `arrivals-p`/`drops-p`);
+    queries `E{r}`/`Emax{r}`/`Emin{r}=? [ C<=k | I=k | F φ | S ]`. Rewards add no state: a transient
+    JANI variable on the step edge, a PRISM transition reward on `[step]`. Bounds are scaled by the
+    transitions per time step; long-run averages use the reward times that number, so `S` is per time
+    step in every layout. State reads in a reward become placeholders substituted by the updates, so
+    `drops-p` keeps its in-step meaning. SMT-LIB skips expected-value queries.
+    *Alternative rejected:* monitor counters as reward proxies (they multiply the state space, cannot
+    express long-run averages or expected times, and per-threshold MDP optima only bound `Emax`).
+    Tool support measured: Storm all forms (JANI and PRISM); `mcsta` only `F`.
