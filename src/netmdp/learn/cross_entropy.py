@@ -13,7 +13,7 @@ from typing import Callable
 
 import numpy as np
 
-from src.netmdp.sim.jani_native import JaniModel
+from src.netmdp.sim.jani_native import JaniModel, derive_seed
 from src.netmdp.sim.scheduler import ActionWeightScheduler
 
 
@@ -47,7 +47,7 @@ def cross_entropy_scheduler(model: JaniModel, groups: dict[str, list[str]], init
         w = np.zeros(len(actions))
         for a, es in edges_of.items():
             w[es] = p[a]
-        scores, counts = model.simulate_scores(n_runs, horizon, score_var, w, seed=seed + it)
+        scores, counts = model.simulate_scores(n_runs, horizon, score_var, w, seed=derive_seed(seed, "cross-entropy", it))
         level = min(float(np.quantile(scores, 1 - rho)), float(target))
         elite = scores >= level
         hit_rate = float(np.mean(scores >= target))

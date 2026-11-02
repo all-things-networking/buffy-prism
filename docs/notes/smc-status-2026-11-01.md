@@ -287,7 +287,42 @@ as JANI `Emax/Emin` properties: `C<=k` is `exp: rew_<r>, accumulate: [steps], st
 - **Not covered yet:**
   - `F` (reward until a goal) needs a step cap, because the value is infinite if the goal can be missed.
   - `S` (long-run average) needs batch means or regeneration.
-  - Confidence intervals are normal approximations (`mean_ci`). The bounded-range sequential tests (`ChowRobbins` on real samples) apply as they are.
+  - `mean_ci` is a normal approximation, kept as a quick diagnostic. Sound intervals are in section 10.
+
+The implementation plans for `F`, `S` and the other planned features are in `case-study-proposals.md`, under "Native-side implementation details".
+
+## 10. Input checks and sound statistics (2026-11-02)
+
+- **RESTART from a state above the first threshold:** thresholds at or below the initial state's importance now count with splitting factor 1. Previously a run starting at level l ≥ 1 was weighted as if it had split at the thresholds below l. This matters for runs from a post-burst `start` state; every run so far started at importance 0.
+- **Destination probabilities:**
+  - Constant probabilities that do not sum to 1 are rejected when compiling.
+  - While sampling, a negative or NaN probability, or a draw that falls into missing probability mass, is an error.
+  - `JaniModel(..., check_probabilities=True)` also checks the full sum of every sampled edge, which catches state-dependent probabilities summing to more than 1.
+  - All 218 constant-probability edges in the current Buffy models sum to 1.
+- **Scheduler weights:** negative, NaN or infinite weights from callbacks, tables or default weights are rejected, and so are repeated policy key variables.
+- **Assignments:** values are range-checked as 64-bit integers before being stored, so a value cannot wrap around int32 into the bounds. Unbounded int transients (JANI `int`) are stored unchecked, as before, to keep the Buffy temporaries cheap (A/B: 83 vs 88 ns/step on the choose MDP, 60 vs 66 staged, 418 vs 403 on fq_rew).
+- **Start states** passed to `simulate` / `simulate_rewards` are checked for shape, type and bounds.
+- **Random streams:** `derive_seed(seed, phase, i)` gives separate streams to expected-success pilots, splitting evaluation batches and cross-entropy iterations.
+- **Statistics:**
+  - `hyptest/betting.py` (`BettingTest`): a sequential test by betting (Waudby-Smith & Ramdas, JRSS-B 2024), valid at every sample size for samples in [0, upper]. It runs four capital processes at level min(α, β)/2: two decide H+/H−, and two stop INCONCLUSIVE once p is inside the indifference region. It is the recommended sequential test; anytime Chow–Robbins is only asymptotically valid.
+    - **Comparison on Bernoulli paths** (α = β = 0.05, the course settings):
+
+      | Setting | Test | Correct at p_true | Median n | Wrong at p = θ (H+ / H−) |
+      |---|---|---|---|---|
+      | θ = 0.7, p_true 0.714 (300 reps) | betting | 299/300 | 13.3k | 7 / 3 |
+      | | anytime Chow–Robbins | 292/300 | 8.2k | 20 / 18 |
+      | θ = 0.011, p_true 0.0128 (200 reps) | betting | 199/200 | 33.6k | 3 / 5 |
+      | | anytime Chow–Robbins | 195/200 | 36.6k | 1 / 15 |
+      | θ = 1.5e-4, p_true 4.1e-4 (100 reps) | betting | 100/100 | 41.8k | 0 / 1 |
+      | | anytime Chow–Robbins | 100/100 | 61.6k | 0 / 4 |
+
+    - **Error rates:** at p = θ every acceptance is wrong. The betting test stays within its level of 2.5% per side, while Chow–Robbins reaches 6–7.5% per side.
+    - **Sample sizes:** betting needs about 60% more samples than Chow–Robbins at θ = 0.7, slightly fewer at θ = 0.011, and about a third fewer at θ = 1.5e-4. Its vectorised loop also makes it about 10× faster in wall time.
+  - `hyptest/intervals.py`: `clopper_pearson`, `dkw_mean_ci` for bounded samples, and `per_test_level` for families of intervals.
+  - Reward curves now use Welford updates.
+  - The SPRT rejects non-0/1 samples.
+- **Tests:** `tests/test_native_checks.py`. The existing tests give unchanged numbers.
+
 
 ## Design decisions to review (made unattended)
 
@@ -301,7 +336,8 @@ as JANI `Emax/Emin` properties: `C<=k` is `exp: rew_<r>, accumulate: [steps], st
    shaping is available but off by default (it hurt).
 4. **Cross-entropy** learns one arrival distribution per input queue (i.i.d. over time), elite quantile ρ = 0.05,
    smoothing 0.7. It is a distribution-learning method, not RL, and needs no reward design.
-5. **Chow-Robbins default is `mode="anytime"`**, with `mode="fixed_width"` kept for the course runners.
+5. **Sequential tests:** `BettingTest` is the recommended test (valid at every n). Chow-Robbins keeps
+   `mode="anytime"` as its default (asymptotic only) and `mode="fixed_width"` for the course runners.
    `min_nonzero` = 10 by default (30 helps at θ = 1.5e-4).
 6. **Splitting levels:** expected success with pilot effort 256. Importance is `min(iq5_deqs_bl, k+1)`, matching
    the course `ImportanceFQCodel`.

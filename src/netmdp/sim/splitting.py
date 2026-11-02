@@ -14,7 +14,7 @@ from typing import Optional
 import numpy as np
 
 from src.netmdp.sampler.sampler import Sampler
-from src.netmdp.sim.jani_native import JaniModel, Scheduling
+from src.netmdp.sim.jani_native import JaniModel, Scheduling, derive_seed
 
 
 @dataclass(frozen=True)
@@ -43,7 +43,7 @@ def expected_success(model: JaniModel, goal: str, importance: str, max_importanc
     while m < max_pilots and p_up[-1] == 0:
         m += 1
         _, _, succ = model.fixed_effort(1, horizon, goal, importance, thresholds, efforts, scheduler,
-                                        seed=seed + m, level_successes=True)
+                                        seed=derive_seed(seed, "pilot", m), level_successes=True)
         p_up += (succ[0] / pilot_effort - p_up) / m
     if p_up[-1] == 0:
         raise RuntimeError(f"expected success: goal level not reached in {max_pilots} pilots")
@@ -71,18 +71,20 @@ class NativeSplittingSampler(Sampler):
         self.scheduler, self.user_effort, self.batch, self.seed = scheduler, user_effort, batch, seed
         self._buffer: deque = deque()
         self.steps = 0
+        self._batches = 0
 
     def __str__(self):
         return f"Native {self.method} sampler [thresholds={self.design.thresholds}, factors={self.design.factors}]"
 
     def runs(self, n: int) -> np.ndarray:
-        self.seed += 1
+        self._batches += 1
+        seed = derive_seed(self.seed, "evaluation", self._batches)   # never a pilot's stream (expected_success)
         if self.method == "restart":
             out, steps = self.model.restart(n, self.horizon, self.goal, self.importance, self.design.thresholds,
-                                            self.design.factors, self.scheduler, seed=self.seed)
+                                            self.design.factors, self.scheduler, seed=seed)
         else:
             out, steps = self.model.fixed_effort(n, self.horizon, self.goal, self.importance, self.design.thresholds,
-                                                 self.design.efforts(self.user_effort), self.scheduler, seed=self.seed)
+                                                 self.design.efforts(self.user_effort), self.scheduler, seed=seed)
         self.steps += steps
         return out
 
