@@ -22,6 +22,23 @@ Further results (second round, compiler branch `features`):
   `choose` and `staged` layouts; must equal the DTMC at the same P0.
 - `results/rare/`: `run_rare.sh` output.
 
+Third round (compiler at Buffy `91aaee0`: bursty traffic, rewards, derived importance, minimised
+monitors, fewer choose-layout states):
+- **Regression.** All 27 models of `make_models.sh` were regenerated and compared with the second-round
+  compiler semantically (JSON with sorted keys, comments dropped, temporaries renumbered). Only the
+  four choose-layout MDP models differ, as intended: each nondeterministic choice edge now applies its
+  arrivals to the buffer instead of storing them in a register. All DTMC, staged and PRISM models are
+  unchanged.
+- **Choose layout re-validated** (`results/third_round/`): modes `-R Uniform -N 100000 --seed 1` on the
+  mixed FQ MDP gives exactly the earlier estimates (P0 = 0.2: 4.2e-4; P0 = 0.6: 0.01245), about 10%
+  faster (23 s against 25.5 s).
+- **Derived importance** (`run_rare.sh`, `restart_autoimp`): `--auto-importance` derives
+  `starve_imp = min(deqs_bl, 4)`, the hand hint up to clipping; RESTART reaches the same estimate
+  (3.709e-4, 95% CI [3.34e-4, 4.08e-4]) in 142 s, against 146 s with the hand hint and 220 s plain.
+- **Rewards at this size.** Of the expected-value forms, `modes` estimates `C<=k` and `F` correctly
+  (checked on `bursty`), returns the initial value for `I=k`, and cannot simulate `S` on discrete-time
+  models. Use `C`/`F` on FQ-sized models.
+
 Results and discussion: `docs/notes/jani-vs-prism-compilation-target.md`, section "Results (2026-11-01)". Raw logs
 are in `results/`. `results/smc/` came from an equivalent earlier run of the same models, made by the same
 compiler before the MDP-naming change, which leaves DTMC output unchanged. Re-running `run_smc.sh` writes

@@ -1,0 +1,65 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes /private/tmp/claude-501/-Users-jkai-buffy-prism--claude-worktrees-goofy-kapitsa-2ef95f/8c280ac0-9702-4363-8421-ca23c88a8a8c/scratchpad/cmp/cur/bfy_mdp_mixed_p0.6_choose.jani -R Uniform -N 100000 -J 1 --seed 1
+
+
+
+
+bfy_mdp_mixed_p0.6_choose.jani:model: info: bfy_mdp_mixed_p0 is an MDP model and will be simulated as an MDP.
+bfy_mdp_mixed_p0.6_choose.jani: info: Using default confidence level of 0.95.
+
+Analysis results for bfy_mdp_mixed_p0.6_choose.jani
+Status:          Finished
+Simulation time: 23.3 s
+
++ Properties "starve_violation", "cond_a_violation", "early_violation" and "gap_violation"
+  Run type: MDP
+  Status:   Finished
+
+  + Property starve_violation
+    Estimated probability: 0.01245
+    Confidence interval:   [0.011771922776987041, 0.013156570598478667]
+    Interval half-width:   0.0006923239107458129
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property cond_a_violation
+    Estimated probability: 0.86641
+    Confidence interval:   [0.8642857590010734, 0.868512964585338]
+    Interval half-width:   0.0021136027921322964
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property early_violation
+    Estimated probability: 0.85595
+    Confidence interval:   [0.8537583275573707, 0.8581210054253555]
+    Interval half-width:   0.002181338933992416
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property gap_violation
+    Estimated probability: 0.98989
+    Confidence interval:   [0.98925054505263, 0.9905007953968047]
+    Interval half-width:   0.0006251251720873485
+    Runs used:             100000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
