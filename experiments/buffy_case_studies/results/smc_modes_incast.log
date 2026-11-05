@@ -1,0 +1,42 @@
+The Modest Toolset (www.modestchecker.net), version v3.1.315-g5c2783073+5c27830737e5f7d4c696974b046aa9820de59a1b.
+Command: modest modes out/inc_big.jani -N 20000 -J 1 --seed 1
+
+
+
+
+inc_big.jani:model: info: inc_big is a DTMC model and will be simulated as an MDP with uniform resolution of nondeterminism.
+inc_big.jani: info: Using default confidence level of 0.95.
+
+Analysis results for inc_big.jani
+Status:          Finished
+Simulation time: 129.9 s
+
++ Properties "loss" and "iloss"
+  Run type: MDP
+  Status:   Finished
+
+  + Property loss
+    Estimated probability: 0.538
+    Confidence interval:   [0.5310604176176524, 0.5449285320987932]
+    Interval half-width:   0.00693405724057039
+    Runs used:             20000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+  + Property iloss
+    Estimated probability: 0
+    Confidence interval:   [0, 0.0001844269639619256]
+    Interval half-width:   9.22134819809628E-05
+    Runs used:             20000
+    Distribution support:  {0, 1}
+
+    + Statistical guarantees
+      Method:    Clopper-Pearson interval
+      Statement: 100*γ % of the confidence intervals contain the true probability
+      γ:         0.95
+
+rc=0 wall_s=134

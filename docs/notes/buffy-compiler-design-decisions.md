@@ -237,3 +237,20 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     *Alternative rejected:* monitor counters as reward proxies (they multiply the state space, cannot
     express long-run averages or expected times, and per-threshold MDP optima only bound `Emax`).
     Tool support measured: Storm all forms (JANI and PRISM); `mcsta` only `F`.
+42. **Case-study programs use the language as it is.** `incast.buffy` and `llm_sched.buffy` reproduce
+    the hand-written PRISM models of the incast and LLM batch-scheduler case studies exactly (every
+    property to 1e-15 on small configurations; full size within SMC error). Per-step random draws that
+    a method needs in the same step are arrival counts of a capacity-0 buffer; sender and request
+    state are method globals. PRISM's one-value ranges (`[0..0]`) are emitted one wider. The design
+    gaps these programs expose (stopping at the horizon, first-class draws, sources with memory,
+    `drops-p` for moves, selection loops, at-horizon queries, exact probability literals) are listed
+    in `experiments/buffy_case_studies/README.md`; only the first is implemented (43).
+43. **`--stop-at-horizon`** freezes the state once `time` reaches the horizon:
+    every step update and staged arrival update becomes `time < H ? update : current value`.
+    Draws past H still happen but return to the same state. The option is opt-in because it
+    changes the model's meaning beyond H. Each query is checked against the horizon (bounded
+    `F`/`G`/`U` and monitor horizons ≤ H; `E` only as `C<=k`/`I=k` with k ≤ H), with the error
+    at the query.
+    *Alternatives:* applying it automatically whenever every query qualifies. Rejected, because
+    tools and users read the emitted model with other properties too. A separate sink state was
+    also rejected: it would lose the state at H that the at-horizon queries read.

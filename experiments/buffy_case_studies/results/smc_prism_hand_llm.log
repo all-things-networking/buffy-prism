@@ -1,0 +1,37 @@
+PRISM
+=====
+
+Version: 4.10.1
+Date: Thu Nov 05 09:03:04 PST 2026
+Hostname: dhcp-206-87-105-76.ubcsecure.wireless.ubc.ca
+Memory limits: cudd=1g, java(heap)=2g
+Command line: prism llm/model/llm_batch_scheduler/chunked/scheduler_big.pm -const 'T_V=5,POLICY=0,ADM_POLICY=0,N_SLOTS=3,KV_CAP=32,CHUNK_BLK=8,p_arr=0.9,p_lp=0.5,p_ol_sp=0.5,p_ol_lp=0.5' -pf 'P=? [ F ("done" & v_maxgap>=SLO_TBT) ]' -sim -simmethod ci -simsamples 20000 -simpathlen 3000
+
+Parsing PRISM model file "llm/model/llm_batch_scheduler/chunked/scheduler_big.pm"...
+
+Type:        DTMC
+Modules:     worker
+Actions:     []
+Variables:   t stage st_1 pp_1 oo_1 bk_1 ad_1 st_2 pp_2 oo_2 bk_2 ad_2 st_3 pp_3 oo_3 bk_3 ad_3 st_4 pp_4 oo_4 bk_4 ad_4 st_5 pp_5 oo_5 bk_5 ad_5 st_6 pp_6 oo_6 bk_6 ad_6 st_7 pp_7 oo_7 bk_7 ad_7 st_8 pp_8 oo_8 bk_8 ad_8 v_gap v_maxgap v_preempts preempts n_lp n_lo lp_before_v lp_after_v peak_conc
+Labels:      "done" "v_preempted" "v_stalled" "cascade"
+
+1 property:
+(1) P=? [ F ("done"&v_maxgap>=SLO_TBT) ]
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F ("done"&v_maxgap>=SLO_TBT) ]
+Model constants: T_V=5,N_SLOTS=3,KV_CAP=32,CHUNK_BLK=8,POLICY=0,ADM_POLICY=0,p_arr=0.9,p_lp=0.5,p_ol_sp=0.5,p_ol_lp=0.5
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=20000
+Simulation parameters: max path length=3000
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 20000 iterations in 58.853 seconds (average 0.0029)
+Path length statistics: average 5.3e+02, min 497, max 564
+
+Result: 0.47695 (+/- 0.009097477060132659 with probability 0.99; rel err 0.019074278352306656)
+
+rc=0 wall_s=61

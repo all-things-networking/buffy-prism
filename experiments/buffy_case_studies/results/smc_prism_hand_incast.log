@@ -1,0 +1,41 @@
+PRISM
+=====
+
+Version: 4.10.1
+Date: Thu Nov 05 09:03:04 PST 2026
+Hostname: dhcp-206-87-105-76.ubcsecure.wireless.ubc.ca
+Memory limits: cudd=1g, java(heap)=2g
+Command line: prism incast/model/example2_desync_short_bursts/incast.pm hand_incast.props -prop 1 -const 'M=16,WIN=96,SLEN=8,BUF=32,THRESH=8' -sim -simmethod ci -simsamples 20000 -simpathlen 8000
+
+Parsing PRISM model file "incast/model/example2_desync_short_bursts/incast.pm"...
+
+Type:        DTMC
+Modules:     tor
+Actions:     [] [step] [end]
+Variables:   on1 t1 on2 t2 on3 t3 on4 t4 on5 t5 on6 t6 on7 t7 on8 t8 on9 t9 on10 t10 on11 t11 on12 t12 on13 t13 on14 t14 on15 t15 on16 t16 on17 t17 on18 t18 on19 t19 on20 t20 q1 q2 q3 q4 q5 q6 q7 q8 q9 q10 qo odrops idrops slot stage
+Labels:      "done"
+
+Parsing properties file "hand_incast.props"...
+
+3 properties:
+(1) P=? [ F ("done"&odrops>=THRESH) ]
+(2) P=? [ F ("done"&idrops>=THRESH) ]
+(3) filter(count, stage=1)
+
+---------------------------------------------------------------------
+
+Simulating: P=? [ F ("done"&odrops>=THRESH) ]
+Model constants: M=16,WIN=96,SLEN=8,BUF=32,THRESH=8
+
+Simulation method: CI (Confidence Interval)
+Simulation method parameters: width=unknown, confidence=0.01, number of samples=20000
+Simulation parameters: max path length=8000
+
+Sampling progress: [ 10% 20% 30% 40% 50% 60% 70% 80% 90% 100% ]
+
+Sampling complete: 20000 iterations in 308.792 seconds (average 0.015)
+Path length statistics: average 4.9e+03, min 4872, max 4873
+
+Result: 0.53945 (+/- 0.009078768275821611 with probability 0.99; rel err 0.016829675179945523)
+
+rc=0 wall_s=311

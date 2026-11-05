@@ -1,0 +1,17 @@
+== M=4 WIN=4 SLEN=3 BUF=3 THRESH=2
+hand  States:      216272 0.8336000000000002 0.04000000000000001 States satisfying filter true: 216272 10354 
+buffy States:      31097 0.8336000000000001 0.04000000000000001 States satisfying filter true: 31097 3369 
+== M=4 WIN=6 SLEN=4 BUF=3 THRESH=2
+hand  States:      1102427 0.9250312369845902 0.325281132861308 States satisfying filter true: 1102427 52696 
+buffy States:      156273 0.9250312369845903 0.325281132861308 States satisfying filter true: 156273 17053 
+== M=6 WIN=3 SLEN=3 BUF=4 THRESH=2
+hand  States:      1895261 1.0 0.0 States satisfying filter true: 1895261 90906 
+buffy States:      216353 1.0 0.0 States satisfying filter true: 216353 16223 
+== M=6 WIN=5 SLEN=2 BUF=2 THRESH=2
+hand  
+buffy States:      2332215 0.9922839506172845 0.07407407407407413 States satisfying filter true: 2332215 175095 
+== M=8 WIN=3 SLEN=2 BUF=3 THRESH=2
+hand  
+buffy States:      3069257 1.0 0.0 States satisfying filter true: 3069257 175405 
+== M=6 WIN=6 SLEN=3 BUF=3 THRESH=3
+hand  
