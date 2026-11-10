@@ -1,0 +1,6 @@
+ECMP=0 LAMBDA=1: P[starved]=1.0000 +- 0.0000  (227 us/run, compile 24 s)
+ECMP=0 LAMBDA=0.5: P[starved]=0.9874 +- 0.0007  (270 us/run, compile 21 s)
+ECMP=1 LAMBDA=1: P[starved]=0.1428 +- 0.0022  (225 us/run, compile 22 s)
+ECMP=1 LAMBDA=0.5: P[starved]=0.7706 +- 0.0026  (205 us/run, compile 18 s)
+ECMP=2 LAMBDA=1: P[starved]=0.7503 +- 0.0027  (196 us/run, compile 15 s)
+ECMP=2 LAMBDA=0.5: P[starved]=0.8516 +- 0.0022  (173 us/run, compile 13 s)

@@ -1,0 +1,20 @@
+  t=0
+    in  loom_flow_0: queue [1/0 1/0 1/0 1/0] enq [1/0 1/0 1/0 1/0] deq fperf 4 buffy 4
+    in  loom_flow_1: queue [2/0 2/0] enq [2/0 2/0] deq fperf 2 buffy 2
+    in  loom_flow_2: queue [3/0 3/0 3/0] enq [3/0 3/0 3/0] deq fperf 3 buffy 2  <-
+    in  loom_flow_3: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_4: queue [2/0 2/0 2/0] enq [2/0 2/0 2/0] deq fperf 3 buffy 3
+    in  loom_flow_5: queue [3/0] enq [3/0] deq fperf 1 buffy 1
+    in  loom_flow_6: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_7: queue [2/0] enq [2/0] deq fperf 1 buffy 1
+    in  loom_flow_8: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_9: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_10: queue [2/0] enq [2/0] deq fperf 1 buffy 1
+    in  loom_flow_11: queue [3/0 3/0] enq [3/0 3/0] deq fperf 2 buffy 2
+    out loom_out1: fperf [1/0] buffy [1/0]
+    out loom_out2: fperf [] buffy []
+loom: differs up to T=3 (373.313 s); FPerf's flow enqueue only bounds tenant 2's dequeues from below, so it may drop packets it does not pass on
+loom with flow-enqueue drops forbidden: equivalent (871.143 s)
+ok   loom
+1/1 as expected
+exit 0

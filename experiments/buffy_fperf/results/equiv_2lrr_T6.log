@@ -1,0 +1,19 @@
+  t=0
+    in  fq_ibs_0: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [] enq [382/383 390/391] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [] enq [454/455] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [] enq [494/495] deq fperf 0 buffy 0
+    out fq_ob: fperf [] buffy []
+  t=1
+    in  fq_ibs_0: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [382/383 390/391] enq [] deq fperf 0 buffy 1  <-
+    in  fq_ibs_2: queue [] enq [420/421] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [454/455] enq [] deq fperf 1 buffy 0  <-
+    in  fq_ibs_4: queue [494/495] enq [335/336] deq fperf 0 buffy 0
+    out fq_ob: fperf [454/455] buffy [382/383]  <-
+2lrr: differs up to T=6 (1.175 s); FPerf may order queues that become active together in any order
+2lrr with new-list insertions in index order: equivalent (137.868 s)
+ok   2lrr
+1/1 as expected
+T=6 exit 0

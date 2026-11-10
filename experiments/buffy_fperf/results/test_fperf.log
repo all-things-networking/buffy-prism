@@ -1,0 +1,322 @@
+c++ -std=c++17 -O2 -Wall -Wextra -MMD -MP -Iinclude/ -I./build/antlr-gen -isystem /opt/homebrew/opt/antlr4-cpp-runtime/include/antlr4-runtime -Ifperf/lib/ -Ifperf/lib/metrics/ -Ifperf/lib/cps -Ifperf/lib/qms -I/opt/homebrew/include -Wno-unused-parameter -Wno-sign-compare -c test/fperf/fperf_tandem_test.cpp -o build/objects/fp/test/fperf/fperf_tandem_test.o
+c++ -std=c++17 -O2 -o build/fperf_tandem_test build/objects/fp/fperf/src/contention_point.o build/objects/fp/fperf/src/cost.o build/objects/fp/fperf/src/example.o build/objects/fp/fperf/src/input_only_solver.o build/objects/fp/fperf/src/metric.o build/objects/fp/fperf/src/net_context.o build/objects/fp/fperf/src/query.o build/objects/fp/fperf/src/queue.o build/objects/fp/fperf/src/queuing_module.o build/objects/fp/fperf/src/search.o build/objects/fp/fperf/src/shared_config.o build/objects/fp/fperf/src/solver.o build/objects/fp/fperf/src/spec_factory.o build/objects/fp/fperf/src/tests.o build/objects/fp/fperf/src/util.o build/objects/fp/fperf/src/workload.o build/objects/fp/fperf/src/cps/buggy_2l_rr_scheduler.o build/objects/fp/fperf/src/cps/leaf_spine.o build/objects/fp/fperf/src/cps/loom_mqprio.o build/objects/fp/fperf/src/cps/priority_scheduler.o build/objects/fp/fperf/src/cps/rr_scheduler.o build/objects/fp/fperf/src/cps/tbf.o build/objects/fp/fperf/src/metrics/aipg.o build/objects/fp/fperf/src/metrics/cblocked.o build/objects/fp/fperf/src/metrics/cdeq.o build/objects/fp/fperf/src/metrics/cenq.o build/objects/fp/fperf/src/metrics/deq.o build/objects/fp/fperf/src/metrics/dst.o build/objects/fp/fperf/src/metrics/ecmp.o build/objects/fp/fperf/src/metrics/qsize.o build/objects/fp/fperf/src/qms/buggy_2l_rr_qm.o build/objects/fp/fperf/src/qms/leaf_forwarding_qm.o build/objects/fp/fperf/src/qms/loom_demux_qm.o build/objects/fp/fperf/src/qms/loom_flow_enq_qm.o build/objects/fp/fperf/src/qms/loom_nic_enq_qm.o build/objects/fp/fperf/src/qms/priority_qm.o build/objects/fp/fperf/src/qms/rr_qm.o build/objects/fp/fperf/src/qms/spine_forwarding_qm.o build/objects/fp/fperf/src/qms/switch_xbar_qm.o build/objects/fp/fperf/src/qms/tbf_qm.o build/objects/mc/src/frontend/AstDump.o build/objects/mc/src/frontend/Parser.o build/objects/mc/src/immut/Bounds.o build/objects/mc/src/immut/Expr.o build/objects/mc/src/immut/Ltl.o build/objects/mc/src/immut/Sharing.o build/objects/mc/src/lower/Elaborate.o build/objects/mc/src/backend/jani/JaniEmitter.o build/objects/mc/src/backend/prism/PrismEmitter.o build/objects/mc/src/backend/smt/SmtEmitter.o build/objects/mc/gen/BuffyLexer.o build/objects/mc/gen/BuffyParser.o build/objects/fp/src/backend/fperf/BuffyQM.o build/objects/fp/test/fperf/fperf_tandem_test.o -L/opt/homebrew/lib -lz3 -L/opt/homebrew/opt/antlr4-cpp-runtime/lib -lantlr4-runtime -Wl,-rpath,/opt/homebrew/opt/antlr4-cpp-runtime/lib
+./build/fperf_sp_test examples/fperf/sp_prio.buffy
+ok   workload 0 q1 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 0 q1 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 q1 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 0 q3 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 0 q3 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 q3 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 q1 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 1 q1 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 q1 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 q3 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 1 q3 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 q3 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 2 q1 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 2 q1 cblocked >= 2 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 2 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 4 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 4 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 q1 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 q3 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 2 q3 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 q3 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 3 q1 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 3 q1 cblocked >= 2 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 2 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 4 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 4 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 q1 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 q3 cblocked >= 0 (exists): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 0 (forall): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 2 (exists): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 2 (forall): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 4 (exists): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 4 (forall): buffy SAT, fperf SAT
+ok   workload 3 q3 cblocked >= 6 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 q3 cblocked >= 6 (forall): buffy UNSAT, fperf UNSAT
+64/64 agree
+./build/fperf_tandem_test examples/fperf/sp_tandem.buffy
+ok   workload 0 b_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_1 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cblocked >= 1 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cblocked >= 1 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cblocked >= 3 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cblocked >= 3 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 0 b_ibs_0 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 0 b_ibs_0 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cblocked >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 0 a_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_1 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cblocked >= 1 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cblocked >= 1 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cblocked >= 3 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cblocked >= 3 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 1 b_ibs_0 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 1 b_ibs_0 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cblocked >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 1 a_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_1 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cblocked >= 1 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cblocked >= 1 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cblocked >= 3 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cblocked >= 3 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 b_ibs_0 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 2 b_ibs_0 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cblocked >= 1 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cblocked >= 1 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cblocked >= 3 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cblocked >= 3 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 2 a_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 2 a_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_1 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cblocked >= 1 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cblocked >= 1 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cblocked >= 3 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cblocked >= 3 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cblocked >= 5 (exists): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cblocked >= 5 (forall): buffy UNSAT, fperf UNSAT
+ok   workload 3 b_ibs_0 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 3 b_ibs_0 cenq >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cblocked >= 5 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 1 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 1 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 3 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 3 (forall): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 5 (exists): buffy SAT, fperf SAT
+ok   workload 3 a_ibs_1 cenq >= 5 (forall): buffy SAT, fperf SAT
+144/144 agree
+./build/fperf_equiv_test
+prio: equivalent up to T=8 (24.63 s)
+ok   prio
+rr: equivalent up to T=8 (344.77 s)
+ok   rr
+tbf: equivalent up to T=6 (2.493 s)
+ok   tbf
+  t=0
+    in  fq_ibs_0: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [] enq [311/312 317/318] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [] enq [341/342] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [] buffy []
+  t=1
+    in  fq_ibs_0: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [311/312 317/318] enq [] deq fperf 0 buffy 1  <-
+    in  fq_ibs_2: queue [341/342] enq [273/274] deq fperf 1 buffy 0  <-
+    in  fq_ibs_3: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [341/342] buffy [311/312]  <-
+2lrr: differs up to T=5 (0.787 s); FPerf may order queues that become active together in any order
+2lrr with new-list insertions in index order: equivalent (21.752 s)
+ok   2lrr
+  t=0
+    in  fq_ibs_0: queue [] enq [460/461] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [] enq [514/515] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [] enq [558/559] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [] enq [660/661] deq fperf 0 buffy 0
+    out fq_ob: fperf [] buffy []
+  t=1
+    in  fq_ibs_0: queue [460/461] enq [462/463 442/443] deq fperf 1 buffy 1
+    in  fq_ibs_1: queue [514/515] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [558/559] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [] enq [431/432 622/623 439/440 648/649] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [660/661] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [460/461] buffy [460/461]
+  t=2
+    in  fq_ibs_0: queue [462/463 442/443] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [514/515] enq [434/435 436/437] deq fperf 1 buffy 1
+    in  fq_ibs_2: queue [558/559] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [431/432 622/623 439/440 648/649] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [660/661] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [514/515] buffy [514/515]
+  t=3
+    in  fq_ibs_0: queue [462/463 442/443] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [434/435 436/437] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [558/559] enq [564/565 444/445 446/447 448/449] deq fperf 1 buffy 1
+    in  fq_ibs_3: queue [431/432 622/623 439/440 648/649] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [660/661] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [558/559] buffy [558/559]
+  t=4
+    in  fq_ibs_0: queue [462/463 442/443] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_1: queue [434/435 436/437] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [564/565 444/445 446/447 448/449] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [431/432 622/623 439/440 648/649] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_4: queue [660/661] enq [] deq fperf 1 buffy 1
+    out fq_ob: fperf [660/661] buffy [660/661]
+  t=5
+    in  fq_ibs_0: queue [462/463 442/443] enq [] deq fperf 0 buffy 1  <-
+    in  fq_ibs_1: queue [434/435 436/437] enq [451/452 453/454 455/456 457/458] deq fperf 0 buffy 0
+    in  fq_ibs_2: queue [564/565 444/445 446/447 448/449] enq [] deq fperf 0 buffy 0
+    in  fq_ibs_3: queue [431/432 622/623 439/440 648/649] enq [616/617] deq fperf 1 buffy 0  <-
+    in  fq_ibs_4: queue [] enq [] deq fperf 0 buffy 0
+    out fq_ob: fperf [431/432] buffy [462/463]  <-
+2lrr-paper: differs up to T=8 (8.196 s); the paper's scheduler decides at step t, FPerf from the packets arriving during t
+ok   2lrr-paper
+  t=0
+    in  loom_flow_0: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_1: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_2: queue [3/0 3/0] enq [3/0 3/0] deq fperf 2 buffy 2
+    in  loom_flow_3: queue [1/0] enq [1/0] deq fperf 1 buffy 1
+    in  loom_flow_4: queue [2/0] enq [2/0] deq fperf 1 buffy 1
+    in  loom_flow_5: queue [3/0 3/0 3/0 3/0] enq [3/0 3/0 3/0 3/0] deq fperf 3 buffy 3
+    in  loom_flow_6: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_7: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_8: queue [3/0 3/0 3/0] enq [3/0 3/0 3/0] deq fperf 3 buffy 3
+    in  loom_flow_9: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_10: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_11: queue [3/0] enq [3/0] deq fperf 1 buffy 1
+    out loom_out1: fperf [] buffy []
+    out loom_out2: fperf [3/0] buffy [3/0]
+  t=1
+    in  loom_flow_0: queue [1/0] enq [1/0] deq fperf 1 buffy 1
+    in  loom_flow_1: queue [2/0] enq [2/0] deq fperf 1 buffy 1
+    in  loom_flow_2: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_3: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_4: queue [2/0 2/0] enq [2/0 2/0] deq fperf 2 buffy 2
+    in  loom_flow_5: queue [3/0 3/0 3/0 3/0 3/0] enq [3/0 3/0 3/0 3/0] deq fperf 5 buffy 2  <-
+    in  loom_flow_6: queue [1/0 1/0 1/0 1/0] enq [1/0 1/0 1/0 1/0] deq fperf 4 buffy 4
+    in  loom_flow_7: queue [2/0 2/0 2/0 2/0] enq [2/0 2/0 2/0 2/0] deq fperf 4 buffy 4
+    in  loom_flow_8: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_9: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_10: queue [] enq [] deq fperf 0 buffy 0
+    in  loom_flow_11: queue [] enq [] deq fperf 0 buffy 0
+    out loom_out1: fperf [] buffy []
+    out loom_out2: fperf [3/0] buffy [3/0]
+loom: differs up to T=2 (35.524 s); FPerf's flow enqueue only bounds tenant 2's dequeues from below, so it may drop packets it does not pass on
+loom with flow-enqueue drops forbidden: equivalent (62.551 s)
+ok   loom
+leaf-spine: equivalent up to T=2 (24.269 s); FPerf's crossbar may pick any stable matching
+leaf-spine with crossbars pinned to Buffy's matchings: equivalent (29.625 s)
+leaf-spine: Buffy's choices always satisfy the hand-written conditions (26.743 s)
+ok   leaf-spine
+7/7 as expected
+timeout 5400 make test-fperf  638.96s user 13.21s system 97% cpu 11:08.36 total
+exit 0

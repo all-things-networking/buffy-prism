@@ -1,0 +1,6 @@
+leaf-spine: equivalent up to T=3 (328.134 s); FPerf's crossbar may pick any stable matching
+leaf-spine with crossbars pinned to Buffy's matchings: equivalent (185.963 s)
+leaf-spine: Buffy's choices always satisfy the hand-written conditions (236.41 s)
+FAIL leaf-spine
+0/1 as expected
+exit 1

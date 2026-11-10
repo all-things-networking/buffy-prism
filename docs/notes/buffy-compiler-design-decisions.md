@@ -254,3 +254,27 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     *Alternatives:* applying it automatically whenever every query qualifies. Rejected, because
     tools and users read the emitted model with other properties too. A separate sink state was
     also rejected: it would lose the state at H that the at-horizon queries read.
+44. **Random and nondeterministic choices inside methods: `x ~ D;`.** `D` is any traffic distribution:
+    constant, conditional on the instance's state at the time-step boundary, or `nondet` (an MDP
+    choice). Every occurrence, after loop unrolling, is a source of its own (`Traffic::draw`: no
+    buffer, no state) drawn in every step, whose value the statement assigns. The step stays a
+    deterministic function of the state and the step's draws, so the factored structure and every
+    backend carry over. In JANI and PRISM a draw is a bufferless source like a phase without memory.
+    In FPerf it is a free value restricted to its possible values, which is FPerf's own
+    nondeterminism. Nondeterministic draws are resolved before the step's probabilistic ones, from
+    the boundary state, as nondeterministic traffic is. This supersedes the capacity-0 buffer idiom
+    (`arrivals-p` of a dropped source), which gave identical models in every layout
+    (`test/jani/same/`).
+    *Alternative rejected:* distributions that depend on values computed in the step. They would
+    need sequential sampling inside the step (no sync layout) and would break the deterministic
+    step. A draw over a fixed range mapped onto the candidates covers the common case.
+45. **FPerf backend for multi-device networks.**
+    - Packet classes map to FPerf metadata (fields in order: `meta1`, `meta2`) over FIFO storage.
+    - Buffers that a program fills itself are module state rather than FPerf queues.
+    - External inputs can be same-step `IMM_QUEUE`s, which is Buffy's own order.
+    - Output packets come from the output buffers' final contents.
+    - `BuffyNet` builds the modules inside any contention point. `fperf_equiv_test` uses it to check
+      each hand-written FPerf CP against its Buffy program for every workload up to a horizon, with
+      pins for FPerf's nondeterministic choices and a refinement check for the crossbars.
+
+    See `docs/notes/fperf-cps-in-buffy.md`.
