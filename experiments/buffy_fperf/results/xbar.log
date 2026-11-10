@@ -1,0 +1,9 @@
+XBAR=0 ECMP=1 LAMBDA=0.75: starved=0.4053±0.0043  starved_min=0.4053±0.0043  e_goodput=4.690±0.008  e_offered=7.502±0.012
+XBAR=2 ECMP=1 LAMBDA=0.75: starved=0.4053±0.0043  starved_min=0.4053±0.0043  e_goodput=4.690±0.008  e_offered=7.502±0.012
+XBAR=0 ECMP=1 LAMBDA=1: starved=0.1437±0.0031  starved_min=0.1437±0.0031  e_goodput=5.294±0.007  e_offered=10.000±0.000
+XBAR=2 ECMP=1 LAMBDA=1: starved=0.1437±0.0031  starved_min=0.1437±0.0031  e_goodput=5.294±0.007  e_offered=10.000±0.000
+XBAR=0 ECMP=2 LAMBDA=0.75: starved=0.7417±0.0038  starved_min=0.7417±0.0038  e_goodput=4.314±0.011  e_offered=7.502±0.012
+XBAR=2 ECMP=2 LAMBDA=0.75: starved=0.7417±0.0038  starved_min=0.7417±0.0038  e_goodput=4.314±0.011  e_offered=7.502±0.012
+XBAR=0 ECMP=2 LAMBDA=1: starved=0.7504±0.0038  starved_min=0.7504±0.0038  e_goodput=4.876±0.016  e_offered=10.000±0.000
+XBAR=2 ECMP=2 LAMBDA=1: starved=0.7504±0.0038  starved_min=0.7504±0.0038  e_goodput=4.876±0.016  e_offered=10.000±0.000
+exit 0

@@ -35,8 +35,8 @@ one of FPerf's: Buffy *refines* FPerf.
 | `TBF` (rate 3, 6 tokens) | `tbf.buffy` | equivalent, T=6 (2 s) |
 | `Buggy2LRRScheduler` (5 queues) | `fq_2lrr.buffy` | differs (FPerf's order of queues activated together is free); with index order pinned: **equivalent**, T=5 (21 s) and T=6 (138 s) |
 | `Buggy2LRRScheduler` | `fq_paper.buffy`, the paper's scheduler | differs, as expected: see finding 2 |
-| `LoomMQPrio` (4 cores) | `loom.buffy` | differs (FPerf's flow enqueue may drop packets); with those drops forbidden: **equivalent**, T=2 (63 s) and T=3 (871 s) |
-| `LeafSpine` (3 leaves, 2 spines) | `leaf_spine.buffy` | equivalent unpinned at T=3; pinned to Buffy's matchings: equivalent (186 s); Buffy's Gale–Shapley matchings **always satisfy** FPerf's matching conditions (236 s), so the Buffy fabric refines FPerf's |
+| `LoomMQPrio` (4 cores) | `loom.buffy` (one method), `loom_modular.buffy` (one instance per FPerf module, `connect ... immediate`; the same at T=2) | differs (FPerf's flow enqueue may drop packets); with those drops forbidden: **equivalent**, T=2 (63 s) and T=3 (871 s) |
+| `LeafSpine` (3 leaves, 2 spines) | `leaf_spine.buffy` | equivalent unpinned at T=3; pinned to Buffy's matchings: equivalent (186 s); Buffy's Gale–Shapley matchings **always satisfy** FPerf's matching conditions (236 s), so the Buffy fabric refines FPerf's. With `XBAR = 1` (any stable matching) it is **the same relation as FPerf's**, both directions at T=3. `XBAR = 2` (output-proposing) also always satisfies FPerf's conditions |
 
 ## Findings
 
@@ -146,7 +146,82 @@ Native simulator (`src/netmdp/sim`), 100,000 runs each (95% CI half-width ≤ 0.
   finish 2,000 runs in 10 minutes. Reduced fabrics and an `argmin`/`argmax` builtin are therefore
   not needed for these runs; the builtin would still shrink the crossbar's DAG.
 
-## Probabilistic checks for the same examples
+## Same-step composition: `connect ... immediate`
+
+Finding 4 is now addressed. `connect a.ob -> b.ib immediate;` delivers within the step (user guide
+§2.9.3, design decision 46). `loom_modular.buffy` builds Loom as FPerf does, with one instance per
+module, and it is as equivalent to FPerf's network as the one-method program. In FPerf, instances
+joined by immediate connections become one module.
+
+## Matching FPerf's crossbar exactly
+
+With draws inside methods, the crossbar no longer has to be deterministic. With `XBAR = 1` every VOQ
+gets a nondeterministic candidate bit. The candidate is used when it is a matching on non-empty VOQs
+in which every unmatched non-empty VOQ ranks below a matched one at its input or its output (FPerf's
+conditions); otherwise Gale–Shapley's matching is used. That is exactly FPerf's set of stable
+matchings. The harness proves it in both directions at T=3:
+- every Buffy choice satisfies FPerf's withheld matching conditions;
+- with Buffy's candidates pinned to FPerf's matching, Buffy always ends up with exactly that matching.
+
+`XBAR = 0` and `XBAR = 2` are the input- and output-proposing Gale–Shapley matchings, the two extremes
+of the stable matchings, and both refine FPerf.
+
+## More probabilistic results
+
+**Leaf-spine throughput.** Expected packets of flow 0 delivered by step 10 (the pipeline allows at
+most 7), against offered load; native simulator, 50,000 runs per point:
+
+| λ (offered by T) | fixed spine | per-flow hash | per-packet hash |
+|---|---|---|---|
+| 0.25 (2.5) | 1.84 | 1.93 | 1.93 |
+| 0.5 (5.0) | 2.90 | 3.43 | 3.60 |
+| 0.75 (7.5) | 3.19 | 4.31 | 4.69 |
+| 1 (10) | 3.00 | 4.88 | 5.29 |
+
+The hash policy is irrelevant at light load. From λ = 0.5 up, a fixed spine loses a third to half of
+the throughput; per-flow hashing recovers most of it and per-packet spraying the most.
+
+**Does the crossbar's choice of matching matter?** The input- and output-proposing matchings, the
+two extremes of the stable matchings, give identical estimates (same seeds, 50,000 runs) for
+per-packet and per-flow ECMP at λ = 0.75 and 1 (`results/xbar.log`): starvation 0.405 / 0.144 /
+0.742 / 0.750 and the same throughput. The models differ, so configurations with more than one stable
+matching are too rare under this traffic to show at this precision. Each server injects at most one
+packet per step, so a port rarely holds two non-empty VOQs that two outputs both want in a cycle.
+For this workload FPerf's freedom of choice in the crossbar is irrelevant. Workloads with more
+contending flows per port would test it.
+
+**Loom isolation.** P[tenant 2 leads by more than 3 packets at every step 6..9], FPerf's query, over
+the tenants' and memcached's per-flow loads (50,000 runs each):
+
+| L1 | L2 | LM = 0 | LM = 0.1 | LM = 0.25 |
+|---|---|---|---|---|
+| 0.5 | 0.5 | 0.006 | 0.073 | 0.347 |
+| 0.5 | 1 | 0.069 | 0.143 | 0.290 |
+| 0.25 | 0.5 | 0.163 | 0.399 | 0.742 |
+| 0.1 | 0.5 | 0.645 | 0.809 | 0.948 |
+
+With equal tenant loads isolation almost always holds. A memcached load of 0.1 per flow (0.4 packets
+per step in all) already raises the violation twelvefold, and 0.25 makes it about one in three;
+tenant 1's deliveries fall from 5.25 to 2.36. This is a mild input under which the bad behaviour
+is likely. Memcached has strict priority at the NIC but counts towards tenant 2, and FPerf's
+workload kept it idle.
+
+**Priority starvation** (`examples/jani/prio_load.buffy`, exact with Storm, 4,320 states).
+P[queue 2 blocked in more than 5 of 7 steps], FPerf's query, against the load LH of each of the two
+higher-priority queues (L2 = 0.5, L3 = 0.3):
+
+| LH | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 |
+|---|---|---|---|---|---|---|---|
+| P[starve] | 0.017 | 0.093 | 0.248 | 0.436 | 0.592 | 0.687 | 0.731 |
+
+The transition is gradual through saturation (2·LH = 1 at LH = 0.5), not a threshold. It stays
+below 1 because queue 2 is blocked only while it has packets.
+
+Scripts: `experiments/buffy_fperf/run_ecmp_load.sh`, `run_loom.sh`, `run_xbar.sh`, and
+`native_eval.py`, which evaluates every bounded probability and C/I expected value of a Buffy JANI
+file with the native simulator.
+
+## Probabilistic checks for the same examples (the original brainstorm)
 
 FPerf answers "is there a workload, among those satisfying a spec, under which the query holds?"
 and synthesises workload specs, which are conjunctions of bounds on cumulative enqueues, under

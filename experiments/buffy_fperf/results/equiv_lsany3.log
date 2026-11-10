@@ -1,0 +1,7 @@
+leaf-spine-any: equivalent up to T=3 (200.361 s); both crossbars may pick any stable matching
+leaf-spine-any with crossbars pinned to Buffy's matchings: equivalent (108.425 s)
+leaf-spine-any: with Buffy's choices pinned to the hand-written ones, equivalent (422.699 s)
+leaf-spine-any: Buffy's choices always satisfy the hand-written conditions (243.814 s)
+ok   leaf-spine-any
+1/1 as expected
+exit 0

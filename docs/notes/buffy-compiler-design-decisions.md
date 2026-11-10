@@ -278,3 +278,18 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
       pins for FPerf's nondeterministic choices and a refinement check for the crossbars.
 
     See `docs/notes/fperf-cps-in-buffy.md`.
+46. **`connect a.ob -> b.ib immediate;`** delivers what `a` puts into `ob` to `b.ib` in the same step:
+    after `b.ib`'s own arrivals and before `b`'s step, with tail drop. Instances are elaborated in a
+    topological order of the immediate connections (a cycle is an error, reported at a connection),
+    and the network step stays one simultaneous update, so JANI, PRISM and SMT-LIB need nothing new.
+    In FPerf, instances joined by immediate connections form one module whose immediately connected
+    inputs are internal state. Reading FPerf's `IMM_QUEUE` there would count the same-step packets
+    twice, because the DAG already appends them.
+
+    `tandem_immediate.buffy` equals the same tandem fused into one method in every layout.
+    `loom_modular.buffy`, with one instance per FPerf module, is as equivalent to FPerf's Loom as the
+    one-method version.
+
+    *Alternative rejected:* a global "all connections immediate" mode. It cannot express the leaf-spine
+    fabric, whose links between switches deliver at the next step while its stages within a switch
+    deliver in the same step.
