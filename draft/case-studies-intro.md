@@ -91,7 +91,7 @@ but you have learned nothing new. A good assumption is one whose *worst* include
 case is still dangerous — the whole box is bad, not just a skewing corner. Checking
 the worst corner is how we tell a real finding from an artifact.
 
-The four case studies below are four contention points that all fit this shape.
+The five case studies below are five contention points that all fit this shape.
 They differ in what the shared resource is and in how far along we are.
 
 ---
@@ -463,7 +463,87 @@ model written directly in PRISM. (Details: `docs/notes/case-study-loom.md`.)
 
 ---
 
-## 6. What ties the four together
+## 6. Case study E — the TCP outcast problem
+
+*Like case study B, the assumptions here are temporal patterns of the input, learned from runs,
+rather than a range of loads.*
+
+**The contention point.** A switch's output port is fed by two input ports. Several TCP flows
+come in on port A, through an upstream switch. One flow comes in alone on port B, straight from a
+host. You would expect the lone flow to do well: it has a whole port to itself. Prakash et al.
+(NSDI'12) found the opposite and called it the *TCP outcast problem*: with drop-tail queues and
+small buffers, the lone flow can get far less than each of the flows that share port A.
+
+```mermaid
+flowchart LR
+    subgraph A["port A"]
+      direction TB
+      a0["TCP flow"] --> up["upstream switch<br/>1 packet / step"]
+      a1["TCP flow"] --> up
+    end
+    b["TCP flow B (alone)"] --> arb
+    up --> arb{"both ports deliver,<br/>room for one"}
+    arb --> oq["drop-tail queue"]
+    oq --> out(("output link<br/>1 packet / step"))
+    style b fill:#f8d7da,stroke:#c33
+    style oq fill:#fff3cd,stroke:#b90
+```
+
+**The input, and why it is different here.** The senders are TCP: each one sends faster when its
+window is large and backs off when it loses packets. So a sender's traffic distribution depends on
+its own state, and the input is no longer independent of what the switch does. A lost packet slows
+its sender down, which changes the traffic the switch sees next. We model a simple TCP: each flow
+sends a packet in a step with probability proportional to its window. The window grows with every
+acknowledged window's worth of packets and halves after a loss. If a loss cannot be repaired
+quickly, because too few later packets get through, the flow times out: it goes silent for a while
+and restarts with the smallest window.
+
+**The bad event `Q`.** Over the second half of the run, the lone flow receives at most half its
+fair share of the link.
+
+**How the model is built and checked.** The model is written in Buffy and compiled. On small
+instances, exact model checking matches the simulator. At full size, an independent simulator,
+written from the model's description, gives the same answers (for example 0.5216 against 0.5214).
+
+**Finding 1 — the outcast appears with small buffers.** With a 4-packet buffer and two to four
+flows on port A, the lone flow is starved in about 70% of runs, against about 30% for a flow on
+port A. On average it gets half as much. With a 16-packet buffer the effect reverses. The
+mechanism: port A almost always has a packet waiting, so nearly every packet the lone flow sends
+has to compete for the last slot in the queue. A packet from port A competes only when the lone
+flow happens to send. Contention is fair between *ports*, not between *flows*. Random early drops
+(RED), one of the paper's remedies, remove the effect at an 8-packet buffer.
+
+**Finding 2 — "port blackout" shows in the tail, not the mean.** The paper blames runs of drops
+that hit one port. When we make the switch's tie-breaking sticky, the lone flow's *average* share
+is actually slightly higher than port A's flows' (27.3 against 25.9 packets). Yet it is starved more
+often (48% against 37%). Runs of lost ties time it out; runs of won ties let it catch up. An
+analysis of averages would call this fair.
+
+**The assumptions found.** We let a learner search a family of bounded temporal formulas over
+one thing: which ports delivered a packet at each step. It looks only at the *first* half of the
+run and keeps formulas that predict `Q` in the second half and hold in at least 10% of runs. Each
+candidate was then re-checked on fresh runs of the compiled model. The base rate is 0.52. Two
+results:
+
+- *Lock-in.* "The lone flow went silent for several steps in a row (a timeout), and port A was never
+  idle from step 40 to 80" holds in 14% of runs. Given it, the lone flow is starved with probability
+  **0.91**. Once it backs off while port A stays busy, every packet it sends meets contention, and it
+  rarely recovers.
+- *Escape.* "Port A was idle for 8 steps in a row, and the lone flow sent 4 packets in a row while it
+  was idle" holds in 11% of runs. Given it, the probability falls to **0.02**. The lone flow recovers
+  only through gaps in the *other* port's traffic.
+
+**Why this supports the paper.** It is the closest counterpart to the FQ study, carried further.
+The input is state-dependent (closed-loop senders), and the assumptions are learned bounded-LTL
+formulas over the input's timing, not boxes of loads. They are mild (11–17% of runs) and move `P[Q]`
+from 0.52 to 0.91 or to 0.02. It also shows a limit to be honest about. In a closed loop the input
+is partly a *consequence* of the bad event: "the lone flow rarely sends" trivially predicts "the lone
+flow rarely receives". So the conditions are restricted to an earlier part of the run. They are
+predictive, not causal. (Details: `docs/notes/case-study-outcast.md`.)
+
+---
+
+## 7. What ties the five together
 
 | | contention point | shared resource | bad event `Q` | input knobs | assumption found |
 |---|---|---|---|---|---|
@@ -471,6 +551,7 @@ model written directly in PRISM. (Details: `docs/notes/case-study-loom.md`.)
 | **B. FQ-CoDel** | flow-queuing scheduler | one dequeue per step | thin flow served while all others backlogged ≥ 4 times | per-queue arrival counts, arrival timing/sparsity | early-traffic patterns (preliminary) |
 | **C. LLM scheduler** | GPU batch scheduler | KV-cache memory | victim evicted / stalled / cascade | arrival rate, prompt and output lengths | timing/shape candidates, not yet validated |
 | **D. Multi-queue NIC** | NIC transmit scheduler | link share | tenant 1 waiting yet ≤ 40% of a 20-step window | per-tenant and memcached loads | one mild box, `P[Q] ≥ 0.37` across the whole box (0 under the intended policy) |
+| **E. TCP outcast** | switch output port, two input ports | queue slots under contention | lone flow gets ≤ half its fair share in the second half | closed-loop TCP senders; arrival timing at the two ports | learned temporal patterns: `P[Q \| A]` 0.91 (lock-in) or 0.02 (gaps on the other port), from a base of 0.52 |
 
 Every row is the same picture. The randomness lives in the input. The component is a
 deterministic reaction to that input. The bad event is a monotone counter. The
