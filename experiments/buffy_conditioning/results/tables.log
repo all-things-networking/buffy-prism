@@ -1,0 +1,3 @@
+# compare_tables.py on the PFC condition i2 (--condition-on, compile-time table; JANI path)
+pfc_i2.jani: tables 5.10 MB C, built in 155.2 s | without 9.11 MB, 284.1 s | results identical: True
+# the same condition with --target native (on-demand h): 0.3 MB, built in 1.0 s
