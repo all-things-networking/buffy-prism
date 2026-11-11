@@ -342,3 +342,32 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     *Alternative rejected:* importance weights in the simulator. They need simulator support for
     reweighting probabilistic edges, and they give unbiased but higher-variance estimates. Here the
     weights cancel exactly.
+50. **`--target native`: the native simulator's C model core, straight from the model.** For the native
+    simulator, JANI is a detour. Buffy would print the step DAG as JSON (42 MB for one conditioned PFC
+    model), and the simulator would parse it and translate it back to C, losing the sharing and any
+    structure Buffy knew, such as lookup tables. The native target writes the JANI header (variables,
+    properties) with the C core embedded under `x-buffy-native`. The core defines what
+    `jani_native.JaniModel` would otherwise generate: the destination tables, `jm_enabled`,
+    `jm_apply_r`. The simulator appends its generic runtime: sampling, goals, observables, policies,
+    batch simulation, splitting.
+    - It has the sync layout's semantics: an edge per joint nondeterministic choice, probabilistic
+      sources as parts in traffic order, and the step DAG with shared nodes as C locals.
+    - So the simulation is identical, seed for seed, to the JANI sync layout, for every example
+      (`tests/test_native_target.py` in buffy-prism).
+
+    The simulator still accepts JANI from other tools. For those, it now recognises Buffy-style
+    balanced selection trees and emits them as `static const` arrays. That recognition is exact:
+    `tests/test_native_tables.py` compares 48,000 states with tables on and off.
+51. **On-demand conditioning (native target).** With `--condition-on`, the native target does not
+    enumerate the input's state space at compile time (decision 49).
+    - It keeps ψ's monitor and a step counter as state variables, and emits the input cone as a small C
+      step function.
+    - The conditioned source's probabilities are `p · h(next) / h(current)`, where `h` is a memoised
+      recursion over the input states that runs reach.
+    - `condition_probability()` returns P(ψ) = h(initial) exactly.
+
+    On `cond_input`, P(ψ) matches Storm to rounding and the conditional estimates fall in their 99.9%
+    intervals (`tests/test_native_conditioning.py`). On the PFC condition that took 50 s, 42 MB and
+    minutes of clang as a compile-time table, it takes 0.14 s, 0.3 MB and 1 s to build, and P(ψ)
+    takes 0.01 s over 41,943 input states. The input states visited bound the memory, and the
+    recursion depth is ψ's depth.

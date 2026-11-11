@@ -48,12 +48,30 @@ class Variable:
     initial: int
 
 
+_TABLE_MIN_LEAVES = 16   # select trees with fewer leaves stay nested conditionals
+_TABLE_MAX_EXCEPTIONS = 8
+
+
 class _Translator:
-    """ Translates JANI expressions to C, with a static int/bool/real type for each expression. """
+    """
+    Translates JANI expressions to C, with a static int/bool/real type for each expression.
+
+    Lookup tables: a balanced tree of conditionals that selects on one integer variable by `v < m` tests
+    (as Buffy emits for `--condition-on` and for monitor updates; intervals of any width) and whose
+    leaves are constants, or short chains `c1 ? k1 : c2 ? k2 : ... : d` with constant results over at most
+    six distinct conditions, is emitted as a `static const` C array indexed by the variable (and, for the
+    chains, by the set of conditions that hold, so the conditions need not exclude each other). The
+    values are those of the tree, so results are identical; C size and compile time become proportional to
+    the table's data instead of to nested code. `tables` collects the arrays (shared by the translators
+    of one model, deduplicated); JM_NO_TABLES=1 in the environment turns this off.
+    """
     def __init__(self, variables: dict[str, int], constants: dict[str, Union[int, float, bool]]):
         self.variables = variables
         self.var_types: dict[str, str] = {}
         self.constants = constants
+        self.tables: list[str] = []
+        self.table_ids: dict[str, str] = {}
+        self.use_tables = os.environ.get("JM_NO_TABLES", "") not in ("1", "true", "yes")
 
     def type_of(self, e: Expr) -> str:
         if isinstance(e, bool):
@@ -111,12 +129,125 @@ class _Translator:
         if op == "⇒":
             return f"(!{self.c(e['left'])} || {self.c(e['right'])})"
         if op == "ite":
+            t = self._table(e) if self.use_tables else None
+            if t is not None:
+                return t
             return f"({self.c(e['if'])} ? {self.c(e['then'])} : {self.c(e['else'])})"
         if op == "abs":
             return f"({'fabs' if self.type_of(e['exp']) == 'real' else 'llabs'}({self.c(e['exp'])}))"
         if op in ("floor", "ceil"):
             return f"((int64_t){op}((double){self.c(e['exp'])}))"
         raise JaniUnsupported(f"unsupported operator {op!r}")
+
+
+    # ---- lookup tables ----
+    @staticmethod
+    def _const(x) -> bool:
+        return isinstance(x, (bool, int, float))
+
+    def _chain(self, e):
+        """
+        A chain `c1 ? k1 : (c2 ? k2 : ... : d)` with constant k, d and any (boolean) conditions c:
+        ([(condition key, condition, k), ...], d), or None.
+        """
+        pairs = []
+        while isinstance(e, dict) and e.get("op") == "ite" and self._const(e["then"]):
+            pairs.append((json.dumps(e["if"], sort_keys=True), e["if"], e["then"]))
+            e = e["else"]
+        if not pairs or not self._const(e):
+            return None
+        return pairs, e
+
+    def _table(self, e) -> Optional[str]:
+        c = e["if"]
+        if not (isinstance(c, dict) and c.get("op") == "<" and isinstance(c.get("left"), str)
+                and c["left"] in self.variables and isinstance(c.get("right"), int) and not isinstance(c["right"], bool)):
+            return None
+        v = c["left"]
+        bounds, leaves = [], []
+
+        def walk(x, lo, hi):
+            if isinstance(x, dict) and x.get("op") == "ite":
+                cc = x["if"]
+                if (isinstance(cc, dict) and cc.get("op") == "<" and cc.get("left") == v and isinstance(cc.get("right"), int)
+                        and not isinstance(cc["right"], bool) and (lo is None or lo < cc["right"])
+                        and (hi is None or cc["right"] < hi)):
+                    m = cc["right"]
+                    walk(x["then"], lo, m)
+                    bounds.append(m)
+                    walk(x["else"], m, hi)
+                    return
+            leaves.append(x)
+
+        walk(e, None, None)
+        n = len(leaves)
+        if n < _TABLE_MIN_LEAVES:
+            return None
+        # One entry per integer in [bounds[0] - 1, bounds[-1]]; values outside clamp to the end leaves.
+        lo, L = bounds[0] - 1, bounds[-1] - bounds[0] + 2
+        if L > max(4 * n, 1024) or L > 1_000_000:
+            return None
+        leaf_of = []
+        for i in range(n):
+            a = lo if i == 0 else bounds[i - 1]
+            b = lo + L if i == n - 1 else bounds[i]
+            leaf_of += [i] * (b - a)
+        kind = [("k", x) if self._const(x) else ("c", self._chain(x)) for x in leaves]
+        kind = [("x", leaves[i]) if k == "c" and ch is None else (k, ch) for i, (k, ch) in enumerate(kind)]
+        exceptions = [i for i, (k, _) in enumerate(kind) if k == "x"]
+        if len(exceptions) > _TABLE_MAX_EXCEPTIONS or len(exceptions) == n:
+            return None
+        chains = [ch for k, ch in kind if k == "c"]
+        conds = {}                         # condition key -> (column bit, expression), in first-seen order
+        for pairs, _ in chains:
+            for ck, cexp, _ in pairs:
+                conds.setdefault(ck, (len(conds), cexp))
+        if len(conds) > 6:
+            return None
+        width = 1 << len(conds) if chains else 1   # column = the set of conditions that hold
+        # C's ?: promotes to double when any branch is real; so does the table.
+        vals = [x for k, x in kind if k == "k"] + [v for pairs, d in chains for v in [d] + [kv for _, _, kv in pairs]]
+        real = (self.type_of(e) == "real" or any(isinstance(x, float) for x in vals)
+                or any(self.type_of(leaves[i]) == "real" for i in exceptions))
+        typ = "real" if real else "int"
+        leaf_rows = []
+        for k, x in kind:
+            if k == "k":
+                leaf_rows.append([x] * width)
+            elif k == "c":
+                pairs, d = x
+                row = []
+                for mask in range(width):
+                    val = d
+                    for ck, _, kv in pairs:   # the first condition of the chain that holds
+                        if mask >> conds[ck][0] & 1:
+                            val = kv
+                            break
+                    row.append(val)
+                leaf_rows.append(row)
+            else:
+                leaf_rows.append([0] * width)
+        ctype = "double" if typ == "real" else "int64_t"
+        fmt = (lambda x: repr(float(x))) if typ == "real" else (lambda x: str(int(x)))
+        data = ", ".join(fmt(x) for li in leaf_of for x in leaf_rows[li])
+        key = ctype + ":" + data
+        name = self.table_ids.get(key)
+        if name is None:
+            name = f"jm_tab{len(self.table_ids)}"
+            self.table_ids[key] = name
+            self.tables.append(f"static const {ctype} {name}[{L * width}] = {{{data}}};")
+        sv = self.c(v)
+        idx = f"jm_iclamp({sv} - ((int64_t){lo}), 0, {L - 1})"
+        if chains:
+            col = " + ".join(f"({self.c(cexp)} ? {1 << bit} : 0)" for bit, cexp in conds.values())
+            ref = f"{name}[{idx} * {width} + ({col})]"
+        else:
+            ref = f"{name}[{idx}]"
+        for i in reversed(exceptions):   # leaves that are not constants: by their index range
+            a = 0 if i == 0 else bounds[i - 1] - lo
+            b = L if i == n - 1 else bounds[i] - lo
+            ref = f"({idx} >= {a} && {idx} < {b} ? ({ctype})({self.c(leaves[i])}) : {ref})"
+        return f"(({ctype}){ref})"
 
 
 _PRELUDE = r"""
@@ -126,6 +257,7 @@ _PRELUDE = r"""
 #include <math.h>
 static inline int64_t jm_imin(int64_t a, int64_t b) { return a < b ? a : b; }
 static inline int64_t jm_imax(int64_t a, int64_t b) { return a > b ? a : b; }
+static inline int64_t jm_iclamp(int64_t x, int64_t lo, int64_t hi) { return x < lo ? lo : x > hi ? hi : x; }
 static inline int64_t jm_mod(int64_t a, int64_t b) { int64_t r = a % b; return r < 0 ? r + (b < 0 ? -b : b) : r; }
 /* xoshiro256** seeded by splitmix64, for the batch simulator */
 static inline uint64_t jm_rotl(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
@@ -441,6 +573,9 @@ class JaniModel:
         in no synchronisation vector fires on its own under its own name (as Storm's PRISM export expects).
         """
         model = json.loads(Path(jani).read_text()) if not isinstance(jani, dict) else jani
+        if "x-buffy-native" in model:
+            self._init_native(model, goals, constants, importance, observables, check_probabilities)
+            return
         self.model_type = model["type"]
         consts = {c["name"]: c["value"] for c in model.get("constants", []) if "value" in c}
         consts.update(constants or {})
@@ -572,6 +707,9 @@ class JaniModel:
             global_scope["__loc"] = self.location_slot[0]
         self._tr = _Translator(global_scope, {**consts, **global_transients})   # goals and importance
         self._tr.var_types = {**var_types, "__loc": "int"}
+        # one list of lookup tables for the whole generated source
+        for t in self._trs + self._trs_read:
+            t.tables, t.table_ids = self._tr.tables, self._tr.table_ids
 
         self.edges = self._compose(model)
         self.edge_actions = [e.action for e in self.edges]
@@ -586,6 +724,68 @@ class JaniModel:
         source = self._generate()
         self.lib = _compile(source)
         self._bind()
+
+    def _init_native(self, model: dict, goals, constants, importance, observables, check_probabilities):
+        """
+        A model compiled by `buffyc-mc --target native`: a JANI header (variables, properties) whose step is the C
+        model core under "x-buffy-native" (edges: their action names; c: the core). No automata to translate: the
+        core is used as it is, followed by the generic runtime.
+        """
+        nat = model["x-buffy-native"]
+        self.model_type = model["type"]
+        consts = {c["name"]: c["value"] for c in model.get("constants", []) if "value" in c}
+        consts.update(constants or {})
+        self.constants = consts
+        self.instances, self.instance_names, self.location_names, self.location_slot = [], [], [], []
+        self.variables, self.transients, self.reward_variables = [], [], []
+        var_types: dict[str, str] = {}
+        reward_init: list[float] = []
+        for v in model.get("variables", []):
+            t = v["type"]
+            if v.get("transient"):
+                if t != "real":
+                    raise JaniUnsupported(f"native model: unexpected transient variable {v['name']!r}")
+                self.reward_variables.append(v["name"])
+                reward_init.append(float(_const_eval(v.get("initial-value", 0.0), consts)))
+                continue
+            if t == "bool":
+                lo, hi, typ = 0, 1, "bool"
+            else:
+                lo, hi, typ = int(_const_eval(t["lower-bound"], consts)), int(_const_eval(t["upper-bound"], consts)), "int"
+            self.variables.append(Variable(v["name"], lo, hi, int(_const_eval(v.get("initial-value", lo), consts))))
+            var_types[v["name"]] = typ
+        self.index = {v.name: i for i, v in enumerate(self.variables)}
+        self._tr = _Translator(dict(self.index), consts)
+        self._tr.var_types = var_types
+        self.edges = [_Edge(a, []) for a in nat["edges"]]
+        self.edge_actions = [e.action for e in self.edges]
+        self.goals = dict(goals or {})
+        self.goal_names = list(self.goals)
+        self.importance = dict(importance or {})
+        self.importance_names = list(self.importance)
+        self.observables = dict(observables or {})
+        self.observable_names = list(self.observables)
+        self._reward_init = reward_init
+        self.check_probabilities = check_probabilities
+        self.lib = _compile(self._assemble(nat["c"]))
+        self._bind()
+
+    def condition_probability(self) -> Optional[float]:
+        """
+        For a native model compiled with --condition-on: the exact probability of the condition (h at the initial
+        state, computed on demand); None for other models.
+        """
+        if not hasattr(self.lib, "bf_cond_p0"):
+            return None
+        self.lib.bf_cond_p0.restype = ctypes.c_double
+        return float(self.lib.bf_cond_p0())
+
+    def condition_states(self) -> Optional[int]:
+        """ For a model conditioned on demand: how many input states h has been computed for so far. """
+        if not hasattr(self.lib, "bf_cond_states"):
+            return None
+        self.lib.bf_cond_states.restype = ctypes.c_int64
+        return int(self.lib.bf_cond_states())
 
     def _compose(self, model: dict) -> list[_Edge]:
         syncs = model.get("system", {}).get("syncs", [])
@@ -753,8 +953,7 @@ class JaniModel:
         if max(nd_edge + [1]) > 2 ** 30:
             raise JaniUnsupported("too many joint destinations in one synchronised transition")
         max_parts = max([len(ids) for ids in self._part_id] + [1])
-        out = [_PRELUDE, "#define JM_PTOL 1e-9", "#define JM_CHECK_PROBS" if self.check_probabilities else "",
-               f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
+        out = [f"#define NV {nv}", f"#define NW {nv + len(self.transients)}", f"#define NE {ne}",
                f"#define MAXP {max_parts}", "int jm_nvars(void) { return NV; }", "int jm_nedges(void) { return NE; }"]
         out.append("void jm_init(int32_t *s) {" + "".join(f" s[{i}] = {v.initial};" for i, v in
                                                           enumerate(self.variables)) + " }")
@@ -780,11 +979,6 @@ class JaniModel:
         out.append("int jm_ndest(int e) { return jm_nd[e]; }")
         out.append(r"""static void jm_digits(int e, int d, int *dd) {
   for (int p = 0; p < jm_np[e]; p++) { int nd = jm_pnd[jm_pk[jm_poff[e] + p]]; dd[p] = d % nd; d /= nd; }
-}
-double jm_prob(const int32_t *s, int e, int d) {
-  int dd[MAXP]; double q = 1.0; jm_digits(e, d, dd);
-  for (int p = 0; p < jm_np[e]; p++) q *= jm_pp[jm_pk[jm_poff[e] + p]](s, dd[p]);
-  return q;
 }""")
         init_transients = "".join(f" t[{nv + j}] = {v.initial};" for j, v in enumerate(self.transients))
         init_rewards = "".join(f" r[{j}] = {x!r};" for j, x in enumerate(self._reward_init))
@@ -798,6 +992,20 @@ double jm_prob(const int32_t *s, int e, int d) {
                    f"  memcpy(s, t, NV * sizeof(int32_t));\n"
                    "  return 0;\n}\n"
                    "int jm_apply(int32_t *s, int e, int d) { return jm_apply_r(s, e, d, NULL); }")
+        return self._assemble("\n".join(out))
+
+    # The model core (above, or Buffy's --target native) defines NV, NW, NE, MAXP, NR, jm_nvars, jm_nedges, jm_init,
+    # jm_enabled, the destination tables jm_nd / jm_np / jm_poff / jm_pk / jm_pnd / jm_pp, jm_ndest, jm_digits,
+    # jm_apply_r and jm_apply. The rest of the library is generic: sampling, goals, importance, observables,
+    # policies, batch simulation and splitting.
+    def _assemble(self, core: str) -> str:
+        tr = self._tr
+        out = [_PRELUDE, "#define JM_PTOL 1e-9", "#define JM_CHECK_PROBS" if self.check_probabilities else "", core]
+        out.append(r"""double jm_prob(const int32_t *s, int e, int d) {
+  int dd[MAXP]; double q = 1.0; jm_digits(e, d, dd);
+  for (int p = 0; p < jm_np[e]; p++) q *= jm_pp[jm_pk[jm_poff[e] + p]](s, dd[p]);
+  return q;
+}""")
         # Sampling: each part's destination in turn by inverse CDF on one uniform, rescaled inside the chosen
         # interval (exact, since u is uniform on that interval given the choice).
         out.append(r"""static int jm_step_r(int32_t *s, int e, double u, double *r) {
@@ -937,6 +1145,7 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
   return 0;
 }""")
         out.append(_SPLITTING)
+        out.insert(1, "\n".join(self._tr.tables))   # lookup tables, after the prelude
         return "\n".join(out) + "\n"
 
     def _bind(self):
