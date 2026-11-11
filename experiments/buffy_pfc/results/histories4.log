@@ -1,0 +1,2 @@
+8000000 runs, 12222 with uBlk >= 10 (P = 0.0015278) -> experiments/buffy_pfc/models/h4.npz
+PYTHONPATH=. /Users/jkai/buffy-prism/.venv/bin/python $D/pfc_histories.py   2  358.41s user 9.40s system 97% cpu 6:16.55 total

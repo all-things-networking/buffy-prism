@@ -371,3 +371,71 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     minutes of clang as a compile-time table, it takes 0.14 s, 0.3 MB and 1 s to build, and P(ψ)
     takes 0.01 s over 41,943 input states. The input states visited bound the memory, and the
     recursion depth is ψ's depth.
+
+52. **Joint conditioning on several sources (native target).** A condition may read several
+    probabilistic sources when conditioning is on demand (decision 51). The cone is closed as before and
+    collects every source it meets. The JANI and PRISM targets still refuse a second source.
+    - Conditioned on ψ the sources are no longer independent: the reweighted joint law
+      `p_1(x, a_1) ⋯ p_k(x, a_k) · h(x') / h(x)` does not factor. So the emitter makes them one
+      participant of the step, whose outcomes are the sources' joint outcomes (the first source
+      varies fastest). The other sources stay separate participants, so the runtime is unchanged.
+    - `h` sums over joint outcomes. Its memo is capped (`BF_MAX_STATES`, default 20,000,000); past the
+      cap the process stops with an error instead of exhausting memory.
+
+    On `cond_joint` (a condition on a sum of two sources, and a conjunction of conditions on each),
+    P(ψ) matches Storm exactly and the conditional estimates fall in their 99.9% intervals. On the PFC
+    model, a condition over the culprit, V and the incast memoises h over 11 million input states in
+    about 25 s. Rejection over 4,000,000 runs agrees with a two-source condition's conditioned
+    estimate (0.0246 against 0.0247).
+
+53. **Joint outcomes beyond an int (native target).** The runtime numbered a step's joint outcome
+    with an `int`. Loom at 16 cores has 48 Bernoulli sources (2^48 outcomes), and at 32 cores the
+    emitter's 64-bit product overflowed and passed its own check. Now:
+    - the sampler records each participant's outcome as it draws it;
+    - a core that defines `JM_APPLY_DD` (Buffy's native core) applies the step from those digits
+      directly;
+    - the joint index, needed only for exact enumeration (`jm_ndest`, `jm_prob`, `successors`), is 0
+      when it does not fit, and `successors` then refuses.
+
+    Cores from the JANI translator keep the old path, and refuse a step whose index would overflow.
+    Runs are identical to before draw for draw (`tests/test_native_conditioning.py`,
+    `test_native_target.py`).
+
+54. **The structured native step.** `--target native` now generates the program's step as C that
+    follows the program (`src/lower/NativeStep.inc`, `Model::NativeStep`):
+    - loops stay loops and `if`s are tested at run time;
+    - each buffer is a contiguous array handled by generic helpers (`bf_count`, `bf_take`,
+      `bf_append`), with the same semantics as the symbolic `take` and `append`;
+    - queues and arrays are contiguous too, with select and update semantics for dynamic indices.
+
+    The state vector is unchanged, so properties, observables and conditioning work as before. The
+    updates outside the program stay DAG expressions, emitted as small blocks: time, phases, LTL
+    monitors, network assumption flags and conditioning, plus rewards. Monitors and rewards read the
+    new state through `post:x` placeholders. Pruning and the stop at the horizon are applied in C in
+    the elaborator's order, so the results match exactly.
+
+    The unrolled step, one C temporary per DAG node, is kept as `--native-dag`. It is also used
+    automatically for a program the generator does not support. `tests/test_native_structured.py`
+    compares the two cores on every example and variant (states, probabilities and rewards of every
+    enumerable destination), and they are identical. On Loom with queue capacity 32:
+    - at 8 cores, the simulator build and 10,000 runs take 2.7 s instead of about 4.5 min;
+    - at 16 cores, 4.6 s instead of 11.5 min, with the same P[starved] to the last digit;
+    - a run costs 0.47 ms at 16 cores instead of 31 ms.
+
+55. **Elaboration in linear time.** Three costs grew faster than the model.
+    - **`if` joins** copied the environment, which holds every buffer slot, so they cost
+      O(#ifs × #locations). A branch now logs its first write of each location; the join visits
+      what either branch wrote and restores the rest. The enclosing branch logs those locations too.
+    - **Dynamic indices** expanded over every element of an array or buffer array. Interval analysis
+      of the index, from the declared ranges of state variables and draws, now bounds the elements
+      it can reach. Loom's `ten[2*i + pick]` reaches 3 elements instead of 2·NC. When the interval
+      may leave the array, the out-of-range semantics (read the last element, write nothing) are kept.
+    - **FIFO slot contents** were quadratic in the buffer's capacity (rank selection in `take`,
+      placement in `append`). In structured mode nothing executes that DAG, so the slots become one
+      shared opaque value per range. Lengths, accepted counts and drops stay exact. A condition for
+      `--condition-on` that reads FIFO order falls back to the unrolled step.
+
+    The Buffy JANI suite (Storm against reference values) and the native equivalence tests pass
+    unchanged. Loom with capacity 32 now compiles at 256 cores (51,083 state variables) in 4.3 s and
+    0.7 GB. The simulator builds in 2.1 s and a run costs 7.6 ms. At 512 cores with capacity 64 the
+    compile takes 15 s and 2 GB. Before these changes, 32 cores took 24 s and 2.1 GB.

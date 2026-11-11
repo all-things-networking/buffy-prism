@@ -1009,7 +1009,9 @@ class JaniModel:
         # Sampling: each part's destination in turn by inverse CDF on one uniform, rescaled inside the chosen
         # interval (exact, since u is uniform on that interval given the choice).
         out.append(r"""static int jm_step_r(int32_t *s, int e, double u, double *r) {
-  int d = 0, mult = 1;
+  /* the joint destination index d = sum_p dd[p] * prod_{q<p} nd_q, while it fits an int (a core that defines
+     JM_APPLY_DD takes the digits dd themselves, so that it may have more joint outcomes than an int holds) */
+  int d = 0, dd[MAXP], big = 0; long long mult = 1;
   for (int p = 0; p < jm_np[e]; p++) {
     int k = jm_pk[jm_poff[e] + p], nd = jm_pnd[k], j = 0;
     if (nd > 1) {
@@ -1031,10 +1033,16 @@ class JaniModel:
 #ifdef JM_CHECK_PROBS
     else { double q = jm_pp[k](s, 0); if (q > 1.0 + JM_PTOL || q < 1.0 - JM_PTOL) return -6; }
 #endif
-    d += j * mult; mult *= nd;
+    dd[p] = j;
+    if (!big) { long long nd2 = d + (long long)j * mult; if (nd2 > 0x7fffffffLL || mult > (1LL << 40)) big = 1; else { d = (int)nd2; mult *= nd; } }
   }
+#ifdef JM_APPLY_DD
+  int rc = jm_apply_dd(s, e, dd, r);
+#else
+  if (big) return -2;
   int rc = jm_apply_r(s, e, d, r);
-  return rc < 0 ? rc : d;
+#endif
+  return rc < 0 ? rc : (big ? 0 : d);
 }
 int jm_step(int32_t *s, int e, double u) { return jm_step_r(s, e, u, NULL); }""")
         out.append("int jm_goal(const int32_t *s, int g) {\n  switch (g) {")
@@ -1192,7 +1200,10 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
         return out[:self.lib.jm_enabled(_ptr(s), _ptr(out))]
 
     def step(self, s: np.ndarray, edge: int, u: float) -> int:
-        """ In place: takes `edge` from s, choosing the destination with the uniform number u. Returns its index. """
+        """
+        In place: takes `edge` from s, choosing the destination with the uniform number u. Returns its index (0 for
+        a model whose joint destinations do not fit an int: Buffy's --target native with very many sources).
+        """
         d = self.lib.jm_step(_ptr(s), int(edge), float(u))
         if d < 0:
             _check(d)
@@ -1205,6 +1216,8 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
         [(probability, successor state, reward variable values)].
         """
         out = []
+        if self.lib.jm_ndest(int(edge)) <= 0:
+            raise RuntimeError(f"edge {edge} ({self.edge_actions[edge]}): too many joint destinations to enumerate")
         for d in range(self.lib.jm_ndest(int(edge))):
             t, r = s.copy(), np.zeros(max(len(self.reward_variables), 1))
             rc = self.lib.jm_apply_r(_ptr(t), int(edge), d, _dptr(r) if rewards else None)

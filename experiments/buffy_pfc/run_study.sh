@@ -3,7 +3,8 @@
 #   1. base rates with and without PFC over the load on the congested port (sweep.log);
 #   2. input histories (pfc_history.buffy records every step's incast burst and culprit arrival), 4M runs;
 #   3. learned conditions (learn_pfc.py), mild and sharp;
-#   4. certification: incast-only conditions with --condition-on, culprit ones by rejection.
+#   4. certification: incast-only conditions with --condition-on, culprit ones by rejection;
+#   5. joint conditions over all four sources, all certified exactly (--target native).
 cd "$(dirname "$0")/../.." || exit 1
 D=experiments/buffy_pfc; M=$D/models; R=$D/results; mkdir -p $M $R
 PY=/Users/jkai/buffy-prism/.venv/bin/python
@@ -16,3 +17,9 @@ buffy/build/buffyc-mc $D/pfc_history.buffy -D PB=0.3 -D LC=0.5 --stop-at-horizon
 PYTHONPATH=. $PY $D/pfc_histories.py $M/hist.jani 4000000 1 0.01 10 $M/h.npz | tee $R/histories.log
 { for mp in 0.05 0.005 0.0005; do echo "#### P[c] >= $mp"; $PY $D/learn_pfc.py $M/h.npz $mp 6; done; } > $R/learn.log
 PYTHONPATH=. $PY $D/certify_pfc.py $D/conds_blkU.txt blkU10 "PB=0.3 LC=0.5" 200000 31 --reject 4000000 3 | tee $R/certify_blkU.log
+# 5. joint conditions over all four sources (incast, culprit, U, V), certified exactly with
+#    --target native --condition-on (several sources conditioned jointly); about 30 minutes more.
+buffy/build/buffyc-mc $D/pfc_history.buffy -D PB=0.3 -D LC=0.5 --target native --stop-at-horizon -o $M/hist4.jani || exit 1
+PYTHONPATH=. $PY $D/pfc_histories.py $M/hist4.jani 8000000 2 0.03 10 $M/h4.npz 200000 | tee $R/histories4.log
+PYTHONPATH=. $PY $D/learn_joint.py $M/h4.npz 0.01 0.003 0.001 --top 10 > $R/learn_joint.log
+PYTHONPATH=. $PY $D/certify_joint.py $D/conds_joint.txt blkU10 "PB=0.3 LC=0.5" 200000 31 --reject 4000000 1 | tee $R/certify_joint.log

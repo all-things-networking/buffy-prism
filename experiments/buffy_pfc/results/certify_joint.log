@@ -1,0 +1,11 @@
+blkU10, PB=0.3 LC=0.5: P[Q] = 0.001541 [0.001503, 0.00158]  (4000000 runs)
+  j1 [culprit+V]: P(A) = 0.01094 (exact, 76390 input states)  P(Q|A) = 0.02465 [0.02398, 0.02534]  lift 16  P(A|Q) ~ 0.175  (0.7 s compile, 10 s build + runs)  | rejection: 1076/43744 = 0.0246 (P(A) ~ 0.01094)   cc(50,>=31) & cc(60,>=36) & cv(60,>=21)
+  c1 [culprit]: P(A) = 0.01083 (exact, 1950 input states)  P(Q|A) = 0.01964 [0.01904, 0.02026]  lift 13  P(A|Q) ~ 0.138  (0.6 s compile, 9 s build + runs)   cc(40,>=25) & cc(50,>=32) & cc(60,>=39)
+  i1 [incast]: P(A) = 0.01079 (exact, 9045 input states)  P(Q|A) = 0.003815 [0.00355, 0.004095]  lift 2  P(A|Q) ~ 0.027  (0.6 s compile, 8 s build + runs)   inc(60,>=50) & inc(10,>=12)
+  u1 [culprit+U]: P(A) = 0.01046 (exact, 80740 input states)  P(Q|A) = 0.02077 [0.02015, 0.0214]  lift 13  P(A|Q) ~ 0.141  (0.6 s compile, 9 s build + runs)   cc(40,>=25) & cc(50,>=31) & cu(60,>=21)
+  t1 [incast+culprit+V]: P(A) = 0.004038 (exact, 11057020 input states)  P(Q|A) = 0.03886 [0.03802, 0.03972]  lift 25  P(A|Q) ~ 0.102  (0.6 s compile, 25 s build + runs)   cc(50,>=31) & cv(60,>=21) & inc(40,>=28)
+  j2 [culprit+V]: P(A) = 0.003278 (exact, 79630 input states)  P(Q|A) = 0.03469 [0.0339, 0.03551]  lift 23  P(A|Q) ~ 0.074  (0.5 s compile, 8 s build + runs)   cc(40,>=24) & cc(50,>=32) & cv(60,>=23)
+  c2 [culprit]: P(A) = 0.003148 (exact, 1930 input states)  P(Q|A) = 0.02638 [0.02569, 0.0271]  lift 17  P(A|Q) ~ 0.054  (0.5 s compile, 7 s build + runs)   cc(40,>=26) & cc(50,>=35) & cc(60,>=38)
+  j3 [culprit+V]: P(A) = 0.001189 (exact, 7542 input states)  P(Q|A) = 0.03705 [0.03623, 0.03789]  lift 24  P(A|Q) ~ 0.029  (0.2 s compile, 6 s build + runs)   cc(40,>=25) & run(v1,6,[21,51))
+  c3 [culprit]: P(A) = 0.001121 (exact, 1940 input states)  P(Q|A) = 0.03154 [0.03078, 0.03232]  lift 20  P(A|Q) ~ 0.023  (0.5 s compile, 10 s build + runs)   cc(40,>=28) & cc(50,>=36) & cc(60,>=39)
+PYTHONPATH=. timeout 7200 /Users/jkai/buffy-prism/.venv/bin/python   blkU10    223.73s user 3.98s system 97% cpu 3:54.47 total

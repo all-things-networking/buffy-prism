@@ -1,5 +1,5 @@
-// Generated from buffy/examples/jani/pfc.buffy with monitors that record every step's incast burst and
-// culprit arrival (for learning; experiments/buffy_pfc). Queries removed.
+// Generated from buffy/examples/jani/pfc.buffy with monitors that record every step's incast burst,
+// culprit arrival and U / V sends (for learning; experiments/buffy_pfc). Queries removed.
 // PFC congestion spreading (RDMA over lossless Ethernet; e.g. Guo et al., SIGCOMM'16). One priority
 // class, every port and link moves one packet per step, over two hops of pause:
 //
@@ -59,6 +59,8 @@ pfc(buffer burst) {
     //@ monitor int<0..BMAX> bl;      // the incast burst of the last step
     //@ monitor int<0..BMAX>[T] hb;   // the incast burst of every step (for learning)
     //@ monitor int<0..1>[T] hc;      // the culprit's arrival of every step (for learning)
+    //@ monitor int<0..1>[T] hu;      // U's and V's sends of every step (for learning)
+    //@ monitor int<0..1>[T] hv;
     //@ monitor int<0..W> offU;       // U's packets offered / delivered in the window
     //@ monitor int<0..W> gotU;
     //@ monitor int<0..W> offV;
@@ -76,6 +78,8 @@ pfc(buffer burst) {
     //@ bl = b;
     //@ if (time < T) hb[time] = b;
     //@ if (time < T) hc[time] = c;
+    //@ if (time < T) hu[time] = u;
+    //@ if (time < T) hv[time] = v;
     local bool inWin = time >= T - W & time < T;
 
     // Egress ports send.

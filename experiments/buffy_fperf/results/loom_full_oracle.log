@@ -1,0 +1,2 @@
+oracle POLICY=0 rho=(0.6,0.6,0.1): starved=0.3862±0.0067  waiting=0.9537  e_w1=8.993  e_w2=10.980
+oracle POLICY=1 rho=(0.6,0.6,0.1): starved=0.0000±0.0000  waiting=0.8349  e_w1=9.840  e_w2=10.133

@@ -1,5 +1,6 @@
 // Generated from buffy/examples/jani/pfc.buffy with monitors for conditions (cb: incast packets so far,
-// cl: the culprit's last arrival); certify_pfc.py adds `given` queries (experiments/buffy_pfc).
+// cl / lu / lv: the culprit's arrival and U's / V's sends in the last step, cc / cu / cv: their counts
+// so far); certify_pfc.py and certify_joint.py add `given` queries (experiments/buffy_pfc).
 // PFC congestion spreading (RDMA over lossless Ethernet; e.g. Guo et al., SIGCOMM'16). One priority
 // class, every port and link moves one packet per step, over two hops of pause:
 //
@@ -59,6 +60,11 @@ pfc(buffer burst) {
     //@ monitor int<0..BMAX> bl;      // the incast burst of the last step
     //@ monitor int<0..BMAX * T> cb;  // incast packets so far
     //@ monitor int<0..1> cl;         // the culprit's arrival in the last step
+    //@ monitor int<0..1> lu;         // U's / V's send in the last step
+    //@ monitor int<0..1> lv;
+    //@ monitor int<0..T> cc;         // the culprit's arrivals, U's and V's sends so far
+    //@ monitor int<0..T> cu;
+    //@ monitor int<0..T> cv;
     //@ monitor int<0..W> offU;       // U's packets offered / delivered in the window
     //@ monitor int<0..W> gotU;
     //@ monitor int<0..W> offV;
@@ -76,6 +82,11 @@ pfc(buffer burst) {
     //@ bl = b;
     //@ cb = min(BMAX * T, cb + b);
     //@ cl = c;
+    //@ lu = u;
+    //@ lv = v;
+    //@ cc = min(T, cc + c);
+    //@ cu = min(T, cu + u);
+    //@ cv = min(T, cv + v);
     local bool inWin = time >= T - W & time < T;
 
     // Egress ports send.

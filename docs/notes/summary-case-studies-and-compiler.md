@@ -46,3 +46,12 @@ mild condition can make a rare event certain or impossible, as in C.
   full-scale proofs.
 - Conditioning handles one random source per condition, and gets slow when the conditioning input's
   state space is large (PFC). A table-lookup primitive in the native simulator would fix the latter.
+
+**Since then (decisions 52–55):**
+- **Conditioning.** With `--target native` it covers several sources jointly. PFC's joint round
+  certified conditions over three sources, with h over 11 million input states.
+- **The structured native step.** The C follows the program, and the compiler works in linear time.
+  Loom grows from 16 cores (11.5 min to build and run) to 256 cores with 51,083 state variables
+  (4 s to compile, 2 s to build, 7.6 ms per run). 512 cores with capacity 64 compiles in 15 s.
+- **What remains.** Simulation-only work now scales with the program. Exact checking and Z3 are
+  unchanged.

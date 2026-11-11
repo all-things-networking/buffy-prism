@@ -1,0 +1,697 @@
+{
+ "registration": "docs/notes/prereg-sprt-loom.md",
+ "model": "buffy/examples/jani/loom_isolation.buffy",
+ "flags": [
+  "--target",
+  "native",
+  "--stop-at-horizon"
+ ],
+ "event": "waiting and 100*w1 <= SHARE*W (SHARE=40, W=20)",
+ "batch": 200,
+ "tests": [
+  {
+   "family": "A",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 0,
+    "RHO1": 0.6,
+    "RHO2": 0.6,
+    "RHOM": 0.1
+   },
+   "theta": 0.3,
+   "delta": 0.01,
+   "alpha": 0.0125,
+   "beta": 0.0125,
+   "max_runs": 10597,
+   "predict": "H+",
+   "index": 0,
+   "seed": 20261111
+  },
+  {
+   "family": "A",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 0,
+    "RHO1": 0.6,
+    "RHO2": 0.6,
+    "RHOM": 0.1
+   },
+   "theta": 0.3,
+   "delta": 0.01,
+   "alpha": 0.0125,
+   "beta": 0.0125,
+   "max_runs": 10597,
+   "predict": "H+",
+   "index": 1,
+   "seed": 20261112
+  },
+  {
+   "family": "A",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 0,
+    "RHO1": 0.6,
+    "RHO2": 0.6,
+    "RHOM": 0.1
+   },
+   "theta": 0.3,
+   "delta": 0.01,
+   "alpha": 0.0125,
+   "beta": 0.0125,
+   "max_runs": 10597,
+   "predict": "H+",
+   "index": 2,
+   "seed": 20261113
+  },
+  {
+   "family": "A",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 0,
+    "RHO1": 0.6,
+    "RHO2": 0.6,
+    "RHOM": 0.1
+   },
+   "theta": 0.3,
+   "delta": 0.01,
+   "alpha": 0.0125,
+   "beta": 0.0125,
+   "max_runs": 10597,
+   "predict": "H+",
+   "index": 3,
+   "seed": 20261114
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 4,
+   "seed": 20261115
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 5,
+   "seed": 20261116
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 6,
+   "seed": 20261117
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 7,
+   "seed": 20261118
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 8,
+   "seed": 20261119
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 9,
+   "seed": 20261120
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 10,
+   "seed": 20261121
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 64,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 11,
+   "seed": 20261122
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 12,
+   "seed": 20261123
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 13,
+   "seed": 20261124
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 14,
+   "seed": 20261125
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 15,
+   "seed": 20261126
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 16,
+   "seed": 20261127
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 17,
+   "seed": 20261128
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 18,
+   "seed": 20261129
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 128,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 19,
+   "seed": 20261130
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 20,
+   "seed": 20261131
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 21,
+   "seed": 20261132
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 22,
+   "seed": 20261133
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 23,
+   "seed": 20261134
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 24,
+   "seed": 20261135
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 25,
+   "seed": 20261136
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 26,
+   "seed": 20261137
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 256,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 27,
+   "seed": 20261138
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 28,
+   "seed": 20261139
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 29,
+   "seed": 20261140
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 30,
+   "seed": 20261141
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.5,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 31,
+   "seed": 20261142
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 32,
+   "seed": 20261143
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.5,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 33,
+   "seed": 20261144
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.05
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 34,
+   "seed": 20261145
+  },
+  {
+   "family": "B",
+   "defines": {
+    "NC": 512,
+    "CAP": 64,
+    "POLICY": 1,
+    "RHO1": 0.7,
+    "RHO2": 0.7,
+    "RHOM": 0.3
+   },
+   "theta": 0.001,
+   "delta": 0.0005,
+   "alpha": 0.0015625,
+   "beta": 0.0015625,
+   "max_runs": 34197,
+   "predict": "H-",
+   "index": 35,
+   "seed": 20261146
+  }
+ ]
+}

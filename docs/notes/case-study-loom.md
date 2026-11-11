@@ -128,9 +128,59 @@ at the corner (0.18 of 0.37) is there even without memcached.
 
 **Scale.** At 8 cores the corner's probability is unchanged: 0.365 ± 0.009 from the compiled model
 (10,000 runs), 0.367 ± 0.007 from the oracle. The hierarchical policy stays at 0. The effect depends
-on the shares of the link, not on the number of cores. The FPerf-sized NIC (queue capacity 10) is
-kept, because at capacity 32 and 8 cores the step has about 970,000 DAG nodes, beyond what the native
-compiler handles in reasonable time.
+on the shares of the link, not on the number of cores.
+
+**At the full NIC size** (8 cores, queue capacity 32; 1,729 state variables and 970,000 DAG nodes per
+step). This size was out of reach before `--target native`. Now each point takes:
+- 4–6 s of Buffy compile;
+- a 22 MB C model core;
+- about 2.5 min of clang at 1.4 GB.
+
+The whole sweep, 18 points of 10,000 runs, takes 48 minutes two at a time (`run_loom_full.sh`,
+`results/loom_full.log`):
+
+| ρ_m (ρ₁ = ρ₂ = 0.6) | 0 | 0.05 | 0.10 | 0.15 | 0.20 | 0.30 |
+|---|---|---|---|---|---|---|
+| MQPrio, capacity 32, 8 cores | 0.200 | 0.291 | 0.383 | 0.488 | 0.587 | 0.759 |
+| MQPrio, capacity 10, 4 cores | 0.181 | 0.273 | 0.371 | 0.478 | 0.579 | 0.758 |
+| hierarchical, capacity 32 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+- **The box.** The box A's centre gives 0.609 and its most favourable corner 0.791. The obvious point
+  (ρ_m = 0.5) gives 0.941.
+- **Mean shares.** These are identical to the small NIC's (e.g. 8.99 and 10.99 of 20 at the corner).
+- **Unfairness.** Larger queues make a visibly unfair window slightly more likely at low memcached
+  shares (0.200 against 0.181 without memcached), and the difference vanishes as memcached grows.
+- **The hierarchical policy.** It gives 0 starved windows out of 10,000 at every point. Its 95%
+  Clopper–Pearson upper bound is 3.7·10⁻⁴; earlier reports of "0 ± 0" mean the same bound for their
+  run counts.
+- **The oracle at full size.** It agrees at the corner (20,000 runs, `results/loom_full_oracle.log`):
+  0.386 ± 0.007 against 0.383 ± 0.010 for MQPrio, and 0 for the hierarchical policy.
+
+**At 16 cores** (capacity 32; 3,321 state variables, 2.8 million DAG nodes): the corner gives
+0.381 ± 0.010. Getting there needed the joint-outcome fix of design decision 53, because the step's
+48 Bernoulli sources have 2^48 joint outcomes. The cost:
+- a 66 MB C file;
+- clang at 2.5 GB;
+- 11.5 min for the build and 10,000 runs.
+
+At 32 cores the unrolled step (9.4 million DAG nodes, 219 MB of C) did not fit this machine's 8 GB. The C
+was large because the step was fully unrolled: every queue slot of every core is a scalar, and a FIFO
+shared by the cores takes O(cores × capacity) chained selects per step.
+
+**With the structured native step** (design decisions 54–55), the C follows the program and the
+compiler works in linear time. The same seeds give the same P[starved] to the last digit: 0.3833 at
+8 cores, 0.3809 at 16. Capacity 32, 2,000 runs per size (`loom_scale.py`, `results/loom_scale.log`):
+
+| cores | state variables | Buffy | C | simulator build | per run | P[starved] |
+|---|---|---|---|---|---|---|
+| 4 | 935 | 0.1 s | 63 kB | 0.5 s | 0.13 ms | 0.39 ± 0.02 |
+| 16 | 3,323 | 0.2 s | 0.2 MB | 0.6 s | 0.47 ms | 0.37 ± 0.02 |
+| 64 | 12,875 | 0.9 s | 0.8 MB | 0.7 s | 2.1 ms | 0.40 ± 0.02 |
+| 256 | 51,083 | 4.3 s, 0.7 GB | 3.3 MB | 2.1 s | 7.6 ms | 0.37 ± 0.02 |
+
+The isolation failure stays at about 0.37–0.41 from 4 to 256 cores. 512 cores with capacity 64
+compiles in 15 s and 2 GB. The pre-registered sequential test at that size is
+`docs/notes/prereg-sprt-loom.md`.
 
 **Cross-checks with the oracle** (20,000 runs each; all within the confidence intervals):
 
@@ -146,6 +196,7 @@ compiler handles in reasonable time.
 - `experiments/buffy_fperf/run_loom_iso.sh` and `run_loom_box.sh` produce `results/loom_iso_sweep.log`
   and `loom_box.log` with the native simulator, using `loom_eval.py` (one pass per point).
 - `loom_oracle.py` is the oracle.
+- `run_loom_full.sh` is the full-size sweep (`--target native`, 8 cores, capacity 32).
 - `buffy/build/fperf_equiv_test loom-isolation` is the FPerf equivalence.
 
 **Why this supports the paper.** It applies the recipe to a NIC rather than a switch or a GPU, and

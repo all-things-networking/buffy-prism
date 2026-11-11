@@ -1,0 +1,11 @@
+# Q = U blocked in >= 10 of the 30 window steps; learn_joint.py on 8M runs (PB = 0.3, LC = 0.5),
+# the best condition per set of sources at P(A) ~ 1%, 0.3%, 0.1%; all certified with joint --condition-on
+j1 | cc(50,>=31) & cc(60,>=36) & cv(60,>=21)
+c1 | cc(40,>=25) & cc(50,>=32) & cc(60,>=39)
+i1 | inc(60,>=50) & inc(10,>=12)
+u1 | cc(40,>=25) & cc(50,>=31) & cu(60,>=21)
+t1 | cc(50,>=31) & cv(60,>=21) & inc(40,>=28)
+j2 | cc(40,>=24) & cc(50,>=32) & cv(60,>=23)
+c2 | cc(40,>=26) & cc(50,>=35) & cc(60,>=38)
+j3 | cc(40,>=25) & run(v1,6,[21,51))
+c3 | cc(40,>=28) & cc(50,>=36) & cc(60,>=39)
