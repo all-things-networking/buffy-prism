@@ -141,7 +141,7 @@ Native simulator (`src/netmdp/sim`), 100,000 runs each (95% CI half-width ≤ 0.
 - **λ = 0.5.** "At most 4 packets" is likely even without contention, since the flow offers about
   5 packets in 10 steps over a 3-step path. A load-normalised query (delivered vs offered) is
   needed below saturation.
-- **Speed.** The model has 647 state variables and 6,147 transients per step. The native simulator
+- **Speed.** The model has about 660 state variables (662 at the defaults) and about 6,100 transients per step. The native simulator
   takes about 0.3 ms per run (30 µs per step, after 20–50 s of compilation). `modes` did not
   finish 2,000 runs in 10 minutes. Reduced fabrics and an `argmin`/`argmax` builtin are therefore
   not needed for these runs; the builtin would still shrink the crossbar's DAG.
@@ -281,7 +281,7 @@ JANI and PRISM; only the `traffic` declarations are new.
    - This is the clearest case of "more informative": FPerf can only say that some hash assignment
      starves the flow, while the probability says how often a random hash does.
 
-**Scale.** The leaf-spine fabric has 643 state variables and Loom 301 (at capacity 10). Both are
+**Scale.** The leaf-spine fabric has 662 state variables and Loom 305 (at capacity 10; counts of the compiled JANI, 2026-11-10). Both are
 SMC-only, so they go to `modes` or the native simulator, with `--stop-at-horizon` and importance
 splitting on the derived importance functions for the rare events (Loom isolation, ECMP
 starvation). The other four are small enough for exact checking at reduced capacities.

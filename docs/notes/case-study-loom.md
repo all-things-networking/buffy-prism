@@ -54,8 +54,8 @@ arrivals. `POLICY` selects the NIC:
   its own Spark, and a round robin between the tenants.
 
 Everything before the NIC is the same under both policies. The model has 317 state variables at 4
-cores with queue capacity 10, too large for exact checking. Numbers come from the native JANI
-simulator (`src/netmdp/sim`), with 20,000 runs per point and 95% CI half-width at most 0.007.
+cores with queue capacity 10 (585 at 8 cores), too large for exact checking. Numbers come from the
+native JANI simulator (`src/netmdp/sim`), with 20,000 runs per point and 95% CI half-width at most 0.007.
 
 **Validation.**
 - With its defaults and `POLICY = 0`, the compiled model is proven equivalent to FPerf's hand-written
