@@ -1,0 +1,14 @@
+runs=20000 T=160 Q=starveB:13: P[Q]=0.5266
+194 single formulas
+
+dangerous (highest P[Q|cond]), P[cond] >= 0.1; train | held-out
+  P[c]=0.129 P[Q|c]=0.914 lift=1.74 | P[c]=0.136 P[Q|c]=0.896   ~run(!aA&!aB,1,[40,80)) & run(!aB,6,[0,40))
+  P[c]=0.127 P[Q|c]=0.913 lift=1.73 | P[c]=0.134 P[Q|c]=0.897   ~run(!aA,1,[40,80)) & run(!aB,6,[0,40))
+  P[c]=0.162 P[Q|c]=0.913 lift=1.73 | P[c]=0.168 P[Q|c]=0.899   ~run(!aA&!aB,1,[40,80)) & run(!aB,8,[40,80))
+  P[c]=0.162 P[Q|c]=0.913 lift=1.73 | P[c]=0.168 P[Q|c]=0.899   ~run(!aA&!aB,1,[40,80)) & run(aA&!aB,8,[40,80))
+
+protective (lowest P[Q|cond]), P[cond] >= 0.1; train | held-out
+  P[c]=0.117 P[Q|c]=0.008 lift=0.01 | P[c]=0.113 P[Q|c]=0.023   run(!aA,8,[40,80)) & run(aB&!aA,4,[0,80))
+  P[c]=0.115 P[Q|c]=0.008 lift=0.01 | P[c]=0.110 P[Q|c]=0.017   run(!aA,8,[0,80)) & run(aB&!aA,4,[40,80))
+  P[c]=0.115 P[Q|c]=0.008 lift=0.01 | P[c]=0.110 P[Q|c]=0.017   run(!aA,8,[40,80)) & run(aB&!aA,4,[40,80))
+  P[c]=0.111 P[Q|c]=0.008 lift=0.02 | P[c]=0.106 P[Q|c]=0.016   ~run(!aB,8,[40,80)) & run(aB&!aA,4,[40,80))

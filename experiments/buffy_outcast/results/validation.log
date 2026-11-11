@@ -1,0 +1,22 @@
+== reduced NA=1: exact (mcsta)
+  Probability: 0.21098995208740234	+ Property starveA0
+  Probability: 0.21098995208740234	+ Property toB
+  Probability: 0.8001060485839844	+ Property toA0
+  Probability: 0.8001060485839844	
+  States:     8161
+== reduced NA=1: native simulator
+reduced NA=1: P[starveB]=0.2111±0.0018 P[starveA]=0.2102  P[toB]=0.8010±0.0017  P[toA]=0.7995  E[gotB]=2.92  E[gotA]=2.93  E[toB]=0.80 E[toA]=0.80
+== reduced NA=2: exact (mcsta)
+  Probability: 0.37658500391989946	+ Property starveA0
+  Probability: 0.42035675956867635	+ Property toB
+  Probability: 0.921393383294344	+ Property toA0
+  Probability: 0.9046653718687594	
+  States:     1885096
+== reduced NA=2: native simulator
+reduced NA=2: P[starveB]=0.3755±0.0021 P[starveA]=0.4205  P[toB]=0.9214±0.0012  P[toA]=0.9040  E[gotB]=2.12  E[gotA]=1.93  E[toB]=0.92 E[toA]=0.90
+== full size NA=2: compiled model vs oracle
+model NA=2: P[starveB]=0.5216±0.0031 P[starveA]=0.2814  P[toB]=0.7857±0.0025  P[toA]=0.6633  E[gotB]=20.25  E[gotA]=28.62  E[toB]=1.63 E[toA]=1.18
+oracle NA=2 BUF=8 ARB=2: P[starveB]=0.5214±0.0031 P[starveA]=0.2822  P[toB]=0.7872  E[gotB]=20.23  E[gotA]=28.63
+== full size NA=4: compiled model vs oracle
+model NA=4: P[starveB]=0.2357±0.0026 P[starveA]=0.3060  P[toB]=0.9513±0.0013  P[toA]=0.9440  E[gotB]=15.62  E[gotA]=15.33  E[toB]=1.93 E[toA]=2.14
+oracle NA=4 BUF=8 ARB=2: P[starveB]=0.2359±0.0026 P[starveA]=0.3053  P[toB]=0.9533  E[gotB]=15.56  E[gotA]=15.34

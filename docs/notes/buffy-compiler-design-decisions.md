@@ -293,3 +293,15 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     *Alternative rejected:* a global "all connections immediate" mode. It cannot express the leaf-spine
     fabric, whose links between switches deliver at the next step while its stages within a switch
     deliver in the same step.
+47. **A draw's condition may read the variables of enclosing loops.** `snd[i] ~ w[i] == 1 ? D1 : D2;`
+    in a loop over `i` is one state-dependent source per `i`. Conditions are resolved after elaboration
+    (they read the boundary state, not the step's values), outside the loop's scope, so each
+    conditional draw now records the loop variables in force where it was drawn and restores them when
+    its condition is resolved. The outcast case study (`examples/jani/outcast.buffy`, TCP senders whose
+    rate depends on their window) needed it. `draws_loop.buffy` equals a hand-unrolled copy in every
+    layout (`test/jani/same/`).
+
+    *Open:* bounded LTL with long time windows. A conjunction of two `F<=80` windows exceeds the
+    100,000-state monitor limit, because formula progression gives each conjunct a countdown that
+    duplicates `time`. Time-anchored or factored monitors would avoid this
+    (`docs/notes/case-study-outcast.md`).

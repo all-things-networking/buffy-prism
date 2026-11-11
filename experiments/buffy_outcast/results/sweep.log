@@ -1,0 +1,16 @@
+NA=1 BUF=4: P[starveB]=0.3514±0.0066 P[starveA]=0.3446  P[toB]=0.4562±0.0069  P[toA]=0.4455  E[gotB]=36.28  E[gotA]=36.62  E[toB]=0.81 E[toA]=0.80
+NA=2 BUF=4: P[starveB]=0.6836±0.0064 P[starveA]=0.2460  P[toB]=0.8629±0.0048  P[toA]=0.6452  E[gotB]=15.15  E[gotA]=29.94  E[toB]=2.15 E[toA]=1.14
+NA=3 BUF=4: P[starveB]=0.7319±0.0061 P[starveA]=0.3007  P[toB]=0.9727±0.0023  P[toA]=0.8093  E[gotB]=9.50  E[gotA]=22.10  E[toB]=2.66 E[toA]=1.63
+NA=4 BUF=4: P[starveB]=0.6515±0.0066 P[starveA]=0.3293  P[toB]=0.9931±0.0011  P[toA]=0.9096  E[gotB]=8.35  E[gotA]=16.81  E[toB]=2.79 E[toA]=2.03
+NA=1: P[starveB]=0.2422±0.0059 P[starveA]=0.2453  P[toB]=0.3455±0.0066  P[toA]=0.3463  E[gotB]=39.12  E[gotA]=38.92  E[toB]=0.49 E[toA]=0.49
+NA=2: P[starveB]=0.5171±0.0069 P[starveA]=0.2801  P[toB]=0.7871±0.0057  P[toA]=0.6638  E[gotB]=20.30  E[gotA]=28.60  E[toB]=1.63 E[toA]=1.18
+NA=3: P[starveB]=0.3802±0.0067 P[starveA]=0.3030  P[toB]=0.9110±0.0039  P[toA]=0.8563  E[gotB]=16.11  E[gotA]=20.32  E[toB]=1.90 E[toA]=1.71
+NA=4: P[starveB]=0.2367±0.0059 P[starveA]=0.3032  P[toB]=0.9520±0.0030  P[toA]=0.9435  E[gotB]=15.63  E[gotA]=15.32  E[toB]=1.93 E[toA]=2.14
+NA=1 BUF=16: P[starveB]=0.1627±0.0051 P[starveA]=0.1653  P[toB]=0.2899±0.0063  P[toA]=0.2915  E[gotB]=39.96  E[gotA]=39.84  E[toB]=0.36 E[toA]=0.35
+NA=2 BUF=16: P[starveB]=0.2426±0.0059 P[starveA]=0.3283  P[toB]=0.5991±0.0068  P[toA]=0.7411  E[gotB]=28.77  E[gotA]=24.79  E[toB]=0.94 E[toA]=1.27
+NA=3 BUF=16: P[starveB]=0.0925±0.0040 P[starveA]=0.3747  P[toB]=0.5942±0.0068  P[toA]=0.9226  E[gotB]=30.22  E[gotA]=16.22  E[toB]=0.85 E[toA]=1.79
+NA=4 BUF=16: P[starveB]=0.0838±0.0038 P[starveA]=0.3669  P[toB]=0.6502±0.0066  P[toA]=0.9627  E[gotB]=27.42  E[gotA]=13.01  E[toB]=0.90 E[toA]=2.10
+NA=2 ARB=3: P[starveB]=0.4764±0.0069 P[starveA]=0.3695  P[toB]=0.7028±0.0063  P[toA]=0.6758  E[gotB]=27.30  E[gotA]=25.92  E[toB]=1.56 E[toA]=1.30
+NA=2 POLICY=1: P[starveB]=0.2569±0.0061 P[starveA]=0.2585  P[toB]=0.7480±0.0060  P[toA]=0.7658  E[gotB]=24.87  E[gotA]=24.91  E[toB]=1.23 E[toA]=1.30
+NA=2 BUF=4 POLICY=1: P[starveB]=0.4400±0.0069 P[starveA]=0.2694  P[toB]=0.8363±0.0051  P[toA]=0.7706  E[gotB]=20.15  E[gotA]=24.93  E[toB]=1.63 E[toA]=1.34
+NA=3 POLICY=1: P[starveB]=0.1560±0.0050 P[starveA]=0.2756  P[toB]=0.8862±0.0044  P[toA]=0.9162  E[gotB]=20.39  E[gotA]=18.28  E[toB]=1.56 E[toA]=1.81

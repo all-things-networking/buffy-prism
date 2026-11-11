@@ -1,0 +1,12 @@
+NA=2  [mon]  runs=20000 seed=101  P[Q]=0.5219 [0.5149,0.5288]
+  c0 [dangerous] P[c]=0.1358  P[Q|c]=0.9083 [0.8968,0.9189]  (learned: P[c]=0.136 P[Q|c]=0.896)  ~run(!aA&!aB,1,[40,80)) & run(!aB,6,[0,40))
+  c1 [dangerous] P[c]=0.1327  P[Q|c]=0.9099 [0.8984,0.9206]  (learned: P[c]=0.134 P[Q|c]=0.897)  ~run(!aA,1,[40,80)) & run(!aB,6,[0,40))
+  c2 [dangerous] P[c]=0.1663  P[Q|c]=0.9071 [0.8967,0.9168]  (learned: P[c]=0.168 P[Q|c]=0.899)  ~run(!aA&!aB,1,[40,80)) & run(!aB,8,[40,80))
+  c3 [dangerous] P[c]=0.1661  P[Q|c]=0.9070 [0.8966,0.9166]  (learned: P[c]=0.168 P[Q|c]=0.899)  ~run(!aA&!aB,1,[40,80)) & run(aA&!aB,8,[40,80))
+  c4 [protective] P[c]=0.1133  P[Q|c]=0.0199 [0.0145,0.0265]  (learned: P[c]=0.113 P[Q|c]=0.023)  run(!aA,8,[40,80)) & run(aB&!aA,4,[0,80))
+  c5 [protective] P[c]=0.1112  P[Q|c]=0.0162 [0.0114,0.0223]  (learned: P[c]=0.110 P[Q|c]=0.017)  run(!aA,8,[0,80)) & run(aB&!aA,4,[40,80))
+  c6 [protective] P[c]=0.1101  P[Q|c]=0.0154 [0.0107,0.0215]  (learned: P[c]=0.110 P[Q|c]=0.017)  run(!aA,8,[40,80)) & run(aB&!aA,4,[40,80))
+  c7 [protective] P[c]=0.1098  P[Q|c]=0.0118 [0.0077,0.0173]  (learned: P[c]=0.106 P[Q|c]=0.016)  ~run(!aB,8,[40,80)) & run(aB&!aA,4,[40,80))
+NA=2  [ltl]  runs=20000 seed=101  P[Q]=0.5219 [0.5149,0.5288]
+  c0 [dangerous] P[c]=0.1358  P[Q|c]=0.9083 [0.8968,0.9189]  (learned: P[c]=0.136 P[Q|c]=0.896)  ~run(!aA&!aB,1,[40,80)) & run(!aB,6,[0,40))
+  c1 [dangerous] P[c]=0.1327  P[Q|c]=0.9099 [0.8984,0.9206]  (learned: P[c]=0.134 P[Q|c]=0.897)  ~run(!aA,1,[40,80)) & run(!aB,6,[0,40))

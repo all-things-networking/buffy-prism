@@ -1,0 +1,110 @@
+{
+ "Q": "starveB:13",
+ "PQ": 0.5266,
+ "conditions": [
+  {
+   "kind": "dangerous",
+   "formula": "~run(!aA&!aB,1,[40,80)) & run(!aB,6,[0,40))",
+   "buffy": "!(F<=80 (time >= 40 && time < 80 && (outcast.aA == 0 && outcast.aB == 0))) && (F<=40 (time >= 0 && time < 40 && outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X outcast.aB == 0))))))",
+   "train": [
+    0.1294,
+    0.9142194744976817
+   ],
+   "heldout": [
+    0.1362,
+    0.8964757709251102
+   ]
+  },
+  {
+   "kind": "dangerous",
+   "formula": "~run(!aA,1,[40,80)) & run(!aB,6,[0,40))",
+   "buffy": "!(F<=80 (time >= 40 && time < 80 && outcast.aA == 0)) && (F<=40 (time >= 0 && time < 40 && outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X outcast.aB == 0))))))",
+   "train": [
+    0.127,
+    0.9133858267716536
+   ],
+   "heldout": [
+    0.1343,
+    0.896500372300819
+   ]
+  },
+  {
+   "kind": "dangerous",
+   "formula": "~run(!aA&!aB,1,[40,80)) & run(!aB,8,[40,80))",
+   "buffy": "!(F<=80 (time >= 40 && time < 80 && (outcast.aA == 0 && outcast.aB == 0))) && (F<=80 (time >= 40 && time < 80 && outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X outcast.aB == 0))))))))",
+   "train": [
+    0.1617,
+    0.9128014842300557
+   ],
+   "heldout": [
+    0.1678,
+    0.899284862932062
+   ]
+  },
+  {
+   "kind": "dangerous",
+   "formula": "~run(!aA&!aB,1,[40,80)) & run(aA&!aB,8,[40,80))",
+   "buffy": "!(F<=80 (time >= 40 && time < 80 && (outcast.aA == 0 && outcast.aB == 0))) && (F<=80 (time >= 40 && time < 80 && (outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X ((outcast.aA == 1 && outcast.aB == 0) && X (outcast.aA == 1 && outcast.aB == 0)))))))))",
+   "train": [
+    0.1616,
+    0.9127475247524752
+   ],
+   "heldout": [
+    0.1676,
+    0.899164677804296
+   ]
+  },
+  {
+   "kind": "protective",
+   "formula": "run(!aA,8,[40,80)) & run(aB&!aA,4,[0,80))",
+   "buffy": "(F<=80 (time >= 40 && time < 80 && outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X outcast.aA == 0)))))))) && (F<=80 (time >= 0 && time < 80 && (outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X (outcast.aB == 1 && outcast.aA == 0)))))",
+   "train": [
+    0.117,
+    0.007692307692307692
+   ],
+   "heldout": [
+    0.1131,
+    0.022988505747126433
+   ]
+  },
+  {
+   "kind": "protective",
+   "formula": "run(!aA,8,[0,80)) & run(aB&!aA,4,[40,80))",
+   "buffy": "(F<=80 (time >= 0 && time < 80 && outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X outcast.aA == 0)))))))) && (F<=80 (time >= 40 && time < 80 && (outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X (outcast.aB == 1 && outcast.aA == 0)))))",
+   "train": [
+    0.1152,
+    0.0078125
+   ],
+   "heldout": [
+    0.1099,
+    0.017288444040036398
+   ]
+  },
+  {
+   "kind": "protective",
+   "formula": "run(!aA,8,[40,80)) & run(aB&!aA,4,[40,80))",
+   "buffy": "(F<=80 (time >= 40 && time < 80 && outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X (outcast.aA == 0 && X outcast.aA == 0)))))))) && (F<=80 (time >= 40 && time < 80 && (outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X (outcast.aB == 1 && outcast.aA == 0)))))",
+   "train": [
+    0.1145,
+    0.007860262008733625
+   ],
+   "heldout": [
+    0.1095,
+    0.017351598173515982
+   ]
+  },
+  {
+   "kind": "protective",
+   "formula": "~run(!aB,8,[40,80)) & run(aB&!aA,4,[40,80))",
+   "buffy": "!(F<=80 (time >= 40 && time < 80 && outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X (outcast.aB == 0 && X outcast.aB == 0)))))))) && (F<=80 (time >= 40 && time < 80 && (outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X ((outcast.aB == 1 && outcast.aA == 0) && X (outcast.aB == 1 && outcast.aA == 0)))))",
+   "train": [
+    0.1105,
+    0.008144796380090498
+   ],
+   "heldout": [
+    0.1059,
+    0.016052880075542966
+   ]
+  }
+ ]
+}
