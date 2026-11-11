@@ -91,7 +91,7 @@ but you have learned nothing new. A good assumption is one whose *worst* include
 case is still dangerous — the whole box is bad, not just a skewing corner. Checking
 the worst corner is how we tell a real finding from an artifact.
 
-The three case studies below are three contention points that all fit this shape.
+The four case studies below are four contention points that all fit this shape.
 They differ in what the shared resource is and in how far along we are.
 
 ---
@@ -378,13 +378,99 @@ trace would never have shown that. A probability over the input space did.
 
 ---
 
-## 5. What ties the three together
+## 5. Case study D — tenant isolation on a multi-queue NIC
+
+**The contention point.** A server's network card sends packets for two tenants over
+one link. Tenant 1 runs a Spark job. Tenant 2 runs Spark and memcached. The intended
+policy has two levels: the two tenants share the link fairly, and *inside* tenant 2,
+memcached (latency-sensitive) goes before tenant 2's own Spark traffic. This is the
+policy that the Loom paper (NSDI'19) argues a NIC should support.
+
+Linux's standard multi-queue configuration, MQPrio, cannot express two levels. The
+closest it gets is to put every memcached packet into a high-priority NIC queue and
+every Spark packet, of either tenant, into one low-priority queue, with strict priority
+between the two. So memcached is prioritized over *tenant 1's* traffic too, and the
+low-priority queue mixes the two tenants first-come first-served. We model this pipeline
+exactly as the FPerf tool does: per CPU core, one queue per tenant and a round robin
+between them, then the NIC's two priority queues, one packet out per time step.
+
+```mermaid
+flowchart LR
+    subgraph C["each CPU core"]
+      direction TB
+      f1["tenant 1 Spark"] --> t1["tenant-1 queue"]
+      f2["tenant 2 Spark"] --> t2["tenant-2 queue"]
+      fm["tenant 2 memcached"] --> t2
+      t1 --> rr{{"round robin"}}
+      t2 --> rr
+    end
+    rr --> NIC{"NIC (MQPrio)"}
+    NIC --> hi["high: all memcached"]
+    NIC --> lo["low: all Spark, both tenants, in arrival order"]
+    hi --> out(("link<br/>1 packet / step"))
+    lo --> out
+    style lo fill:#fff3cd,stroke:#b90
+```
+
+**The bad event `Q`.** Look at a window of 20 time steps after the system has warmed up.
+`Q` is "tenant 1 had packets waiting at every step of the window, yet it received at
+most 40% of the packets sent" (its fair share is 50%). The "waiting" part matters: a
+tenant that simply has nothing to send is not being treated unfairly.
+
+**The input parameters.** Three knobs: the offered load of tenant 1's Spark (`ρ1`), of
+tenant 2's Spark (`ρ2`), and of memcached (`ρm`), each as a fraction of the link. Each
+core's flow sends a packet per step with a fixed probability, so the only randomness is
+in the arrivals; the NIC and the queues are deterministic.
+
+**How the model is built and checked.** This model is written in Buffy and compiled,
+not written by hand. A switch selects the NIC policy: MQPrio, or the intended
+two-level policy (round robin between the tenants, memcached first inside tenant 2);
+everything before the NIC is identical. The MQPrio version is *proven* equivalent to
+FPerf's hand-written model of the same pipeline: for every possible input, over short
+runs, the two forward exactly the same packets. The numbers come from a fast native
+simulator (20,000 runs per point), and an independent Python simulator written from
+FPerf's description agrees at every point we compared.
+
+**Finding 1 — MQPrio is unfair even without memcached.** With both tenants offering
+60% of the link and no memcached at all, the two tenants get exactly the same average
+share. Yet tenant 1 is starved (`Q`) in **18%** of windows. The cause is the shared
+first-come first-served Spark queue: over a short window, which tenant's packets happen
+to arrive first is a coin flip, and the shares drift. The intended policy alternates
+between tenants and is never starved. An average-based analysis would call MQPrio fair
+here; only the probability over windows shows the problem.
+
+**Finding 2 — a small memcached share makes it likely.** Adding memcached at 10% of the
+link costs tenant 1 only 5% of its *average* share, but doubles its chance of starvation
+(18% → 37%). The probability keeps climbing with the memcached share: 27% at 5%, 48% at
+15%, 58% at 20%. The intended policy stays at zero throughout.
+
+**The assumption found.** `A = (ρ1 in 0.5..0.6) and (ρ2 in 0.6..0.7) and (ρm in 0.1..0.2)`:
+both tenants want at least half the link, tenant 2's Spark is at least as heavy as
+tenant 1's, and memcached is a modest 10–20% of the link. `P[Q]` goes up with `ρm` and
+`ρ2` and down with `ρ1`, so the least dangerous point of the box is its corner
+(`ρ1=0.6, ρ2=0.6, ρm=0.1`), which gives **0.37**. Across the whole box, `P[Q] ≥ 0.37`
+under MQPrio and 0 under the intended policy. For contrast, the *obvious* region is a
+heavy memcached load: at `ρm = 0.5` starvation is nearly certain (0.94), which anyone
+would predict from strict priority.
+
+**Why this supports the paper.** It carries the recipe to a NIC, and the contention point
+is a *policy mismatch*: a two-level intent forced into a one-level priority scheme. The
+finding is mild and non-obvious in the sense the paper cares about. The danger appears
+at a memcached share an operator would consider harmless, and a third of it is present
+with no memcached at all, invisible to any average. It also shows the tool working from
+a compiled model that is checked against an independent hand-written one, rather than a
+model written directly in PRISM. (Details: `docs/notes/case-study-loom.md`.)
+
+---
+
+## 6. What ties the four together
 
 | | contention point | shared resource | bad event `Q` | input knobs | assumption found |
 |---|---|---|---|---|---|
 | **A. Incast** | ToR switch output port | buffer capacity | ≥ `THRESH` packets dropped at output | senders, window, burst length | two mild boxes, `P[Q] ≥ 0.54–0.64` across the whole box |
 | **B. FQ-CoDel** | flow-queuing scheduler | one dequeue per step | thin flow served while all others backlogged ≥ 4 times | per-queue arrival counts, arrival timing/sparsity | early-traffic patterns (preliminary) |
 | **C. LLM scheduler** | GPU batch scheduler | KV-cache memory | victim evicted / stalled / cascade | arrival rate, prompt and output lengths | timing/shape candidates, not yet validated |
+| **D. Multi-queue NIC** | NIC transmit scheduler | link share | tenant 1 waiting yet ≤ 40% of a 20-step window | per-tenant and memcached loads | one mild box, `P[Q] ≥ 0.37` across the whole box (0 under the intended policy) |
 
 Every row is the same picture. The randomness lives in the input. The component is a
 deterministic reaction to that input. The bad event is a monotone counter. The
