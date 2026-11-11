@@ -198,85 +198,89 @@ hardest corner of the second box the two agree closely (0.538 vs 0.539).
 
 ---
 
-## 3. Case study B — flow starvation under FQ-CoDel
+## 3. Case study B — flow starvation under a buggy fair-queuing scheduler
 
-*This case study is earlier along than the incast one. We use it here mainly to
-show that the same recipe applies to a scheduler, not just a buffer. The numbers
-below are illustrative, not final.*
-
-**The contention point.** FQ-CoDel is a widely deployed queue-management scheme. It
-gives each flow its own queue and rotates service between a "new" list and an "old"
-list so that thin, low-rate flows get served promptly and are not drowned out by
-bulk flows. We model one FQ-CoDel scheduler with **five input queues and one
-output**. Up to four packets can arrive at each queue per time step (up to twenty in
-total), but the output performs exactly **one dequeue per time step**. The output is
-heavily oversubscribed, which is what creates the pressure.
+**The contention point.** Fair queuing (as in FQ-CoDel) gives each flow its own queue and serves
+them in turn. It also favours *sparse* flows: a queue that has just become active joins a "new" list
+that is served before the "old" list of long-running flows. The scheduler in the Buffy paper has a
+bug here. When a new queue is emptied, it should move to the old list (RFC 8290's rule); instead it
+simply leaves both lists. Its next packet then makes it "new" again, and it jumps ahead of everyone
+once more. We model one such scheduler with **five input queues and one dequeue per time step**,
+over 14 steps.
 
 ```mermaid
 flowchart LR
-    A1["iq1 (bulk, uniform arrivals)"] --> SCH
+    A1["iq1 (bulk)"] --> SCH
     A2["iq2 (bulk)"] --> SCH
     A3["iq3 (bulk)"] --> SCH
     A4["iq4 (bulk)"] --> SCH
-    A5["iq5 (thin flow: 60% idle)"] --> SCH
-    SCH{{"FQ-CoDel scheduler<br/>new list → old list<br/>1 dequeue / step"}} --> OUT["output link"]
+    A5["iq5 (thin flow)"] --> SCH
+    SCH{{"scheduler<br/>new list → old list<br/>1 dequeue / step"}} --> OUT["output link"]
     style A5 fill:#fff3cd,stroke:#b90
     style SCH fill:#e2e3ff,stroke:#66a
 ```
 
-**The input.** Randomness enters only through arrivals. Queues `iq1..iq4` each draw
-0 to 4 packets uniformly. Queue `iq5` is the thin flow: it draws 0 packets 60% of
-the time and 1 to 4 packets otherwise. The input description of `iq5` is tracked by
-a few instrumentation variables: `iq5_cenq` (cumulative packets enqueued so far)
-and `iq5_aipg` (how many steps since its last arrival — how sparse it is).
+**The input.** Queues `iq1..iq4` are bulk flows: each receives 0 to 4 packets per step, uniformly.
+`iq5` is a thin flow: no packet with probability `P0`, otherwise 1 to 4. We study two settings: a
+uniform one (`P0` = 0.2) and a sparse one where the thin flow is idle 60% of the time (`P0` = 0.6).
 
-**The bad event `Q`.** We track a counter, `iq5_deqs_bl`, that increments on each
-time step where `iq5` is served while all four of the other queues are backlogged.
-`Q` is `iq5_deqs_bl ≥ 4`. This flags a fairness anomaly of the exact flow FQ-CoDel
-is supposed to protect. (Because the counter measures `iq5` *being served* while
-others wait, the precise reading of "starvation" here needs care; the mechanism is
-in place and the semantics are being pinned down.) FQ-CoDel is supposed to make this
-rare, so `P[Q]` should be near zero. The observed base rate is about `0.0004`, so the
-scheduler mostly behaves; the question is under which input patterns it does not.
+**The bad event `Q`.** `Q` is "the thin flow is served at least 4 times while all four bulk queues are
+waiting". Taking turns among five backlogged queues, the thin flow could be served at most 3 times
+in 14 steps, so `Q` means it overtook the bulk flows through the bug, and they starved. `Q` is rare:
+3.6·10⁻⁴ in the uniform setting, 1.2% in the sparse one. With RFC 8290's rule added, it falls to
+4·10⁻⁶ and 5·10⁻⁴.
 
-**How the model runs.** It is a DTMC. One network time step is 16 automata
-sub-stages: for each of the five queues, draw arrivals and apply them, then update
-its list membership, and finally perform the single dequeue. The clock advances only
-at the dequeue. The horizon is 14 time steps, which is `14 × 16 = 224` sub-steps.
-The property is written as a bounded-global formula over those 224 steps.
+**How the assumptions are found.** We record the input of millions of simulated runs, and let a
+learner search bounded temporal formulas over the thin flow's arrivals for conditions that make `Q`
+likely or impossible. Examples are "at most 1 packet in the first 5 steps" and "single packets in two
+consecutive steps". Each candidate is then certified on the compiled model. The compiler builds
+a version of the model whose runs all satisfy the condition, with exactly the right probabilities.
+That gives the exact probability of the condition and a cheap, precise `P[Q | A]` even when `A` is
+rare. Where we could afford it, we checked these against the old way (simulating everything and
+keeping the runs that satisfy `A`). They agree.
 
-**The assumption `A`.** The conditions are patterns over `iq5`'s arrival history —
-for example, "`iq5` did not receive much early traffic," written exactly as
-`(time > 5) or (iq5_cenq < 2)`. Others ask whether `iq5` received substantial
-traffic by the end, or whether its arrivals stayed sparse in the second half. These
-let us ask a sharp question: does the anomaly line up with a particular arrival
-profile of the thin flow?
+**Finding 1 — only the thin flow's timing matters.** No condition on the bulk flows' arrivals
+changes `P[Q]` at all. The anomaly is determined by how the thin flow sends.
 
-**A note on query shape.** The properties are written in a deliberately inverted
-form. Instead of asking directly for "the bad event eventually happens," we ask for
-the probability that the *safe* predicate holds at every step, `P[ G≤224 (safe) ]`,
-and read the bad event off its complement. This is convenient for a monotone
-counter: "the counter stays below 4 for the whole horizon" is exactly "the final
-value is below 4," so the bounded-global form is an exact statement of the threshold
-event, and the assumption predicates compose cleanly inside the same operator.
+**Finding 2 — a quiet start followed by single packets.** In the sparse setting (base 1.2%):
 
-**How `P[Q | A]` is formed and why simulation.** Each assumption is one group of
-three queries — base `P[Q]`, joint `P[Q and A]`, condition `P[A]` — and the
-conditional is joint over condition. The state space is far too large to solve
-exactly (five queue contents, ten list-rank variables, the arrival and history
-counters, the sub-stage and time clocks), so we run PRISM in simulation mode with a
-confidence interval. This case study is the reason the tool needs statistical model
-checking at all: exact checking is intractable on a model this size.
+| assumption `A` on the thin flow | `P[A]` | `P[Q \| A]` |
+|---|---|---|
+| at most 1 packet in the first 5 steps | 14% | 6.9% |
+| … and at most 2 in the first 7 | 7.9% | 9.7% |
+| at most 1 in the first 5, then single packets in two consecutive steps | 1.1% | 29% |
+| at most 1 in the first 6, then single packets in two consecutive steps by step 10 | 0.33% | **50%** |
 
-**Why this supports the paper.** It shows the recipe is not specific to buffers. The
-shared resource here is *scheduler service*, not memory. The bad event is a fairness
-violation, not a drop. Yet the shape is identical: random input, deterministic
-scheduler, a monotone counter for `Q`, and a conditional probability under an
-assumption about the input. It also surfaces an honest difficulty the paper should
-address: when the assumption `A` is very rare, `P[A]` is tiny and the estimate of
-`P[Q | A]` is noisy or, if `P[A] = 0`, undefined. Choosing assumptions that are
-*mild* — likely enough to estimate — is part of what makes a finding useful, and
-this example is where that constraint first bites.
+While the thin flow is quiet, the bulk queues fill up. After that, every single packet it sends is
+served at once and empties its queue, so its next packet makes it "new" again. The first row is the
+condition we had picked by hand; the learner confirms it and sharpens it.
+
+**Finding 3 — in the uniform setting, no mild condition is dangerous.** Conditions that hold in 5%
+of runs raise `Q` only 20-fold, to 0.7%. Making `Q` likely takes a rare input: "at most 1 packet in
+the first 5 steps" holds in 0.19% of runs and gives `P[Q | A]` = 16%. This is exactly the "rare `A`"
+difficulty, and exact conditioning removes it: estimating `P[Q | A]` here costs about 500 times fewer
+runs than discarding the runs that violate `A`.
+
+**Finding 4 — mild conditions that rule `Q` out.** If the thin flow sends something in each of its
+first four steps (41% of runs in the uniform setting), or is never silent twice in a row (73%), `Q`
+did not occur in a million runs. A flow that builds up a backlog early sits in the old list and waits
+its turn.
+
+**Finding 5 — possible is not the same as likely.** In twenty million runs, every run with `Q`
+started quietly: at most 3 thin-flow packets in the first 6 steps. A solver that checks every possible
+workload (Buffy's SMT backend, the style of question FPerf asks) disagrees that a quiet start is
+needed: it finds workloads with a loud start that still trigger the bug. Both are right. Those
+workloads exist, but together they have probability below 2·10⁻⁷, against 3.6·10⁻⁴ for `Q` itself.
+More than 99.9% of the bug's probability lies in the quiet-start region. The existential answer says
+"both kinds of input can trigger it"; the probabilistic answer says which one matters.
+
+**The remedy.** With RFC 8290's rule added, even the most dangerous input profiles become harmless:
+50% → 0.27% and 16% → 0.06%.
+
+**Why this supports the paper.** It shows the recipe on a scheduler, with assumptions that are
+temporal patterns of the input, not ranges of loads, and that are *learned* and then *certified*. It
+also shows why exact conditioning matters: the conditions that make a rare bug likely are themselves
+rare, and only exact conditioning measures them cheaply. (Details: `docs/notes/case-study-fq.md`.)
 
 ---
 
@@ -548,7 +552,7 @@ predictive, not causal. (Details: `docs/notes/case-study-outcast.md`.)
 | | contention point | shared resource | bad event `Q` | input knobs | assumption found |
 |---|---|---|---|---|---|
 | **A. Incast** | ToR switch output port | buffer capacity | ≥ `THRESH` packets dropped at output | senders, window, burst length | two mild boxes, `P[Q] ≥ 0.54–0.64` across the whole box |
-| **B. FQ-CoDel** | flow-queuing scheduler | one dequeue per step | thin flow served while all others backlogged ≥ 4 times | per-queue arrival counts, arrival timing/sparsity | early-traffic patterns (preliminary) |
+| **B. Buggy FQ** | fair-queuing scheduler | one dequeue per step | thin flow overtakes the waiting bulk flows ≥ 4 times in 14 steps | the thin flow's arrival timing | learned temporal patterns (quiet start, then single packets): `P[Q \| A]` up to 0.50 (sparse) / 0.16 (uniform), certified by exact conditioning; mild patterns that rule `Q` out |
 | **C. LLM scheduler** | GPU batch scheduler | KV-cache memory | victim evicted / stalled / cascade | arrival rate, prompt and output lengths | timing/shape candidates, not yet validated |
 | **D. Multi-queue NIC** | NIC transmit scheduler | link share | tenant 1 waiting yet ≤ 40% of a 20-step window | per-tenant and memcached loads | one mild box, `P[Q] ≥ 0.37` across the whole box (0 under the intended policy) |
 | **E. TCP outcast** | switch output port, two input ports | queue slots under contention | lone flow gets ≤ half its fair share in the second half | closed-loop TCP senders; arrival timing at the two ports | learned temporal patterns: `P[Q \| A]` 0.91 (lock-in) or 0.02 (gaps on the other port), from a base of 0.52 |

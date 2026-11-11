@@ -1,0 +1,6 @@
+# P0 = 0.2 (uniform): from mild to sharp, then protective (learn_fq.py on 20M runs)
+u1 | by(3,<=2) & by(7,<=10)
+u2 | by(6,<=3)
+u3 | by(5,<=1)
+v1 | ~run(a5=0,1,[1,5))
+v2 | ~run(a5=0,2,[1,10))

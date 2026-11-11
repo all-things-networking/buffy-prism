@@ -1,0 +1,7 @@
+# P0 = 0.6: from mild to sharp, then protective (learn_fq.py on 4M runs)
+m1 | by(5,<=1)
+m2 | by(7,<=2) & by(5,<=1)
+m3 | by(5,<=1) & run(a5=1,2,[5,15))
+m4 | by(6,<=1) & run(a5=1,2,[5,10))
+p1 | run(a5>=1,3,[1,5))
+p2 | ~run(a5=0,2,[1,10))

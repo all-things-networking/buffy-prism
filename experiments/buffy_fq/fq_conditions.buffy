@@ -1,0 +1,70 @@
+// Generated from buffy/examples/jani/fq_buggy.buffy with a monitor a5 of the thin flow's arrivals per
+// step; certify_fq.py appends one `given` query per learned condition (experiments/buffy_fq).
+// The buggy fair-queuing scheduler of the Buffy paper (HotNets'24, Fig. 2), with the monitors of
+// buffy-prism's hand-written FQ-CoDel model (tests/models/fqcodel_5i_dtmc_unif.pm):
+//   deqs_bl - dequeues from the last queue while all other queues are backlogged
+//   cenq    - cumulative arrivals to the last queue
+//   aipg    - time steps since the last arrival to the last queue
+// Each time step: 0..K arrivals per input buffer (uniform for queues 0..N-2, P0 of none and
+// (1-P0)/K each otherwise for the last queue), tail-dropped at SZ, then one dequeue.
+// Monitors saturate so that exploring past the horizon T stays within their ranges.
+
+const N = 5;
+const SZ = 8;
+const K = 4;
+const T = 14;
+const P0 = 0.2;   // P(no arrival) at the last queue; 0.2 = uniform, 0.6 = the skewed variant
+const FIX = 0;    // 1: RFC 8290's rule, which the bug omits: a new queue that empties moves to the old list
+
+fq(buffer[N] ibs, buffer ob) {
+    global queue<0..N-1>[N] nq;
+    global queue<0..N-1>[N] oq;
+    //@ monitor int<0..T> deqs_bl;
+    //@ monitor int<0..K*T> cenq;
+    //@ monitor int<0..T> aipg;
+    //@ monitor int<0..K> a5;             // the thin flow's arrivals in the last step
+
+    //@ cenq = min(K*T, cenq + arrivals-p(ibs[N-1]));
+    //@ if (arrivals-p(ibs[N-1]) == 0) { aipg = min(T, aipg + 1); } else { aipg = 0; }
+    //@ a5 = arrivals-p(ibs[N-1]);
+
+    // update new queues
+    for (i in 0..N) do {
+        if (backlog-p(ibs[i]) > 0 & !oq.has(i) & !nq.has(i))
+            nq.enq(i);
+    }
+
+    // decide which input queue should transmit
+    local bool dequeued = false;
+    local int head;
+    local bool fromNew;
+    for (i in 0..N) do {
+        if (!dequeued) {
+            head = -1;
+            fromNew = false;
+            if (!nq.empty()) { head = nq.deq(); fromNew = true; }
+            else { if (!oq.empty()) { head = oq.deq(); } }
+
+            if (head != -1) {
+                if (backlog-p(ibs[head]) > 1 | (FIX == 1 & fromNew)) { oq.enq(head); }
+                if (backlog-p(ibs[head]) > 0) {
+                    //@ if (head == N-1 & backlog-p(ibs[0]) > 0 & backlog-p(ibs[1]) > 0 & backlog-p(ibs[2]) > 0 & backlog-p(ibs[3]) > 0) deqs_bl = min(T, deqs_bl + 1);
+                    move-p(ibs[head], ob, 1);
+                    dequeued = true;
+                }
+            }
+        }
+    }
+}
+
+network {
+    capacity fq.ibs = SZ;
+    traffic fq.ibs[0] ~ uniform(0, K);
+    traffic fq.ibs[1] ~ uniform(0, K);
+    traffic fq.ibs[2] ~ uniform(0, K);
+    traffic fq.ibs[3] ~ uniform(0, K);
+    traffic fq.ibs[4] ~ { 0: P0, 1: (1 - P0) / 4, 2: (1 - P0) / 4, 3: (1 - P0) / 4, 4: (1 - P0) / 4 };
+    horizon T;
+}
+
+

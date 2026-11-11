@@ -1,0 +1,5 @@
+Q with >= 4 thin packets by step 5: n_5_4 sat  (187 s)
+Q with >= 4 thin packets by step 6: n_6_4 sat  (214 s)
+Q with >= 3 thin packets by step 5: n_5_3 sat  (255 s)
+Q with >= 4 thin packets by step 3: n_3_4 sat  (266 s)
+Q with >= 4 thin packets by step 4: n_4_4 sat  (270 s)

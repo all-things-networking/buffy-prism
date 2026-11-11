@@ -1,0 +1,190 @@
+#### P0 = 0.6, P[c] >= 0.05
+sample 127024 runs (weights for 4000000); P[Q] = 0.01196
+
+dangerous, thin-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.058 P[Q|c]=0.1590 lift=13.3 | P[c]=0.057 P[Q|c]=0.1632   by(5,<=1) & run(a5=1,1,[5,10))
+  P[c]=0.064 P[Q|c]=0.1572 lift=13.1 | P[c]=0.063 P[Q|c]=0.1589   by(6,<=2) & run(a5=1,1,[5,10))
+  P[c]=0.071 P[Q|c]=0.1218 lift=10.2 | P[c]=0.069 P[Q|c]=0.1229   by(7,<=3) & run(a5=1,1,[5,10))
+  P[c]=0.089 P[Q|c]=0.1118 lift=9.3 | P[c]=0.088 P[Q|c]=0.1134   by(4,<=1) & run(a5=1,1,[5,10))
+  P[c]=0.093 P[Q|c]=0.1082 lift=9.0 | P[c]=0.092 P[Q|c]=0.1094   by(5,<=2) & run(a5=1,1,[5,10))
+  P[c]=0.099 P[Q|c]=0.1017 lift=8.5 | P[c]=0.100 P[Q|c]=0.1011   by(6,<=3) & run(a5=1,1,[5,10))
+
+dangerous, bulk-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.235 P[Q|c]=0.0125 lift=1.0 | P[c]=0.237 P[Q|c]=0.0121   run(ab>=8,4,[1,5))
+  P[c]=0.189 P[Q|c]=0.0124 lift=1.0 | P[c]=0.188 P[Q|c]=0.0124   ~run(ab<=4,1,[1,15))
+  P[c]=0.342 P[Q|c]=0.0124 lift=1.0 | P[c]=0.342 P[Q|c]=0.0121   ~run(ab<=4,1,[1,10))
+  P[c]=0.418 P[Q|c]=0.0123 lift=1.0 | P[c]=0.419 P[Q|c]=0.0120   run(ab>=8,3,[1,5))
+  P[c]=0.306 P[Q|c]=0.0122 lift=1.0 | P[c]=0.306 P[Q|c]=0.0121   ~run(ab<=4,1,[5,15))
+  P[c]=0.379 P[Q|c]=0.0122 lift=1.0 | P[c]=0.376 P[Q|c]=0.0121   run(ab>=12,1,[1,5))
+
+protective, thin-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.052 P[Q|c]=0.0000 lift=0.0 | P[c]=0.053 P[Q|c]=0.0000   ~run(a5=0,2,[1,10))
+  P[c]=0.139 P[Q|c]=0.0000 lift=0.0 | P[c]=0.140 P[Q|c]=0.0000   ~run(a5<=1,2,[1,5))
+  P[c]=0.087 P[Q|c]=0.0000 lift=0.0 | P[c]=0.087 P[Q|c]=0.0000   ~run(a5<=1,2,[5,10))
+  P[c]=0.345 P[Q|c]=0.0000 lift=0.0 | P[c]=0.347 P[Q|c]=0.0000   ~run(a5<=1,3,[1,5))
+  P[c]=0.110 P[Q|c]=0.0000 lift=0.0 | P[c]=0.112 P[Q|c]=0.0000   ~run(a5<=1,3,[1,10))
+  P[c]=0.056 P[Q|c]=0.0000 lift=0.0 | P[c]=0.057 P[Q|c]=0.0000   ~run(a5<=1,3,[1,15))
+
+protective, bulk-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.140 P[Q|c]=0.0115 lift=1.0 | P[c]=0.139 P[Q|c]=0.0116   run(ab<=4,2,[1,15))
+  P[c]=0.099 P[Q|c]=0.0115 lift=1.0 | P[c]=0.099 P[Q|c]=0.0114   run(ab<=4,2,[1,10))
+  P[c]=0.075 P[Q|c]=0.0115 lift=1.0 | P[c]=0.074 P[Q|c]=0.0119   ~run(ab>=8,2,[1,10))
+  P[c]=0.306 P[Q|c]=0.0117 lift=1.0 | P[c]=0.306 P[Q|c]=0.0118   ~run(ab>=8,2,[1,5))
+  P[c]=0.100 P[Q|c]=0.0117 lift=1.0 | P[c]=0.098 P[Q|c]=0.0122   run(ab<=4,2,[5,15))
+  P[c]=0.380 P[Q|c]=0.0117 lift=1.0 | P[c]=0.385 P[Q|c]=0.0114   run(ab<=4,1,[1,5))
+
+the draft's conditions:
+  P[c]=0.142 P[Q|c]=0.0700   by(5,<=1)
+  P[c]=0.923 P[Q|c]=0.0085   by(11,>=5)
+#### P0 = 0.6, P[c] >= 0.01
+sample 127024 runs (weights for 4000000); P[Q] = 0.01196
+
+dangerous, thin-flow conditions, P[c] >= 0.01; train | held-out
+  P[c]=0.011 P[Q|c]=0.2952 lift=24.7 | P[c]=0.011 P[Q|c]=0.3112   by(5,<=1) & run(a5=1,2,[5,15))
+  P[c]=0.011 P[Q|c]=0.2952 lift=24.7 | P[c]=0.011 P[Q|c]=0.3112   by(5,<=1) & run(a5=1,2,[1,15))
+  P[c]=0.012 P[Q|c]=0.2845 lift=23.8 | P[c]=0.012 P[Q|c]=0.2988   by(6,<=2) & run(a5=1,2,[5,15))
+  P[c]=0.010 P[Q|c]=0.2782 lift=23.3 | P[c]=0.011 P[Q|c]=0.2637   run(a5=1,2,[5,10)) & by(5,<=2)
+  P[c]=0.011 P[Q|c]=0.2603 lift=21.8 | P[c]=0.011 P[Q|c]=0.2465   run(a5=1,2,[5,10)) & ~run(a5>=2,1,[1,5))
+  P[c]=0.011 P[Q|c]=0.2589 lift=21.7 | P[c]=0.011 P[Q|c]=0.2453   run(a5=1,2,[5,10)) & by(6,<=3)
+
+dangerous, bulk-flow conditions, P[c] >= 0.01; train | held-out
+  P[c]=0.010 P[Q|c]=0.0154 lift=1.3 | P[c]=0.011 P[Q|c]=0.0119   run(ab>=12,3,[1,10))
+  P[c]=0.014 P[Q|c]=0.0133 lift=1.1 | P[c]=0.015 P[Q|c]=0.0121   run(ab>=12,3,[1,15))
+  P[c]=0.014 P[Q|c]=0.0127 lift=1.1 | P[c]=0.015 P[Q|c]=0.0121   run(ab<=4,3,[1,15))
+  P[c]=0.235 P[Q|c]=0.0125 lift=1.0 | P[c]=0.237 P[Q|c]=0.0121   run(ab>=8,4,[1,5))
+  P[c]=0.189 P[Q|c]=0.0124 lift=1.0 | P[c]=0.188 P[Q|c]=0.0124   ~run(ab<=4,1,[1,15))
+  P[c]=0.342 P[Q|c]=0.0124 lift=1.0 | P[c]=0.342 P[Q|c]=0.0121   ~run(ab<=4,1,[1,10))
+
+protective, thin-flow conditions, P[c] >= 0.01; train | held-out
+  P[c]=0.024 P[Q|c]=0.0000 lift=0.0 | P[c]=0.027 P[Q|c]=0.0000   ~run(a5=0,1,[1,5))
+  P[c]=0.052 P[Q|c]=0.0000 lift=0.0 | P[c]=0.053 P[Q|c]=0.0000   ~run(a5=0,2,[1,10))
+  P[c]=0.014 P[Q|c]=0.0000 lift=0.0 | P[c]=0.016 P[Q|c]=0.0000   ~run(a5=0,2,[1,15))
+  P[c]=0.139 P[Q|c]=0.0000 lift=0.0 | P[c]=0.140 P[Q|c]=0.0000   ~run(a5<=1,2,[1,5))
+  P[c]=0.014 P[Q|c]=0.0000 lift=0.0 | P[c]=0.014 P[Q|c]=0.0000   ~run(a5<=1,2,[1,10))
+  P[c]=0.087 P[Q|c]=0.0000 lift=0.0 | P[c]=0.087 P[Q|c]=0.0000   ~run(a5<=1,2,[5,10))
+
+protective, bulk-flow conditions, P[c] >= 0.01; train | held-out
+  P[c]=0.016 P[Q|c]=0.0111 lift=0.9 | P[c]=0.015 P[Q|c]=0.0112   ~run(ab>=8,1,[5,10))
+  P[c]=0.011 P[Q|c]=0.0112 lift=0.9 | P[c]=0.010 P[Q|c]=0.0121   run(ab>=12,3,[5,15))
+  P[c]=0.046 P[Q|c]=0.0112 lift=0.9 | P[c]=0.046 P[Q|c]=0.0101   run(ab<=4,2,[1,5))
+  P[c]=0.034 P[Q|c]=0.0113 lift=0.9 | P[c]=0.035 P[Q|c]=0.0104   ~run(ab>=8,1,[1,5))
+  P[c]=0.140 P[Q|c]=0.0115 lift=1.0 | P[c]=0.139 P[Q|c]=0.0116   run(ab<=4,2,[1,15))
+  P[c]=0.099 P[Q|c]=0.0115 lift=1.0 | P[c]=0.099 P[Q|c]=0.0114   run(ab<=4,2,[1,10))
+
+the draft's conditions:
+  P[c]=0.142 P[Q|c]=0.0700   by(5,<=1)
+  P[c]=0.923 P[Q|c]=0.0085   by(11,>=5)
+#### P0 = 0.6, P[c] >= 0.001
+sample 127024 runs (weights for 4000000); P[Q] = 0.01196
+
+dangerous, thin-flow conditions, P[c] >= 0.001; train | held-out
+  P[c]=0.003 P[Q|c]=0.4721 lift=39.5 | P[c]=0.003 P[Q|c]=0.5516   run(a5=1,2,[5,10)) & by(6,<=1)
+  P[c]=0.003 P[Q|c]=0.4721 lift=39.5 | P[c]=0.003 P[Q|c]=0.5516   by(6,<=1) & run(a5=1,2,[1,10))
+  P[c]=0.005 P[Q|c]=0.4584 lift=38.3 | P[c]=0.004 P[Q|c]=0.4867   by(7,<=2) & run(a5=1,2,[5,10))
+  P[c]=0.006 P[Q|c]=0.4380 lift=36.6 | P[c]=0.006 P[Q|c]=0.4526   by(5,<=1) & run(a5=1,2,[5,10))
+  P[c]=0.006 P[Q|c]=0.4380 lift=36.6 | P[c]=0.006 P[Q|c]=0.4526   by(5,<=1) & run(a5=1,2,[1,10))
+  P[c]=0.002 P[Q|c]=0.4320 lift=36.1 | P[c]=0.002 P[Q|c]=0.4702   by(10,<=3) & run(a5=1,2,[5,10))
+
+dangerous, bulk-flow conditions, P[c] >= 0.001; train | held-out
+  P[c]=0.004 P[Q|c]=0.0186 lift=1.6 | P[c]=0.005 P[Q|c]=0.0117   run(ab>=12,3,[1,5))
+  P[c]=0.001 P[Q|c]=0.0161 lift=1.3 | P[c]=0.001 P[Q|c]=0.0109   run(ab>=12,4,[1,10))
+  P[c]=0.010 P[Q|c]=0.0154 lift=1.3 | P[c]=0.011 P[Q|c]=0.0119   run(ab>=12,3,[1,10))
+  P[c]=0.001 P[Q|c]=0.0153 lift=1.3 | P[c]=0.001 P[Q|c]=0.0119   run(ab>=12,4,[1,15))
+  P[c]=0.004 P[Q|c]=0.0149 lift=1.2 | P[c]=0.004 P[Q|c]=0.0128   run(ab<=4,3,[10,15))
+  P[c]=0.004 P[Q|c]=0.0140 lift=1.2 | P[c]=0.005 P[Q|c]=0.0099   run(ab<=4,3,[1,5))
+
+protective, thin-flow conditions, P[c] >= 0.001; train | held-out
+  P[c]=0.024 P[Q|c]=0.0000 lift=0.0 | P[c]=0.027 P[Q|c]=0.0000   ~run(a5=0,1,[1,5))
+  P[c]=0.052 P[Q|c]=0.0000 lift=0.0 | P[c]=0.053 P[Q|c]=0.0000   ~run(a5=0,2,[1,10))
+  P[c]=0.014 P[Q|c]=0.0000 lift=0.0 | P[c]=0.016 P[Q|c]=0.0000   ~run(a5=0,2,[1,15))
+  P[c]=0.003 P[Q|c]=0.0000 lift=0.0 | P[c]=0.004 P[Q|c]=0.0001   run(a5=1,3,[1,5))
+  P[c]=0.007 P[Q|c]=0.0000 lift=0.0 | P[c]=0.008 P[Q|c]=0.0000   ~run(a5<=1,1,[1,5))
+  P[c]=0.003 P[Q|c]=0.0000 lift=0.0 | P[c]=0.002 P[Q|c]=0.0000   ~run(a5<=1,1,[5,10))
+
+protective, bulk-flow conditions, P[c] >= 0.001; train | held-out
+  P[c]=0.005 P[Q|c]=0.0083 lift=0.7 | P[c]=0.004 P[Q|c]=0.0122   run(ab>=12,3,[10,15))
+  P[c]=0.001 P[Q|c]=0.0088 lift=0.7 | P[c]=0.001 P[Q|c]=0.0119   run(ab<=4,4,[5,15))
+  P[c]=0.001 P[Q|c]=0.0101 lift=0.8 | P[c]=0.001 P[Q|c]=0.0110   run(ab<=4,4,[1,10))
+  P[c]=0.002 P[Q|c]=0.0102 lift=0.9 | P[c]=0.002 P[Q|c]=0.0110   run(ab<=4,4,[1,15))
+  P[c]=0.007 P[Q|c]=0.0105 lift=0.9 | P[c]=0.007 P[Q|c]=0.0133   run(ab<=4,3,[5,10))
+  P[c]=0.009 P[Q|c]=0.0108 lift=0.9 | P[c]=0.009 P[Q|c]=0.0102   run(ab>=8,9,[5,10))
+
+the draft's conditions:
+  P[c]=0.142 P[Q|c]=0.0700   by(5,<=1)
+  P[c]=0.923 P[Q|c]=0.0085   by(11,>=5)
+#### P0 = 0.2, P[c] >= 0.05
+sample 87031 runs (weights for 20000000); P[Q] = 0.00036
+
+dangerous, thin-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.050 P[Q|c]=0.0072 lift=19.9 | P[c]=0.047 P[Q|c]=0.0076   run(a5<=1,4,[1,5)) & by(5,<=6)
+  P[c]=0.050 P[Q|c]=0.0072 lift=19.9 | P[c]=0.051 P[Q|c]=0.0071   by(3,<=2) & by(7,<=10)
+  P[c]=0.050 P[Q|c]=0.0072 lift=19.9 | P[c]=0.052 P[Q|c]=0.0070   by(6,<=6) & by(7,<=9)
+  P[c]=0.050 P[Q|c]=0.0072 lift=19.9 | P[c]=0.052 P[Q|c]=0.0069   by(6,<=6) & by(11,<=19)
+  P[c]=0.050 P[Q|c]=0.0072 lift=19.9 | P[c]=0.051 P[Q|c]=0.0071   by(4,<=3) & ~run(a5>=2,2,[1,5))
+  P[c]=0.051 P[Q|c]=0.0071 lift=19.7 | P[c]=0.049 P[Q|c]=0.0074   run(a5<=1,4,[1,5)) & ~run(a5>=1,4,[1,5))
+
+dangerous, bulk-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.056 P[Q|c]=0.0004 lift=1.1 | P[c]=0.059 P[Q|c]=0.0004   run(ab>=12,2,[5,10))
+  P[c]=0.056 P[Q|c]=0.0004 lift=1.1 | P[c]=0.057 P[Q|c]=0.0003   run(ab<=4,2,[5,10))
+  P[c]=0.096 P[Q|c]=0.0004 lift=1.1 | P[c]=0.101 P[Q|c]=0.0004   run(ab>=12,2,[1,10))
+  P[c]=0.378 P[Q|c]=0.0004 lift=1.1 | P[c]=0.380 P[Q|c]=0.0004   run(ab>=12,1,[1,5))
+  P[c]=0.240 P[Q|c]=0.0004 lift=1.0 | P[c]=0.240 P[Q|c]=0.0004   run(ab>=8,4,[1,5))
+  P[c]=0.136 P[Q|c]=0.0004 lift=1.0 | P[c]=0.140 P[Q|c]=0.0004   run(ab>=12,2,[1,15))
+
+protective, thin-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.407 P[Q|c]=0.0000 lift=0.0 | P[c]=0.408 P[Q|c]=0.0000   ~run(a5=0,1,[1,5))
+  P[c]=0.132 P[Q|c]=0.0000 lift=0.0 | P[c]=0.133 P[Q|c]=0.0000   ~run(a5=0,1,[1,10))
+  P[c]=0.726 P[Q|c]=0.0000 lift=0.0 | P[c]=0.729 P[Q|c]=0.0000   ~run(a5=0,2,[1,10))
+  P[c]=0.630 P[Q|c]=0.0000 lift=0.0 | P[c]=0.635 P[Q|c]=0.0000   ~run(a5=0,2,[1,15))
+  P[c]=0.128 P[Q|c]=0.0000 lift=0.0 | P[c]=0.128 P[Q|c]=0.0000   ~run(a5<=1,1,[1,5))
+  P[c]=0.077 P[Q|c]=0.0000 lift=0.0 | P[c]=0.076 P[Q|c]=0.0000   ~run(a5<=1,1,[5,10))
+
+protective, bulk-flow conditions, P[c] >= 0.05; train | held-out
+  P[c]=0.091 P[Q|c]=0.0003 lift=1.0 | P[c]=0.090 P[Q|c]=0.0004   run(ab>=8,6,[5,10))
+  P[c]=0.091 P[Q|c]=0.0003 lift=1.0 | P[c]=0.090 P[Q|c]=0.0004   run(ab>=8,6,[5,15))
+  P[c]=0.194 P[Q|c]=0.0003 lift=1.0 | P[c]=0.190 P[Q|c]=0.0004   ~run(ab<=4,1,[1,15))
+  P[c]=0.148 P[Q|c]=0.0003 lift=1.0 | P[c]=0.146 P[Q|c]=0.0004   run(ab>=8,6,[1,10))
+  P[c]=0.148 P[Q|c]=0.0003 lift=1.0 | P[c]=0.146 P[Q|c]=0.0004   run(ab>=8,6,[1,15))
+  P[c]=0.141 P[Q|c]=0.0003 lift=1.0 | P[c]=0.139 P[Q|c]=0.0003   run(ab<=4,2,[1,15))
+
+the draft's conditions:
+  P[c]=0.002 P[Q|c]=0.1580   by(5,<=1)
+  P[c]=1.000 P[Q|c]=0.0004   by(11,>=5)
+#### P0 = 0.2, P[c] >= 0.005
+sample 87031 runs (weights for 20000000); P[Q] = 0.00036
+
+dangerous, thin-flow conditions, P[c] >= 0.005; train | held-out
+  P[c]=0.005 P[Q|c]=0.0722 lift=199.6 | P[c]=0.005 P[Q|c]=0.0701   run(a5<=1,6,[1,10)) & by(4,<=3)
+  P[c]=0.005 P[Q|c]=0.0722 lift=199.6 | P[c]=0.005 P[Q|c]=0.0701   run(a5<=1,6,[1,15)) & by(4,<=3)
+  P[c]=0.005 P[Q|c]=0.0708 lift=195.7 | P[c]=0.005 P[Q|c]=0.0688   by(6,<=3)
+  P[c]=0.005 P[Q|c]=0.0708 lift=195.7 | P[c]=0.005 P[Q|c]=0.0688   by(6,<=3) & by(6,<=4)
+  P[c]=0.005 P[Q|c]=0.0708 lift=195.7 | P[c]=0.005 P[Q|c]=0.0688   by(6,<=3) & by(5,<=3)
+  P[c]=0.005 P[Q|c]=0.0708 lift=195.7 | P[c]=0.005 P[Q|c]=0.0688   by(6,<=3) & by(6,<=5)
+
+dangerous, bulk-flow conditions, P[c] >= 0.005; train | held-out
+  P[c]=0.006 P[Q|c]=0.0006 lift=1.8 | P[c]=0.007 P[Q|c]=0.0004   run(ab>=12,3,[5,10))
+  P[c]=0.011 P[Q|c]=0.0005 lift=1.5 | P[c]=0.012 P[Q|c]=0.0003   run(ab>=12,3,[1,10))
+  P[c]=0.010 P[Q|c]=0.0005 lift=1.4 | P[c]=0.011 P[Q|c]=0.0004   run(ab>=12,3,[5,15))
+  P[c]=0.015 P[Q|c]=0.0005 lift=1.3 | P[c]=0.016 P[Q|c]=0.0004   run(ab>=12,3,[1,15))
+  P[c]=0.005 P[Q|c]=0.0004 lift=1.2 | P[c]=0.005 P[Q|c]=0.0003   run(ab>=12,3,[1,5))
+  P[c]=0.025 P[Q|c]=0.0004 lift=1.1 | P[c]=0.025 P[Q|c]=0.0004   ~run(ab>=8,2,[1,15))
+
+protective, thin-flow conditions, P[c] >= 0.005; train | held-out
+  P[c]=0.407 P[Q|c]=0.0000 lift=0.0 | P[c]=0.408 P[Q|c]=0.0000   ~run(a5=0,1,[1,5))
+  P[c]=0.132 P[Q|c]=0.0000 lift=0.0 | P[c]=0.133 P[Q|c]=0.0000   ~run(a5=0,1,[1,10))
+  P[c]=0.043 P[Q|c]=0.0000 lift=0.0 | P[c]=0.043 P[Q|c]=0.0000   ~run(a5=0,1,[1,15))
+  P[c]=0.726 P[Q|c]=0.0000 lift=0.0 | P[c]=0.729 P[Q|c]=0.0000   ~run(a5=0,2,[1,10))
+  P[c]=0.630 P[Q|c]=0.0000 lift=0.0 | P[c]=0.635 P[Q|c]=0.0000   ~run(a5=0,2,[1,15))
+  P[c]=0.027 P[Q|c]=0.0000 lift=0.0 | P[c]=0.026 P[Q|c]=0.0000   run(a5=1,3,[1,5))
+
+protective, bulk-flow conditions, P[c] >= 0.005; train | held-out
+  P[c]=0.009 P[Q|c]=0.0003 lift=0.8 | P[c]=0.009 P[Q|c]=0.0004   run(ab>=8,9,[5,10))
+  P[c]=0.009 P[Q|c]=0.0003 lift=0.8 | P[c]=0.009 P[Q|c]=0.0004   run(ab>=8,9,[5,15))
+  P[c]=0.046 P[Q|c]=0.0003 lift=0.9 | P[c]=0.046 P[Q|c]=0.0003   run(ab<=4,2,[1,5))
+  P[c]=0.049 P[Q|c]=0.0003 lift=0.9 | P[c]=0.045 P[Q|c]=0.0004   run(ab<=4,2,[10,15))
+  P[c]=0.015 P[Q|c]=0.0003 lift=0.9 | P[c]=0.015 P[Q|c]=0.0003   ~run(ab>=8,1,[5,10))
+  P[c]=0.034 P[Q|c]=0.0003 lift=0.9 | P[c]=0.035 P[Q|c]=0.0003   ~run(ab>=8,1,[1,5))
+
+the draft's conditions:
+  P[c]=0.002 P[Q|c]=0.1580   by(5,<=1)
+  P[c]=1.000 P[Q|c]=0.0004   by(11,>=5)
