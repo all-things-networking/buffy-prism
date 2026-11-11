@@ -1,0 +1,8 @@
+# Q = U blocked in >= 10 of the 30 window steps (learn_pfc.py on 4M runs, PB = 0.3, LC = 0.5)
+# culprit conditions first (rejection), then incast conditions (--condition-on)
+k1 | run(c1,8,[21,41)) & ~run(c0,3,[21,51))
+k2 | run(c1,6,[21,41)) & inc(40,>=26)
+i1 | inc(50,>=42)
+i2 | inc(50,>=44) & ~run(b0,6,[1,51))
+s1 | inc(40,<=14)
+s2 | inc(60,<=30) & inc(40,<=14)

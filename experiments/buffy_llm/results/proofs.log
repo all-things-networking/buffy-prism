@@ -1,0 +1,2 @@
+suff: timeout (3001 s; z3 did not decide "a long output in each of iterations 0-4 => wait >= 20")
+nec: timeout (3001 s; z3 did not decide "wait >= 20 => at least two long outputs in iterations 0-2")

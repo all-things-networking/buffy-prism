@@ -1,0 +1,5 @@
+# Q = the tracked request waits >= 20 iterations (learn_llm.py on 1M runs): mild, certain, protective
+w1 | lo(5,>=4) & lp(3,>=2)
+w2 | lo(5,>=5)
+g1 | lo(3,<=1)
+g2 | ~run(LO,1,[1,3))

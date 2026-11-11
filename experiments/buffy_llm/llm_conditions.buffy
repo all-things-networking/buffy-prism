@@ -1,0 +1,163 @@
+// Generated from buffy/examples/jani/llm_sched.buffy with monitors of the raw arrival draw (`sh`, the last
+// iteration's; `clp`, `clo`, counts so far) for conditions; certify_llm.py adds `given` queries.
+// The batch scheduler of an LLM inference worker with chunked prefill (buffy-prism's LLM case
+// study, branch llm-batch-scheduler-case-study, model/llm_batch_scheduler/chunked/scheduler.pm;
+// R records generalise it as gen_scheduler.py does).
+//
+// One time step is one scheduler iteration. R request records are each empty, waiting or
+// running (st = 0, 1, 2). Record 0 is the tracked request: it arrives at T_V with a short shape
+// and competes under the same rules as the background records 1..R-1. In each iteration:
+//   1. the tracked request joins the waiting set at T_V;
+//   2. at most one background request arrives into the lowest-index empty record (dropped if
+//      none is empty), with a long prompt w.p. P_LP and a long output w.p. P_OL_SP or P_OL_LP;
+//   3. waiting records are admitted while fewer than N_SLOTS run, smallest key first (arrival
+//      order for FCFS, remaining prefill for SJF), ties to the lower index;
+//   4. each running record computes one prefill chunk (CHUNK_BLK blocks) or decodes one token
+//      (one more KV block); a record that emits its last token leaves;
+//   5. while the KV blocks held exceed KV_CAP, the running record with the latest arrival is
+//      evicted to the waiting set and must recompute its blocks (POLICY 1 protects record 0).
+// Monitors measure the tracked request's worst inter-token gap, evictions and the features of
+// the arrivals that the conditions read.
+//
+// The arrival of step 2 is one draw with five outcomes, taken as the arrival count of `req`
+// (capacity 0: only arrivals-p is read): 0 none, 1 short/short, 2 short prompt/long output,
+// 3 long prompt/short output, 4 long/long.
+
+const R = 3;            // request records (record 0 = tracked request)
+const T = 10;           // horizon (iterations)
+const T_V = 3;          // arrival iteration of the tracked request
+const N_SLOTS = 2;      // batch width
+const KV_CAP = 8;       // KV pool (blocks)
+const CHUNK_BLK = 3;    // prefill blocks per iteration
+const POLICY = 0;       // 0: evict the latest arrival (LIFO); 1: never prefer record 0
+const ADM_POLICY = 0;   // 0: FCFS by arrival; 1: SJF by remaining prefill
+const SP = 1;  const LP = 3;    // prompt blocks: short / long
+const SO = 1;  const LO = 3;    // output blocks: short / long (LO >= SO, VO)
+const VP = 1;  const VO = 2;    // tracked request
+const P_ARR = 0.7;      // a background request arrives
+const P_LP = 0.4;       // ... with a long prompt
+const P_OL_SP = 0.4;    // long output given a short prompt
+const P_OL_LP = 0.4;    // long output given a long prompt
+const SLO_TBT = 3;      // inter-token gap that violates the SLO
+const K_CASC = 2;       // eviction cascade threshold
+const BMAX = LP + LO;   // most blocks a record holds
+const NL = 4;           // saturation of the arrival counters
+const PT = 2 * R;       // saturation of the eviction counter
+
+worker(buffer req) {
+    global int<0..2>[R] st;          // 0 empty, 1 waiting, 2 running
+    global int<0..BMAX>[R] pp;       // prefill blocks left
+    global int<0..LO>[R] oo;         // output tokens left
+    global int<0..BMAX>[R] bk;       // KV blocks held
+    global int<0..T>[R] ad;          // arrival iteration
+
+    //@ monitor int<0..T> v_gap;          // iterations since the tracked request's last token
+    //@ monitor int<0..T> v_maxgap;
+    //@ monitor int<0..3> v_preempts;
+    //@ monitor int<0..PT> preempts;
+    //@ monitor int<0..NL> n_lp;          // long-prompt background arrivals
+    //@ monitor int<0..NL> n_lo;          // long-output background arrivals
+    //@ monitor bool lp_before_v;         // a long-prompt arrival before / after the tracked one
+    //@ monitor bool lp_after_v;
+    //@ monitor bool both_before_v;       // a long-prompt, long-output arrival before / after
+    //@ monitor bool both_after_v;
+    //@ monitor int<0..R> peak_conc;
+    //@ monitor int<0..4> sh;             // the arrival draw of the last iteration (0 none, 1..4 shapes)
+    //@ monitor int<0..T> clp;            // long-prompt draws so far (raw: placed or not)
+    //@ monitor int<0..T> clo;            // long-output draws so far
+
+    local int shape = arrivals-p(req);
+    local bool placed = false;
+    local int nrun;
+    local int kv;
+    local int best;
+    local int bkey;
+    local int key;
+    local int c;
+
+    // 1. the tracked request
+    if (time == T_V & st[0] == 0) {
+        st[0] = 1;  pp[0] = VP;  oo[0] = VO;  ad[0] = time;
+    }
+
+    // 2. one background arrival
+    for (i in 1..R) do {
+        if (!placed & shape > 0 & st[i] == 0) {
+            placed = true;
+            st[i] = 1;
+            pp[i] = shape >= 3 ? LP : SP;
+            oo[i] = (shape == 2 | shape == 4) ? LO : SO;
+            ad[i] = time;
+        }
+    }
+    //@ if (placed & shape >= 3) { n_lp = min(NL, n_lp + 1); lp_before_v = lp_before_v | (time < T_V); lp_after_v = lp_after_v | (time > T_V); }
+    //@ if (placed & (shape == 2 | shape == 4)) n_lo = min(NL, n_lo + 1);
+    //@ sh = shape;
+    //@ if (shape >= 3) clp = min(T, clp + 1);
+    //@ if (shape == 2 | shape == 4) clo = min(T, clo + 1);
+    //@ if (placed & shape == 4) { both_before_v = both_before_v | (time < T_V); both_after_v = both_after_v | (time > T_V); }
+
+    // 3. admission, one record per round
+    for (round in 0..R) do {
+        nrun = 0;
+        best = -1;
+        for (i in 0..R) do {
+            if (st[i] == 2) nrun = nrun + 1;
+            key = ADM_POLICY == 1 ? pp[i] : ad[i];
+            if (st[i] == 1 & (best == -1 | key < bkey)) { best = i; bkey = key; }
+        }
+        if (best != -1 & nrun < N_SLOTS) {
+            for (i in 0..R) do { if (i == best) st[i] = 2; }
+            //@ peak_conc = max(peak_conc, nrun + 1);
+        }
+    }
+
+    // 4. service, record by record
+    for (i in 0..R) do {
+        if (st[i] == 1) {
+            //@ if (i == 0) { v_gap = min(T, v_gap + 1); v_maxgap = max(v_maxgap, v_gap); }
+        } else { if (st[i] == 2) {
+            if (pp[i] > 0) {
+                c = min(pp[i], CHUNK_BLK);
+                bk[i] = min(BMAX, bk[i] + c);
+                pp[i] = pp[i] - c;
+                //@ if (i == 0) { v_gap = min(T, v_gap + 1); v_maxgap = max(v_maxgap, v_gap); }
+            } else { if (oo[i] > 0) {
+                oo[i] = oo[i] - 1;
+                if (oo[i] == 0) { bk[i] = 0; st[i] = 0; } else { bk[i] = min(BMAX, bk[i] + 1); }
+                //@ if (i == 0) v_gap = 0;
+            } else {
+                st[i] = 0;  bk[i] = 0;
+            } }
+        } }
+    }
+
+    // 5. eviction while the KV pool is over capacity, one record per round
+    for (round in 0..R) do {
+        kv = 0;
+        best = -1;
+        for (i in 0..R) do {
+            kv = kv + bk[i];
+            key = (i == 0 & POLICY == 1) ? ad[i] - 1000 : ad[i];
+            if (st[i] == 2 & bk[i] > 0 & (best == -1 | key > bkey)) { best = i; bkey = key; }
+        }
+        if (kv > KV_CAP & best != -1) {
+            for (i in 0..R) do {
+                if (i == best) { st[i] = 1;  pp[i] = bk[i];  bk[i] = 0; }
+            }
+            //@ preempts = min(PT, preempts + 1);
+            //@ if (best == 0) { v_preempts = min(3, v_preempts + 1); v_gap = min(T, v_gap + 1); v_maxgap = max(v_maxgap, v_gap); }
+        }
+    }
+}
+
+network {
+    capacity worker.req = 0;
+    traffic worker.req ~ { 0: 1 - P_ARR,
+                           1: P_ARR * (1 - P_LP) * (1 - P_OL_SP),
+                           2: P_ARR * (1 - P_LP) * P_OL_SP,
+                           3: P_ARR * P_LP * (1 - P_OL_LP),
+                           4: P_ARR * P_LP * P_OL_LP };
+    horizon T;
+}
+

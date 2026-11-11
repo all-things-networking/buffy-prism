@@ -1,0 +1,176 @@
+// Generated from buffy/examples/jani/pfc.buffy with monitors for conditions (cb: incast packets so far,
+// cl: the culprit's last arrival); certify_pfc.py adds `given` queries (experiments/buffy_pfc).
+// PFC congestion spreading (RDMA over lossless Ethernet; e.g. Guo et al., SIGCOMM'16). One priority
+// class, every port and link moves one packet per step, over two hops of pause:
+//
+//   host H --(NIC)--> switch 1 --(link)--> switch 2 --> port O2  <-- incast hosts (bursts)
+//                        |                     '-----> port O3  (idle)
+//                        '--> port O1 (idle)
+//
+// Host H sends two flows over its one NIC link: V to switch 2's idle port O3, and U to switch 1's idle
+// port O1. U never touches switch 2. A culprit flow C enters switch 1 on another port and goes to port
+// O2 of switch 2, which an incast from hosts attached to switch 2 congests.
+//
+// Each switch ingress is a FIFO whose head moves to its egress queue when there is room; otherwise it
+// blocks the FIFO (head-of-line blocking). Switch 2's O2 takes from its two ingresses in alternation.
+// With PFC = 1, an ingress holding XOFF or more packets pauses the link that feeds it, from the next
+// step until it falls to XON or fewer: switch 2's ingress pauses switch 1's link to it, and switch 1's
+// ingress from H pauses H's NIC. With PFC = 0 the ingresses tail-drop instead (lossy Ethernet).
+//
+// Input: V, U, C each send a packet per step with probability LV, LU, LC; the incast hosts together
+// send `burst` packets per step into switch 2 (one draw: none, or 1..3 packets): the single source that
+// conditions read. Bad event: U, whose whole path is idle, delivers at most half of what it offered
+// in the measurement window, because pauses spread from switch 2 to switch 1 to H.
+
+const T = 60;          // horizon
+const W = 30;          // measurement window: steps T-W .. T-1
+const LV = 0.3;        // offered loads (packets per step)
+const LU = 0.3;
+const LC = 0.4;
+const PB = 0.3;        // an incast burst in a step
+const BMAX = 3;        // burst size 1..BMAX, uniform
+const NCAP = 12;       // H's NIC queue
+const INCAP = 6;       // switch ingress FIFOs
+const EQ = 2;          // switch egress queues
+const XOFF = 4;        // PFC thresholds (ingress occupancy)
+const XON = 1;
+const PFC = 1;
+const BLK = 10;        // bad event: blocked in at least BLK of the W window steps
+
+pfc(buffer burst) {
+    global queue<0..1>[NCAP] nic;     // H's NIC queue: 0 = V, 1 = U
+    global queue<0..1>[INCAP] s1in;   // switch 1 ingress from H, behind its head
+    global int<-1..1> hd1 = -1;       // its head, waiting to cross (-1: none)
+    global queue<0..1>[INCAP] e1;     // switch 1 egress to switch 2: 0 = V, 1 = C
+    global int<0..EQ> o1;             // switch 1 egress port O1 (U)
+    global queue<0..1>[INCAP] s2in;   // switch 2 ingress from switch 1, behind its head
+    global int<-1..1> hd2 = -1;
+    global int<0..INCAP> inL;         // switch 2 ingress from the incast hosts (all for O2)
+    global int<0..EQ> o2;
+    global int<0..EQ> o3;
+    global bool p1;                   // H's NIC is paused by switch 1 in this step
+    global bool p2;                   // switch 1's link to switch 2 is paused by switch 2
+    global int<0..1> turn;            // O2's alternation: 0 = switch 1's ingress first
+    local int v;
+    local int u;
+    local int c;
+    local int b;
+    local int h;
+    //@ monitor int<0..BMAX> bl;      // the incast burst of the last step
+    //@ monitor int<0..BMAX * T> cb;  // incast packets so far
+    //@ monitor int<0..1> cl;         // the culprit's arrival in the last step
+    //@ monitor int<0..W> offU;       // U's packets offered / delivered in the window
+    //@ monitor int<0..W> gotU;
+    //@ monitor int<0..W> offV;
+    //@ monitor int<0..W> gotV;
+    //@ monitor int<0..T> p1Steps;    // steps with H paused / switch 1 paused
+    //@ monitor int<0..T> p2Steps;
+    //@ monitor int<0..T> drops;      // packets dropped (PFC = 0) or refused at H's full NIC
+    //@ monitor int<0..W> vBlk;       // window steps in which a V packet is blocked (see below)
+    //@ monitor int<0..W> uBlk;       // likewise U
+
+    v ~ bernoulli(LV);
+    u ~ bernoulli(LU);
+    c ~ bernoulli(LC);
+    b = arrivals-p(burst);
+    //@ bl = b;
+    //@ cb = min(BMAX * T, cb + b);
+    //@ cl = c;
+    local bool inWin = time >= T - W & time < T;
+
+    // Egress ports send.
+    if (o1 > 0) {
+        o1 = o1 - 1;
+        //@ if (inWin) gotU = min(W, gotU + 1);
+    }
+    if (o3 > 0) {
+        o3 = o3 - 1;
+        //@ if (inWin) gotV = min(W, gotV + 1);
+    }
+    if (o2 > 0) o2 = o2 - 1;
+
+    // Switch 2's fabric: heads of its ingresses to O2 / O3.
+    if (hd2 == -1 & !s2in.empty()) hd2 = s2in.deq();
+    local bool s1First = turn == 0;
+    if (!s1First & inL > 0 & o2 < EQ) { inL = inL - 1; o2 = o2 + 1; }
+    if (hd2 == 0 & o3 < EQ) { o3 = o3 + 1; hd2 = -1; }
+    else { if (hd2 == 1 & o2 < EQ) { o2 = o2 + 1; hd2 = -1; } }
+    if (s1First & inL > 0 & o2 < EQ) { inL = inL - 1; o2 = o2 + 1; }
+    turn = 1 - turn;
+
+    // Switch 1's link to switch 2.
+    if (!p2 & !e1.empty()) {
+        h = e1.deq();
+        if (hd2 == -1) hd2 = h;
+        else {
+            if (s2in.size() + 1 < INCAP) s2in.enq(h);
+            else {
+                //@ drops = min(T, drops + 1);
+            }
+        }
+    }
+
+    // Switch 1's fabric: the head of its ingress from H to e1 (V) or O1 (U); C arrives into e1.
+    if (hd1 == -1 & !s1in.empty()) hd1 = s1in.deq();
+    if (hd1 == 0 & e1.size() < INCAP) { e1.enq(0); hd1 = -1; }
+    else { if (hd1 == 1 & o1 < EQ) { o1 = o1 + 1; hd1 = -1; } }
+    if (c == 1) {
+        if (e1.size() < INCAP) e1.enq(1);
+        else {
+            //@ drops = min(T, drops + 1);
+        }
+    }
+
+    // H's NIC link to switch 1.
+    if (!p1 & !nic.empty()) {
+        h = nic.deq();
+        if (hd1 == -1) hd1 = h;
+        else {
+            if (s1in.size() + 1 < INCAP) s1in.enq(h);
+            else {
+                //@ drops = min(T, drops + 1);
+            }
+        }
+    }
+
+    // New packets.
+    inL = min(INCAP, inL + b);
+    if (v == 1) {
+        //@ if (inWin) offV = min(W, offV + 1);
+        if (nic.size() < NCAP) nic.enq(0);
+        else {
+            //@ drops = min(T, drops + 1);
+        }
+    }
+    if (u == 1) {
+        //@ if (inWin) offU = min(W, offU + 1);
+        if (nic.size() < NCAP) nic.enq(1);
+        else {
+            //@ drops = min(T, drops + 1);
+        }
+    }
+
+    // PFC: pause decisions for the next step, with hysteresis.
+    local int occ1 = s1in.size() + (hd1 == -1 ? 0 : 1);
+    local int occ2 = s2in.size() + (hd2 == -1 ? 0 : 1);
+    if (PFC == 1) {
+        if (occ2 >= XOFF) p2 = true;
+        else { if (occ2 <= XON) p2 = false; }
+        if (occ1 >= XOFF) p1 = true;
+        else { if (occ1 <= XON) p1 = false; }
+    }
+    // Blocked, for reasons other than its own port: V behind a culprit packet stuck at switch 2's
+    // ingress head, or in a paused link or NIC; U behind a V packet stuck at switch 1's ingress head
+    // (its egress e1 full), or in a paused NIC. Without PFC, U is never blocked.
+    //@ if (inWin & ((hd2 == 1 & s2in.has(0)) | (p2 & e1.has(0)) | (p1 & nic.has(0)))) vBlk = min(W, vBlk + 1);
+    //@ if (inWin & ((hd1 == 0 & e1.size() == INCAP & s1in.has(1)) | (p1 & nic.has(1)))) uBlk = min(W, uBlk + 1);
+    //@ if (p1) p1Steps = min(T, p1Steps + 1);
+    //@ if (p2) p2Steps = min(T, p2Steps + 1);
+}
+
+network {
+    capacity pfc.burst = 0;
+    traffic pfc.burst ~ { 0: 1 - PB, 1: PB / 3, 2: PB / 3, 3: PB / 3 };
+    horizon T;
+}
+

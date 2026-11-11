@@ -1,0 +1,6 @@
+PB=0.3 LC=0.4 PFC=0: blkV: 0.31636 blkU: 0 starveU: 0.00065 starveV: 0.02568 spread: 0 
+PB=0.3 LC=0.4 PFC=1: blkV: 0.26283 blkU: 0.00016 starveU: 0.00068 starveV: 0.0115 spread: 0.00431 
+PB=0.3 LC=0.5 PFC=0: blkV: 0.64387 blkU: 0 starveU: 0.00065 starveV: 0.08606 spread: 0 
+PB=0.3 LC=0.5 PFC=1: blkV: 0.52517 blkU: 0.00127 starveU: 0.00087 starveV: 0.02821 spread: 0.0298 
+PB=0.4 LC=0.5 PFC=0: blkV: 0.78112 blkU: 0 starveU: 0.00066 starveV: 0.11953 spread: 0 
+PB=0.4 LC=0.5 PFC=1: blkV: 0.69083 blkU: 0.00296 starveU: 0.0011 starveV: 0.03605 spread: 0.04842 

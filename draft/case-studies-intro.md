@@ -91,7 +91,7 @@ but you have learned nothing new. A good assumption is one whose *worst* include
 case is still dangerous — the whole box is bad, not just a skewing corner. Checking
 the worst corner is how we tell a real finding from an artifact.
 
-The five case studies below are five contention points that all fit this shape.
+The six case studies below are six contention points that all fit this shape.
 They differ in what the shared resource is and in how far along we are.
 
 ---
@@ -286,9 +286,6 @@ rare, and only exact conditioning measures them cheaply. (Details: `docs/notes/c
 
 ## 4. Case study C — the LLM inference batch scheduler
 
-*This is the newest case study. We have refined the model but do not yet have a
-validated assumption. The candidate findings below are exploratory.*
-
 **The contention point.** A single GPU serving a large language model runs many
 requests at once with **continuous batching**: it rebuilds the batch every
 iteration, admitting and evicting requests between steps so no slot idles. Each
@@ -314,71 +311,62 @@ flowchart LR
     style V fill:#d1e7dd,stroke:#3a3
 ```
 
-**The bad event `Q`.** We follow one interactive "victim" request and watch for three
-bad outcomes, each a monotone counter read at the horizon: the victim is **evicted**
-at least once (`v_preempts ≥ 1`); the victim's worst gap between output tokens
-reaches an SLO threshold, a **time-between-tokens stall** (`v_maxgap ≥ SLO_TBT`); or
-total evictions across all requests reach a **cascade** threshold
-(`preempts ≥ K_CASC`). Because chunked prefill removes the freeze-the-batch
-pathology, the residual risk we study is memory-driven: the victim stalls because it
-was evicted, or because it waited behind long requests for a batch slot.
+**The configuration.** We study a realistic-scale configuration: 3 batch slots, a memory pool
+of 32 blocks, prompts of 1 or 8 blocks and outputs of 1 or 16 tokens, a background request arriving
+in 90% of iterations, each with a long prompt and a long output with probability 1/2, and one
+tracked interactive request (short prompt, short output) arriving at iteration 5. Admission is
+first-come-first-served and eviction takes the newest request. The run lasts 40 iterations. Each
+iteration's arrival is one random draw (none, or one of four request shapes), so the input is the
+sequence of these draws.
 
-**The input parameters.** The workload knobs are the arrival process and the request
-shapes: `p_arr` (probability a background request arrives in an iteration), and the
-probabilities that an arrival has a long prompt and a long output (`p_lp`, `p_ol`,
-drawn independently in the current model). Fixed design constants describe the
-engine: the KV pool size (`KV_CAP`), the number of batch slots (`N_SLOTS`), the
-chunk size, and the policy (first-come-first-served, or a priority policy that
-protects the victim). Lengths are measured in 16-token memory blocks; time is
-measured in engine iterations.
+**The bad events `Q`.** At this scale the tracked request's experience is bimodal. Either it gets a
+slot and generates its tokens with small gaps, or it waits behind long requests for a long time
+(13–31 iterations) before its first token. So we study two rare events: the tracked request is
+**evicted** at least once (5.5% of runs), and it **waits at least 20 iterations**, half the run, for a
+token (6.0%).
 
-**How the model runs.** It is a DTMC. One engine iteration is a fixed sequence of
-sub-stages: inject the victim if it is its arrival time, draw any background arrival
-(the only random step), admit waiting requests into free slots, advance each running
-request by one chunk of prefill or one decode token, and finally evict the
-top-scored request while memory is over capacity. The horizon is 10 iterations.
+**How the assumptions are found.** As in case study B: we record the arrival draws of a million runs,
+let a learner search bounded temporal formulas over them (patterns such as "a long-output request in
+each of the first five iterations", or "at most one long output in the first three"), and certify
+each candidate on the compiled model by exact conditioning. Where we could afford it, we checked
+against simulating everything and keeping the runs that satisfy `A`; the numbers agree.
 
-**Where the model stands.** There are two variants. An earlier one gave the victim a
-privileged, dedicated slot; a later one makes the victim an ordinary competing
-request with a real waiting queue and independent prompt and output lengths. Moving
-to the more faithful variant changed the picture in an instructive way, which is why
-we report no assumption yet:
+**Finding 1 — the long wait has mild, sharp and certain conditions.**
 
-- In the privileged model, a candidate condition — "a long request arrived *before*
-  the victim and none after" — lifted the eviction rate from a base of about `0.14`
-  to about `0.40`, while the same long request arriving *after* the victim gave a
-  rate near zero (it shielded the victim). The story was timing and shape, not
-  volume: last-in-first-out eviction turns an early long prompt into the reason the
-  later interactive request becomes the eviction target.
+| assumption `A` on the arrivals before the tracked request | `P[A]` | `P[wait ≥ 20 \| A]` |
+|---|---|---|
+| a long-output request arrives in at least 4 of the first 5 iterations, and a long-prompt one in at least 2 of the first 3 | 6.3% | **64%** |
+| a long-output request arrives in each of the first 5 iterations | 1.8% | **100%** |
+| at most one long-output request arrives in the first 3 iterations | **57%** | **0** |
 
-- In the faithful model, with realistic slot limits, the victim can no longer be
-  evicted at all in the small configuration, so that bad event becomes unreachable
-  and its earlier finding is partly an artifact of the privileged setup. The
-  surviving bad event is the queueing stall, and the analogous timing condition
-  gives a smaller lift, roughly `0.11` to `0.22`.
+Each long-output request holds a batch slot for 16 iterations, and first-come-first-served admission
+makes the newcomer wait for all of them. The mild condition makes the bad event likely (a tenfold
+lift), the rarer one makes it certain, and a condition that holds more often than not rules it out
+entirely.
 
-These lifts are moderate — about 2.8-fold in the privileged model and about 2.0-fold
-in the faithful one — computed on a deliberately small, exactly checkable
-configuration whose absolute sizes are toy; only the *ratios* between quantities
-(memory oversubscription, long-to-short prompt ratio) are meant to be faithful.
-Finding a *mild* condition that makes a bad event *clearly* probable, and confirming
-it at a realistic scale with simulation, is the open work here.
+**Finding 2 — eviction needs a long request ahead of it.** If no long-prompt, long-output request
+arrives before the tracked one (28% of runs), it is never evicted. With one, the newest-first eviction
+rule picks the tracked request once the long request's memory fills the pool. This is the timing
+story our first, simplified model suggested ("a long request before the victim"); it now holds at
+realistic scale with the victim competing normally. But no short condition makes eviction more than
+about a third likely: P[evicted | A] reaches 0.22 for conditions that hold in 9% of runs and 0.34 for
+rarer ones.
 
-**How `P[Q | A]` is formed.** As in the other studies, each group is three queries —
-base, joint, condition — and the conditional is joint over condition. The conditions
-are patterns over the arrival history, tracked by input-feature variables set when
-each request arrives (whether a long request came before or after the victim, how
-many long requests there were).
+"Certain" and "never" here are statistical: 100,000 conditioned runs without an exception, so the
+probabilities are above 0.99996 and below 4·10⁻⁵. A solver asked to prove them for every workload
+did not finish in 50 minutes on the full-scale model.
 
-**Why this supports the paper.** This is the recipe carried to a very different
-domain: an AI serving system rather than a network switch. The shared resource is
-GPU memory, the input is a stream of prompts of unknown length, and the bad event is
-a latency-SLO violation. The same modeling pattern still applies: random input, a
-deterministic scheduler, monotone bad-event counters, and conditional queries. That
-it applies here at all is part of the argument that this way of reasoning is general. It also gives
-an honest example of the method working *as a check on the modeler*: the more
-faithful model revoked a finding that the privileged model had suggested. A single
-trace would never have shown that. A probability over the input space did.
+**The remedies.** Admitting the shortest job first cuts the long wait from 6% to 0.2%, and even when a
+long-output request arrives in each of the first 5 iterations it falls from certain to 0.16%. Protecting the tracked request
+from eviction removes evictions and leaves the wait unchanged: the long waits are queueing, not
+memory.
+
+**Why this supports the paper.** This is the recipe carried to an AI serving system rather than a
+network switch: the shared resource is GPU memory and batch slots, the input is a stream of requests
+of unknown length, and the bad event is a latency-SLO violation. The case also shows the method
+correcting itself. Our first, simplified model gave the victim a dedicated slot. The faithful model
+first revoked that model's finding at a small scale, and at a realistic scale the learned and
+certified conditions restore a sharper version of it. (Details: `docs/notes/case-study-llm.md`.)
 
 ---
 
@@ -547,15 +535,75 @@ predictive, not causal. (Details: `docs/notes/case-study-outcast.md`.)
 
 ---
 
-## 7. What ties the five together
+## 7. Case study F — congestion spreading under priority flow control
+
+**The contention point.** Datacenter networks that carry RDMA traffic run Ethernet *lossless*: a
+switch whose ingress buffer passes a threshold sends a **pause** upstream, and the sender stops until
+the buffer drains (priority flow control, PFC). Nothing is dropped, but a pause stops *every* packet
+on the link, so congestion at one port can spread to flows that never go near it. Operators report
+this as one of PFC's main hazards.
+
+```mermaid
+flowchart LR
+    H["host H<br/>flows V and U"] -- "paused by switch 1" --> S1{"switch 1"}
+    C["culprit flow C"] --> S1
+    S1 --> O1(("O1: U's port<br/>idle"))
+    S1 -- "paused by switch 2" --> S2{"switch 2"}
+    I["incast hosts"] --> S2
+    S2 --> O2(("O2: congested"))
+    S2 --> O3(("O3: V's port<br/>idle"))
+    style O2 fill:#f8d7da,stroke:#c33
+```
+
+We model two switches. Host H sends two flows over one link into switch 1. V goes on to switch 2 and
+an idle port there. U leaves switch 1 at another idle port and never touches switch 2. A culprit flow
+C goes through both switches to port O2 of switch 2, which an incast from other hosts also targets,
+so O2 is slightly overloaded. When switch 2's buffer for traffic from switch 1 fills, switch 2 pauses
+switch 1; switch 1's buffer from H then fills behind a stuck V packet, and switch 1 pauses H. U is
+caught in a pause it has nothing to do with.
+
+**The bad event `Q`.** U is blocked (waiting behind someone else's stuck packet, or paused) in at
+least a third of the last 30 steps of a 60-step run.
+
+**Finding 1 — spreading exists only with PFC, and it is rare.** With PFC, `Q` happens in 0.16% of
+runs. Without PFC (dropping instead of pausing), U is never blocked. The flow that goes through switch
+2 to an idle port, V, is blocked often in both cases (53% of runs with PFC, 64% without), because it
+shares a buffer with the culprit at switch 2: that is head-of-line blocking, not PFC. In fact PFC
+*helps* V's delivery here (3% vs 9% of runs with V receiving less than half its traffic), because
+without it V's packets are dropped.
+
+**Finding 2 — no mild pattern makes spreading likely.** As in the other studies, we recorded the
+input of four million runs, learned temporal conditions over it, and certified them. The best
+conditions raise `Q` only tenfold, to about 1.6%, and they need a *persistent* culprit: one that sends
+without a break for 8 steps while the incast is heavy. Spreading needs a sustained overload *and*
+the victims' own packets to be in the wrong place when the pauses come. No short pattern of any one
+input captures that. Here the recipe's answer is that the hazard is diffuse rather than tied to a
+recognisable input pattern, which is itself worth knowing.
+
+**Finding 3 — a mild protective condition.** If the incast brings at most 14 packets in the first 40
+steps (6% of runs), spreading becomes 20 times rarer. The learner had suggested "never". Re-checking
+on 200,000 fresh runs that all satisfy the condition corrected it. Learned conditions need that
+re-check.
+
+**Why this supports the paper.** It carries the recipe to a two-switch fabric and to a hazard that
+*only exists* because of a mechanism meant to help (pausing instead of dropping). The probabilistic
+view separates the effects. The flow next to the congestion suffers head-of-line blocking with or
+without PFC, and PFC actually improves its delivery. The unrelated flow is hurt only through PFC, and
+only rarely. Not every bad event has a sharp input condition, and the method says so instead of
+inventing one. (Details: `docs/notes/case-study-pfc.md`.)
+
+---
+
+## 8. What ties the six together
 
 | | contention point | shared resource | bad event `Q` | input knobs | assumption found |
 |---|---|---|---|---|---|
 | **A. Incast** | ToR switch output port | buffer capacity | ≥ `THRESH` packets dropped at output | senders, window, burst length | two mild boxes, `P[Q] ≥ 0.54–0.64` across the whole box |
 | **B. Buggy FQ** | fair-queuing scheduler | one dequeue per step | thin flow overtakes the waiting bulk flows ≥ 4 times in 14 steps | the thin flow's arrival timing | learned temporal patterns (quiet start, then single packets): `P[Q \| A]` up to 0.50 (sparse) / 0.16 (uniform), certified by exact conditioning; mild patterns that rule `Q` out |
-| **C. LLM scheduler** | GPU batch scheduler | KV-cache memory | victim evicted / stalled / cascade | arrival rate, prompt and output lengths | timing/shape candidates, not yet validated |
+| **C. LLM scheduler** | GPU batch scheduler | batch slots and KV-cache memory | tracked request waits ≥ 20 iterations / is evicted | the arrival sequence of request shapes | learned patterns: mild (6%) → 64%, certain (1.8%) → 100%, and a 57%-likely pattern that rules the wait out; eviction ruled out unless a long request comes first |
 | **D. Multi-queue NIC** | NIC transmit scheduler | link share | tenant 1 waiting yet ≤ 40% of a 20-step window | per-tenant and memcached loads | one mild box, `P[Q] ≥ 0.37` across the whole box (0 under the intended policy) |
 | **E. TCP outcast** | switch output port, two input ports | queue slots under contention | lone flow gets ≤ half its fair share in the second half | closed-loop TCP senders; arrival timing at the two ports | learned temporal patterns: `P[Q \| A]` 0.91 (lock-in) or 0.02 (gaps on the other port), from a base of 0.52 |
+| **F. PFC spreading** | two switches, pause frames | ingress buffers and links | an unrelated flow blocked by pauses in ≥ 1/3 of a window | incast bursts, culprit persistence | no short pattern makes it likely (≤ 1.6%); a mild low-incast pattern makes it 20× rarer |
 
 Every row is the same picture. The randomness lives in the input. The component is a
 deterministic reaction to that input. The bad event is a monotone counter. The
