@@ -166,16 +166,14 @@ FQ, they are temporal patterns, not loads.
   condition is resolved after elaboration, outside the loop's scope. The fix records the loop
   variables with each conditional draw (`Elaborate.cpp`, `condLoops`). A regression test,
   `examples/jani/draws_loop.buffy`, is checked against a hand-unrolled copy in 4 layouts.
-- **LTL monitor blow-up.** Buffy compiles nested or combined bounded LTL into one deterministic
-  monitor by formula progression. Conjunctions of two windowed `F<=80` formulas exceed the compiler's
-  limit of 100,000 monitor states: each conjunct carries its own countdown, which duplicates `time`.
-  `certify.py` therefore compiles each `run(p, k, [a, b))` into two small monitor variables: a
-  saturating run length and a sticky flag. Its results are identical to the progression monitor
-  where both compile. Two possible compiler fixes:
-  - *time-anchored* monitors: obligations of formulas evaluated from time 0 can use `time` instead of
-    their own countdown;
-  - *factored* monitors: one small automaton per subformula, as above, instead of one product
-    automaton.
+- **LTL monitor blow-up, fixed.** Buffy used to compile a combined bounded-LTL condition into one
+  deterministic monitor by formula progression. Conjunctions of two windowed `F<=80` formulas then
+  exceeded the compiler's limit of 100,000 monitor states, because each conjunct carries its own
+  countdown. At first, `certify.py` encoded each `run(p, k, [a, b))` as two small monitor variables
+  (`mon`). The compiler now factors such conditions into one monitor per subformula (design
+  decision 48), so the learned conditions also compile as Buffy `given` queries (`ltl`). For all
+  eight conditions the two encodings give identical estimates on the same seed. A single
+  condition's factored monitors have 162–621 states, and it compiles in under a second.
 - **Learning from the compiled model.** Traces come from the same JANI that certifies the conditions.
   The learner's time alignment is confirmed by the certification, whose fresh-run estimates match the
   held-out ones.

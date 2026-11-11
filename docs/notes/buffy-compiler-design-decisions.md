@@ -305,3 +305,40 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     100,000-state monitor limit, because formula progression gives each conjunct a countdown that
     duplicates `time`. Time-anchored or factored monitors would avoid this
     (`docs/notes/case-study-outcast.md`).
+48. **Factored LTL monitors.** A query whose top level (in negation normal form) is an and/or of
+    temporal subformulas may get one monitor per subformula, with the property
+    `F<=depth (and/or of mon_i = accept_i)`. This is exact because a bounded subformula's verdict is
+    absorbing and the combination is positive. Equal subformulas share a monitor, so a `given`
+    condition is built once for `_joint` and `_given`. A single monitor is still tried first while it
+    stays under 20,000 states, since it is minimised as a whole. `--factor-monitors` forces factoring;
+    `test/jani` checks every exactly checked example both ways. This resolves decision 47's open
+    item: the outcast study's learned conditions, two `F<=80` windows each, now compile as `given`
+    queries.
+
+    Monitor updates now select the successor by binary search on the state index (depth log2 N). The
+    linear `ite` chain overflowed the JANI emitter's stack at tens of thousands of states.
+
+    *Alternative rejected:* time-anchored progression (reading `time` instead of each `F<=b`'s own
+    countdown). It only helps formulas evaluated from a fixed position, and it needs knowledge that
+    `time` is monotone, which formula progression does not have.
+49. **`--condition-on <query>`: conditioning the input exactly.** For a query's `given` condition
+    psi that depends on the random input through one probabilistic source:
+    - the compiler closes psi's variables under their updates (the input cone) and enumerates
+      (step, cone state, psi-monitor state) up to psi's depth;
+    - it computes h by backward induction and replaces the source's probabilities by
+      `p * h_{t+1} / h_t`, selected by a new state variable `cond_<q>` (a balanced lookup).
+
+    The resulting DTMC's path law is the original one conditioned on psi (Doob's h-transform).
+    Everything outside the cone depends on the source only through its draws, so it is unchanged.
+    P=? of the query's formula is `P(phi | psi)`, and `P(psi) = h_0` is exact. This turns the rare
+    condition problem of the FQ study, P(A) of 1e-3 to 1e-7, into ordinary simulation
+    (`experiments/buffy_conditioning`). It is the probabilistic counterpart of building the model
+    on demand while pruning paths that violate a path condition (Automata 2025 slides).
+
+    *Restrictions:* a DTMC, and one source; several sources in one step would need their draws
+    sequenced within the step. A closed-loop input, where the source's distribution depends on
+    state it does not drive alone (the outcast study), is outside the cone and rejected.
+
+    *Alternative rejected:* importance weights in the simulator. They need simulator support for
+    reweighting probabilistic edges, and they give unbiased but higher-variance estimates. Here the
+    weights cancel exactly.

@@ -1,0 +1,7 @@
+== conditioned on se: P(condition) = 0.00192 (exact, from the compiler)
+se: 0.8392 [0.834035, 0.844266]  (16784 of 20000)
+== conditioned on sg: P(condition) = 5.12e-07 (exact, from the compiler)
+sg: 1 [0.999816, 1]  (20000 of 20000)
+== unconditioned, 10,000,000 runs
+se_joint: 0.0016112 [0.00158644, 0.00163625]  (16112 of 10000000)
+se_given: 0.0019257 [0.00189862, 0.00195307]  (19257 of 10000000)

@@ -1,0 +1,76 @@
+// Generated from buffy/examples/jani/fq_buggy.buffy (its queries replaced by the two below).
+// The buggy fair-queuing scheduler of the Buffy paper (HotNets'24, Fig. 2), with the monitors of
+// buffy-prism's hand-written FQ-CoDel model (tests/models/fqcodel_5i_dtmc_unif.pm):
+//   deqs_bl - dequeues from the last queue while all other queues are backlogged
+//   cenq    - cumulative arrivals to the last queue
+//   aipg    - time steps since the last arrival to the last queue
+// Each time step: 0..K arrivals per input buffer (uniform for queues 0..N-2, P0 of none and
+// (1-P0)/K each otherwise for the last queue), tail-dropped at SZ, then one dequeue.
+// Monitors saturate so that exploring past the horizon T stays within their ranges.
+
+const N = 5;
+const SZ = 8;
+const K = 4;
+const T = 14;
+const P0 = 0.2;   // P(no arrival) at the last queue; 0.2 = uniform, 0.6 = the skewed variant
+
+fq(buffer[N] ibs, buffer ob) {
+    global queue<0..N-1>[N] nq;
+    global queue<0..N-1>[N] oq;
+    //@ monitor int<0..T> deqs_bl;
+    //@ monitor int<0..K*T> cenq;
+    //@ monitor int<0..T> aipg;
+
+    //@ cenq = min(K*T, cenq + arrivals-p(ibs[N-1]));
+    //@ if (arrivals-p(ibs[N-1]) == 0) { aipg = min(T, aipg + 1); } else { aipg = 0; }
+
+    // update new queues
+    for (i in 0..N) do {
+        if (backlog-p(ibs[i]) > 0 & !oq.has(i) & !nq.has(i))
+            nq.enq(i);
+    }
+
+    // decide which input queue should transmit
+    local bool dequeued = false;
+    local int head;
+    for (i in 0..N) do {
+        if (!dequeued) {
+            head = -1;
+            if (!nq.empty()) { head = nq.deq(); }
+            else { if (!oq.empty()) { head = oq.deq(); } }
+
+            if (head != -1) {
+                if (backlog-p(ibs[head]) > 1) { oq.enq(head); }
+                if (backlog-p(ibs[head]) > 0) {
+                    //@ if (head == N-1 & backlog-p(ibs[0]) > 0 & backlog-p(ibs[1]) > 0 & backlog-p(ibs[2]) > 0 & backlog-p(ibs[3]) > 0) deqs_bl = min(T, deqs_bl + 1);
+                    move-p(ibs[head], ob, 1);
+                    dequeued = true;
+                }
+            }
+        }
+    }
+}
+
+network {
+    capacity fq.ibs = SZ;
+    traffic fq.ibs[0] ~ uniform(0, K);
+    traffic fq.ibs[1] ~ uniform(0, K);
+    traffic fq.ibs[2] ~ uniform(0, K);
+    traffic fq.ibs[3] ~ uniform(0, K);
+    traffic fq.ibs[4] ~ { 0: P0, 1: (1 - P0) / 4, 2: (1 - P0) / 4, 3: (1 - P0) / 4, 4: (1 - P0) / 4 };
+    horizon T;
+}
+
+query starve:  P=? [ G<=T (fq.deqs_bl < 4) ];
+query cond_a:  P=? [ G<=T ((fq.deqs_bl < 4) & (time > 5 | fq.cenq < 2)) ];
+query early:   P=? [ G<=T (time > 5 | fq.cenq < 2) ];
+query gap:     P=? [ G<=T (time < 7 | fq.aipg > 1) ];
+
+// Importance-function hint for rare-event simulation (emitted with --importance-props).
+importance imp: fq.deqs_bl;
+
+// Conditions of the FQ case study (draft §3) as `given` queries. Compiled with
+// `--condition-on se` (or sg), P=? of the query is P(no starvation | condition), estimated by
+// simulating only runs that satisfy the condition.
+query se: P=? [ G<=T (fq.deqs_bl < 4) ] given G<=T (time > 5 || fq.cenq < 2);   // little early traffic
+query sg: P=? [ G<=T (fq.deqs_bl < 4) ] given G<=T (time < 7 || fq.aipg > 1);   // sparse late arrivals

@@ -4,8 +4,8 @@ Reports P[c], P[Q | c] with 95% Clopper-Pearson intervals, and P[Q].
 
 Two encodings of a condition c in a copy of buffy/examples/jani/outcast.buffy:
   ltl  - the query `P=? [ Q ] given c` with c in Buffy's bounded LTL; Buffy compiles c and Q && c into
-         deterministic monitors by formula progression. Exact, but conjunctions of long time windows
-         exceed the compiler's monitor limit.
+         deterministic monitors by formula progression, one per subformula when a single monitor of
+         the conjunction would be too large (design decision 48).
   mon  - each run(p, k, [a, b)) in c becomes two monitor variables updated in the method: the length of
          the current run of p (saturating at k) and a sticky flag "a run of k started in [a, b)". c is
          then a state predicate at time T. Same meaning, a few states per subformula.
