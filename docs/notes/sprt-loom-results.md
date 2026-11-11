@@ -53,6 +53,9 @@ H+: P[starved] ≥ 0.0015 against H−: P ≤ 0.0005, with α = β = 0.05/32 per
 - **What scale gave.** Building and running models with up to 200,459 state variables costs seconds to
   minutes. The step is generated from the program's structure (design decisions 54–55): before that,
   the limit was 16 cores at capacity 32, about 3,300 variables.
+- **What was scaled.** The total offered load stays fixed as cores are added (each core's flows send
+  at ρ/NC), so the bottleneck is the same link at every size. The study scales the model's size, not
+  the difficulty of the contention, which is also why small sizes predicted the large ones.
 - **Limits.** The claims hold for the registered configurations only: the MQPrio corner and the 8
   load corners of the grid. "Across all traffic" would need a maximum over inputs, which sampling
   cannot certify. Family B's single violation-free outcome also fits a policy that cannot starve at

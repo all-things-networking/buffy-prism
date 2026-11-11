@@ -594,7 +594,87 @@ inventing one. (Details: `docs/notes/case-study-pfc.md`.)
 
 ---
 
-## 8. What ties the six together
+## 8. Scaling up — a pre-registered certification at 200,000 state variables
+
+**The question.** The six case studies use models a person can read: a handful of queues, tens to a
+few hundred state variables. A reader will ask whether the approach survives contact with a system
+of realistic size. We took case study D's NIC and scaled it toward the size of a real server NIC: up
+to 512 transmit queues (one per CPU core), each 64 packets deep. That is about 200,000 state
+variables, beyond the reach of any exact method by an enormous margin. We then asked two questions
+of it, fixing the hypotheses in advance.
+
+**What made the size cheap.** Two changes to the compiler, neither specific to this model.
+- **The simulator's code follows the program.** A loop over cores stays a loop, and a queue is an
+  array, so the generated code grows with the size of the Buffy program and not with the size of the
+  model.
+- **The compiler itself runs in linear time.** Three costs that grew faster than the model were
+  removed.
+
+| NIC | state variables | compile | simulator build | one 60-step run |
+|---|---|---|---|---|
+| 16 cores, queues of 32 (largest size before) | 3,323 | 0.2 s (was 10 s) | 0.6 s (was about 6 min) | 0.47 ms (was 31 ms) |
+| 64 cores, queues of 64 | 25,291 | 1.6 s | 0.8 s | 4.9 ms |
+| 512 cores, queues of 64 | 200,459 | 19 s | 7 s | 29 ms |
+
+The faster code computes exactly what the slower one did. On every example and variant, the two
+give the same successor states with the same probabilities in every state checked, and the same
+seeds give the same answers to the last digit.
+
+**Why a sequential test.** Each run is now cheap, so the cost of a claim is the number of runs it
+needs. A fixed-size test decides "is `P[Q]` above or below `θ`" to within `±δ` with a sample size
+set in advance, which grows as `1/δ²`. Wald's sequential probability ratio test (SPRT) instead
+watches the runs one at a time and stops as soon as the evidence is decisive. When the truth is far
+from `θ`, that happens early. We wrote down the hypotheses, error rates, configurations, seeds,
+stopping rules and predictions, and published them before running anything. Configurations at queue
+depth 64 had never been simulated.
+
+**Claim A: MQPrio's isolation failure persists at scale.**
+- **Test.** At the least dangerous corner of case study D's box (`ρ1 = ρ2 = 0.6`, `ρm = 0.1`): is
+  `P[Q] ≥ 0.31`, or `≤ 0.29`?
+- **Sizes.** 64, 128, 256 and 512 cores.
+- **Errors.** 0.0125 per test, so 0.05 for the family.
+- **Prediction.** "≥ 0.31", from the small sizes.
+
+| cores | state variables | decision | runs needed | fixed-size test |
+|---|---|---|---|---|
+| 64 | 25,291 | `P[Q] ≥ 0.31` | 427 | 10,597 |
+| 128 | 50,315 | `P[Q] ≥ 0.31` | 487 | 10,597 |
+| 256 | 100,363 | `P[Q] ≥ 0.31` | 637 | 10,597 |
+| 512 | 200,459 | `P[Q] ≥ 0.31` | 546 | 10,597 |
+
+The isolation failure found on a 4-core model holds unchanged on a 512-core one. SPRT certified it
+with 20 times fewer runs than the fixed-size test: about 30 seconds of simulation in all.
+
+**Claim B: the intended policy keeps starvation below 1 in 1,000 across a grid of loads.**
+- **Test.** Is `P[Q] ≤ 0.0005`, or `≥ 0.0015`?
+- **Configurations.** 8 load corners (`ρ1, ρ2 ∈ {0.5, 0.7}`, `ρm ∈ {0.05, 0.3}`) at each of the 4
+  sizes: 32 tests.
+- **Errors.** 0.05 for the family.
+
+All 32 decided "≤ 0.0005", each after 6,454 runs, and no window starved in any of the 206,528 runs.
+Here SPRT's advantage is the expected modest one. With no violations at all, it stops where the
+classical zero-failure certificate would (6,462 runs). That is still 5 times fewer runs than the
+fixed-size design.
+
+The whole study took 57 minutes on a laptop, and all 36 decisions came out as predicted.
+
+**What this shows, and what it does not.**
+- **What it shows.** The cost of the approach is governed by the work of simulating one run, which
+  grows linearly with the model, and by the statistics of the claim, which do not depend on the
+  model at all. Claim A needed about 500 runs at 25,000 state variables and about 500 at 200,000.
+- **A caveat on what was scaled.** The total offered load is held fixed as cores are added: each
+  core's flows send at `ρ/NC`. So the bottleneck is the same one-packet-per-step link at every
+  size, and the experiment scales the size of the model, not the difficulty of the contention. That
+  is also why the small model predicts the large one so well.
+- **What it does not show.** The claims cover the configurations that were registered, not every
+  traffic pattern. A guarantee over all inputs is a maximum over inputs, which sampling cannot
+  certify. Claim B's clean record is equally consistent with a policy that can never starve tenant
+  1, which only a proof could establish. (Details: `docs/notes/prereg-sprt-loom.md`,
+  `docs/notes/sprt-loom-results.md`.)
+
+---
+
+## 9. What ties the six together
 
 | | contention point | shared resource | bad event `Q` | input knobs | assumption found |
 |---|---|---|---|---|---|
