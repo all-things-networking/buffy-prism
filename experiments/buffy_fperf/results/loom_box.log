@@ -1,0 +1,13 @@
+POLICY=0 rho=(0.5,0.7,0.2) : starved=0.7650±0.0059  waiting=0.9364  e_w1=6.657  e_w2=13.338
+POLICY=1 rho=(0.5,0.7,0.2) : starved=0.0000±0.0000  waiting=0.5583  e_w1=9.248  e_w2=10.748
+POLICY=0 rho=(0.55,0.65,0.15) : starved=0.5917±0.0068  waiting=0.9452  e_w1=7.795  e_w2=12.194
+POLICY=1 rho=(0.55,0.65,0.15) : starved=0.0000±0.0000  waiting=0.7265  e_w1=9.629  e_w2=10.361
+POLICY=0 rho=(0.6,0.6,0.5) : starved=0.9425±0.0032  waiting=0.9937  e_w1=4.985  e_w2=15.015
+POLICY=1 rho=(0.6,0.6,0.5) : starved=0.0000±0.0000  waiting=0.8621  e_w1=9.839  e_w2=10.161
+POLICY=0 rho=(0.6,0.6,0.1) -D NC=8: starved=0.3649±0.0094  waiting=0.9238  e_w1=8.986  e_w2=10.985
+POLICY=1 rho=(0.6,0.6,0.1) -D NC=8: starved=0.0000±0.0000  waiting=0.8368  e_w1=9.836  e_w2=10.138
+oracle POLICY=0 rho=(0.6,0.6,0.1): starved=0.3668±0.0067  waiting=0.9228  e_w1=8.998  e_w2=10.971
+oracle POLICY=1 rho=(0.6,0.6,0.1): starved=0.0000±0.0000  waiting=0.8348  e_w1=9.839  e_w2=10.133
+oracle POLICY=0 rho=(0.5,0.7,0.15): starved=0.6880±0.0064  waiting=0.9174  e_w1=7.070  e_w2=12.919
+oracle POLICY=0 rho=(0.55,0.65,0.15): starved=0.5974±0.0068  waiting=0.9460  e_w1=7.773  e_w2=12.217
+exit 0
