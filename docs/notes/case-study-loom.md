@@ -179,8 +179,15 @@ compiler works in linear time. The same seeds give the same P[starved] to the la
 | 256 | 51,083 | 4.3 s, 0.7 GB | 3.3 MB | 2.1 s | 7.6 ms | 0.37 ± 0.02 |
 
 The isolation failure stays at about 0.37–0.41 from 4 to 256 cores. 512 cores with capacity 64
-compiles in 15 s and 2 GB. The pre-registered sequential test at that size is
-`docs/notes/prereg-sprt-loom.md`.
+compiles in 15 s and 2 GB.
+
+**Pre-registered sequential tests at capacity 64** (`docs/notes/prereg-sprt-loom.md`; results in
+`docs/notes/sprt-loom-results.md`):
+- **MQPrio.** At 64–512 cores (up to 200,459 state variables), SPRT accepts P[starved] ≥ 0.31 against
+  ≤ 0.29 in every configuration, after 427–637 runs each. The fixed-sample design needs 10,597.
+- **The hierarchical policy.** It accepts P < 0.0005 at all 32 points of the load grid, with no
+  starved window in 206,528 runs.
+- **Cost.** 57 minutes in all.
 
 **Cross-checks with the oracle** (20,000 runs each; all within the confidence intervals):
 
