@@ -33,32 +33,40 @@ def expected_success(model: JaniModel, goal: str, importance: str, max_importanc
                      max_pilots: int = 1000, min_pilots: int = 1) -> SplittingDesign:
     """
     Pilot fixed-effort runs with a threshold at every importance value 1..max_importance (constant effort) until the
-    goal level is reached; p_up[l] is the mean success fraction at level l over the pilots that reached level l (a
-    pilot that died below l says nothing about it: counting it as 0 would underestimate every level above the first
-    and inflate the factors there). The factor for crossing into importance l+1 is round(1/p_up[l] + carry) with
-    the rounding error carried forward; values with factor > 1 become thresholds. The goal must imply importance >=
-    max_importance. At least min_pilots pilots run: where the entrance states of a level differ widely in their
-    prospects, a few pilots give very different success fractions, and stopping at the first one that reaches the goal
-    underestimates the upper levels (and inflates their factors).
+    goal level is reached (and at least min_pilots ran). p_up[l], the probability of reaching importance l+1 from
+    an entrance into level l, is estimated as a ratio over pilots, each weighted by its fixed-effort weight there:
+
+        p_up[l] = sum_i W[i,l] f[i,l] / sum_i W[i,l],   f[i,l] = successes / effort,  W[i,l] = prod_{j<l} f[i,j].
+
+    The product of the p_up is then the mean of the pilots' fixed-effort estimates of P, a consistent estimate.
+    Averaging f[i,l] with equal weight over the pilots that reached level l is biased low at the upper levels:
+    a pilot that reached l through one "cold" entrance state counts as much as one with hundreds of "hot" ones,
+    and a pilot's weight and its next fraction are positively correlated. That bias compounds per level (on the
+    leaf-spine fabric it gave a factor product of 5e13 against 1/P = 2e5; docs/notes/case-study-fabric-scaling.md).
+
+    The factor for crossing into importance l+1 is 1/p_up[l] rounded, with the rounding error carried forward
+    multiplicatively, so the product of the factors stays within a factor 2 of 1/prod(p_up) (one expected goal
+    hit per root run). Values with factor > 1 become thresholds. The goal must imply importance >= max_importance.
     """
     thresholds = list(range(1, max_importance + 1))
     efforts = [pilot_effort] * (max_importance + 1)
-    p_up, reached, m = np.zeros(max_importance + 1), np.zeros(max_importance + 1), 0
-    while m < max_pilots and (p_up[-1] == 0 or m < min_pilots):
+    num, den, m = np.zeros(max_importance + 1), np.zeros(max_importance + 1), 0
+    while m < max_pilots and (num[-1] == 0 or m < min_pilots):
         m += 1
         _, _, succ = model.fixed_effort(1, horizon, goal, importance, thresholds, efforts, scheduler,
                                         seed=derive_seed(seed, "pilot", m), level_successes=True)
-        at = np.concatenate([[True], succ[0][:-1] > 0])   # level l was entered (level 0: always)
-        at = np.logical_and.accumulate(at)
-        reached += at
-        p_up[at] += (succ[0][at] / pilot_effort - p_up[at]) / reached[at]
-    if p_up[-1] == 0:
+        f = succ[0] / pilot_effort
+        w = np.concatenate([[1.0], np.cumprod(f[:-1])])   # the pilot's weight on entering each level
+        num += w * f
+        den += w
+    if num[-1] == 0:
         raise RuntimeError(f"expected success: goal level not reached in {max_pilots} pilots")
-    chosen, factors, carry = [], [], 0.0
+    p_up = num / den
+    chosen, factors, carry = [], [], 1.0
     for level in range(max_importance):   # factor for crossing from importance `level` to `level + 1`
-        split = 1.0 / p_up[level] + carry
-        factor = int(np.floor(split + 0.5))
-        carry = split - factor
+        split = carry / p_up[level]
+        factor = max(1, int(np.floor(split + 0.5)))
+        carry = split / factor
         if factor > 1:
             chosen.append(level + 1)
             factors.append(factor)

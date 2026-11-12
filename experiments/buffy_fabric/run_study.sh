@@ -20,12 +20,12 @@ $PY experiments/buffy_fabric/size_sweep.py $R/size_sweep.jsonl \
 $PY experiments/buffy_fabric/horizon_sweep.py $R/horizon_sweep.jsonl 16x16x4 60,180,600,1800,6000,10020 BUDGET=120 \
   2>&1 | tee -a $R/horizon_sweep.log
 
-# 3. a rare event (P ~ 5e-6): Monte Carlo against RESTART and fixed effort, derived and refined importance
-$PY experiments/buffy_fabric/rare_event.py $R/rare_event.jsonl 2x8x2 loss 900 1200 THRESH=6 2>&1 | tee -a $R/rare_event.log
-# refined importance: fixed effort only. With RESTART its factors multiply to 5e13 (1/P ~ 2e5) and one batch did not
-# finish in 2 h 50 min (see the note).
-$PY experiments/buffy_fabric/rare_event.py $R/rare_event.jsonl 2x8x2 loss 900 60 THRESH=6 IMP=hand PILOT=256 PILOTS=16 \
-  RESTART=0 2>&1 | tee -a $R/rare_event.log
+# 3. a rare event (P ~ 6e-6): Monte Carlo against RESTART and fixed effort, derived and refined importance, three seeds
+#    each, factors from the weighted pilot estimator (about 70 min; per-run estimates in $R/rare_event_runs/)
+$PY experiments/buffy_fabric/rare_event_seeds.py $R/rare_event_seeds.jsonl 2x8x2 2>&1 | tee $R/rare_event_seeds.log
+# The first, single-seed run (biased pilot; kept as history in the note) was rare_event.py:
+#   rare_event.py $R/rare_event.jsonl 2x8x2 loss 900 1200 THRESH=6
+#   rare_event.py $R/rare_event.jsonl 2x8x2 loss 900 60 THRESH=6 IMP=hand PILOT=256 PILOTS=16 RESTART=0
 
 # 4. one size further (4,096 hosts), alone: compile under a memory watchdog, then build and run
 experiments/buffy_fabric/try_largest.sh 64 64 16 | tee $R/largest_compile.out

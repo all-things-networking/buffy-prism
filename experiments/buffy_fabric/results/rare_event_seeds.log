@@ -1,0 +1,25 @@
+2x8x2: 692 vars, build 0.0 s
+  MC: 5/800000 in 122 s (152.47 us/run)
+  derived: pilot 157 s, P^ 6.380e-06, 6 thresholds, factor product 1.668e+05 (x P^ = 1.06)
+    thresholds [1, 2, 3, 4, 5, 6]
+    factors [139, 3, 4, 5, 4, 5]
+  derived restart seed 1: 5.615e-06 +-35% (520290 runs, 334 non-zero, top-5 share 0.3232439309679183), for +-10%: 3902.6 s
+  derived fixed_effort seed 1: 6.530e-06 +-32% (503 runs, 286 non-zero, top-5 share 0.3110053736117585), for +-10%: 3328.0 s
+  derived restart seed 2: 6.099e-06 +-35% (497159 runs, 335 non-zero, top-5 share 0.3070801534263412), for +-10%: 3775.2 s
+  derived fixed_effort seed 2: 5.065e-06 +-35% (502 runs, 260 non-zero, top-5 share 0.33067614252728605), for +-10%: 3812.9 s
+  derived restart seed 3: 5.234e-06 +-35% (523924 runs, 346 non-zero, top-5 share 0.30324033584043303), for +-10%: 3824.1 s
+  derived fixed_effort seed 3: 6.414e-06 +-33% (507 runs, 285 non-zero, top-5 share 0.29291243208858014), for +-10%: 3377.4 s
+  refined: pilot 50 s, P^ 1.057e-05, 15 thresholds, factor product 1.106e+05 (x P^ = 1.17)
+    thresholds [10, 12, 13, 14, 15, 24, 27, 42, 47, 60, 74, 76, 88, 90, 94]
+    factors [2, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+  refined restart seed 1: 7.305e-06 +-32% (589977 runs, 389 non-zero, top-5 share 0.28887835132879575), for +-10%: 3201.6 s
+  refined fixed_effort seed 1: 1.038e-05 +-68% (330 runs, 151 non-zero, top-5 share 0.6247244652865076), for +-10%: 13769.7 s
+  refined restart seed 2: 6.542e-06 +-27% (584485 runs, 374 non-zero, top-5 share 0.20613914770845101), for +-10%: 2210.5 s
+  refined fixed_effort seed 2: 6.259e-06 +-54% (330 runs, 134 non-zero, top-5 share 0.5680733073548422), for +-10%: 8746.1 s
+  refined restart seed 3: 5.532e-06 +-44% (620687 runs, 343 non-zero, top-5 share 0.3996334121635819), for +-10%: 5986.1 s
+  refined fixed_effort seed 3: 6.039e-06 +-75% (328 runs, 153 non-zero, top-5 share 0.6036451723811157), for +-10%: 16753.9 s
+  pooled P 6.418e-06; MC needs 59859097 runs, 9127.0 s for +-10%
+  derived restart: speed-up over MC per seed [2.34, 2.39, 2.42]
+  derived fixed_effort: speed-up over MC per seed [2.39, 2.7, 2.74]
+  refined restart: speed-up over MC per seed [1.52, 2.85, 4.13]
+  refined fixed_effort: speed-up over MC per seed [0.54, 0.66, 1.04]

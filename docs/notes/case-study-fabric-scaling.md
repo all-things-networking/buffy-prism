@@ -3,6 +3,11 @@
 *Model: `buffy/examples/jani/fabric.buffy` (Buffy branch `fabric-scaling`). Scripts and raw results:
 `experiments/buffy_fabric/` (run all with `run_study.sh`). One core of an 8 GB laptop, one model at a time.*
 
+*Machine and implementation.* The measurements come from a modest machine (an 8 GB laptop, one core) and a
+research prototype: an unoptimised compiler and a simulator with no parallelism. Where a run hit this
+machine's limits, the note marks it **[machine-bound]**. Such a limit belongs to this laptop and prototype, not
+to the technique. A workstation with more memory, or the compiler change named in decision 56, would move it.
+
 ## Why this study
 
 The SPRT study on Loom (`sprt-loom-results.md`) certified claims at 200,000 state variables, but it grew
@@ -60,14 +65,18 @@ below uses B = 16.
   is 3.55 (`results/oracle_check.log`). Four of the configurations have 32–64 sources per step; they were
   added after the bug below.
 - **Structured vs unrolled step** (`tests/test_native_structured.py`, now with two fabric variants). The
-  default and both variants give identical successors on 960 random-walk states each. The JANI-path
+  default and both variants give identical successors on 960 random-walk states each. The fabric's
+  steps are too large to enumerate, so these are compared at sampled uniforms through
+  `JaniModel.step(s, e, u)`. That single-uniform path is the one the precision fix does not cover, so on
+  the 4×4×4 variant the later sources are compared almost only on their first outcome. The oracle check
+  is the stronger evidence for the structured core. The JANI-path
   simulator cannot load the model (too many joint destinations per step), so `test_native_target.py`
   does not cover it.
 
 ### Two defects found and fixed on the way
 
-1. **The native simulator's draws collapsed in steps with many random sources.** This bug affects
-   earlier results; see the note in the shared folder.
+1. **The native simulator's draws collapsed in steps with many random sources.** It may affect
+   earlier results; see "Who else is affected" below.
    - **Cause.** `jm_step_r` drew all of a step's sources from one double, rescaled into each chosen
      interval. That is exact for real numbers, but each rescaling spends log2(1/q) of the 53 bits. After
      about 45 bits, the later sources collapsed onto their first outcomes.
@@ -78,11 +87,17 @@ below uses B = 16.
      has been rescaled by 2^8. That is exact, since the residual is uniform and independent of the
      earlier choices. Steps that never rescale that far draw exactly as before.
    - **Regression test.** `tests/test_native_precision.py` (64 uniform and 64 rare Bernoulli sources per
-     step) gives |z| = 1.9 with the fix and 346 without it.
-   - **Who else is affected.** Any model whose steps spend more than about 45 bits, e.g. Loom at hundreds
-     of cores in steps with 4 or more arrivals. **The Loom SPRT results at 64–512 cores were produced
-     before this fix and should be re-run.** The bias is small for those claims (it suppresses arrivals at
-     the later cores in about 1% of steps), but it is not zero.
+     step) gives |z| = 1.9 with the fix and 346 without it. Only its uniform half has power: the audit
+     found that the Bernoulli half also passes before the fix.
+   - **Who else is affected.** The collapse needs many draws with power-of-two probabilities. Rescaling
+     by a dyadic interval shifts real bits out of the double, while rescaling by a non-dyadic one rounds
+     and refills the low bits. The fabric's uniform draws over 2, 4, 8 or 16 spines and hosts are
+     dyadic. The audit ran Loom-like steps (512 Bernoulli sources at total rates 1.0–2.0, up to 2 million
+     steps) through a pre-fix copy of the runtime. The distribution of the number of arrivals matched
+     the exact one within sampling error, with a largest deviation of −2.1σ on one tail probability.
+     That is a proxy, not the Loom model. Loom's SPRT results predate the fix, so its Family B (H−, no
+     violations, the direction in which suppressed bursts would be anti-conservative) should be re-run
+     for completeness. `JaniModel.step(s, e, u)` still takes the unrefreshed path.
 2. **Elaboration was quadratic in the number of draws** (Buffy design decision 56).
    - **Cause.** The interval map for dynamic indices was rebuilt for every new traffic source (every
      draw in a loop adds one). Separately, an opaque value was interned per FIFO slot per append.
@@ -113,18 +128,24 @@ own process, one after the other (`size_sweep.py`, `results/size_sweep.jsonl`). 
 | 64×32×8 | 2,048 | 2,015 | 87,052 | 51 s | 2.4 GB | 31 s | 31.4 ms | 256 ns | 0.9995 [0.998, 0.9999] | 99.3% | H+ (12) |
 
 **One size further: 4,096 hosts** (64×64×16; `try_largest.sh`, `largest_run.py`, `results/largest.jsonl`).
-It compiled alone under a 6 GB memory watchdog.
+**[machine-bound]** The compile paged: its footprint was more than twice this laptop's memory. It compiled
+alone. The 6 GB watchdog in `try_largest.sh` polls resident memory, so it could not see
+memory paged out, and it never fired.
 - **Model.** 174,092 state variables, 68 MB of JANI, 28 MB of C.
 - **Compile.**
   - It took 21 minutes of wall time, against 4.5 minutes of user CPU. The machine was paging: 7.8 minutes
-    went to the kernel, and the compiler's peak resident memory was 3.4 GB on an 8 GB machine.
+    went to the kernel. The compiler's peak memory footprint was **18.6 GB** (with `--stats`), of which
+    only 3.4 GB was resident on this 8 GB machine (`results/largest_compile.log`).
   - Even counting user CPU alone, that is 5.3 times the 51 s at 2,048 hosts, for twice the model.
-- **Build and simulation.** Clang took 113 s. A run takes 57 ms, which is 232 ns per host-step, in line
+    Memory grew about 7.6 times for that doubling.
+- **Build and simulation.** Clang took 113 s (3.7 times the 2,048-host build, for 2.2 times the C). A run takes 57 ms, which is 232 ns per host-step, in line
   with the sweep, and the simulator's process peaked at 1.3 GB.
 - **Answer.** P[victim] = 1.000 [0.998, 1] over 1,931 runs, and 99.6% of the incast is lost. The SPRT
-  decides H+ in 12 runs, in 11 s.
+  decides H+ in 12 runs, its minimum. The 11 s is one batch of 200 runs, the sampler's batch size.
 - **Where the size limit is.** Everything after compilation stays cheap at this size. Compilation is
-  what stops it: doubling once more would not fit in memory without the change of decision 56.
+  what stops it **on this machine** [machine-bound]: at 4,096 hosts the prototype compiler already needs
+  more than twice the laptop's 8 GB.
+  Larger sizes need the next step of decision 56, which is not to build the unrolled DAG.
 
 **Reading.**
 - **The answer changes with size, unlike Loom.** Between 16 and 48 hosts, P[victim] goes from 0.002 to
@@ -132,21 +153,30 @@ It compiled alone under a 6 GB memory watchdog.
   keeps growing up to 2,048 hosts, because the aggregator's port delivers about 56 packets per round
   whatever the fan-in. A result at 16 hosts says nothing about 64. Here, scale has to be analysed, not
   extrapolated.
+  - The change happens between 16 and 64 hosts. Above that the answer is saturated, and the port's
+    capacity explains it: the lost share is about 1 − 56/(4M), which gives 0.9931 against the measured
+    0.9927 at 2,048 hosts. P[victim] follows the number of leaves more than the number of hosts.
+  - So the model shows that small sizes can mislead. It does not show a surprise at the largest
+    size.
 - **Simulation scales linearly.** The cost per host-step grows only from 158 ns to 256 ns between 16
-  and 2,048 hosts, roughly cache effects. A run of 60 steps at 2,048 hosts takes 31 ms.
+  and 2,048 hosts, about hosts^1.1 (the cause is not measured). A run of 60 steps at 2,048 hosts takes 31 ms.
 - **Compilation is the steepest step.**
   - Compile time grows faster than the model: ×3.4 from 1,024 to 2,048 hosts.
-  - Compiler memory grows about linearly: 2.4 GB at 87,000 variables. Memory, not time, limits size on
-    this machine.
+  - Compiler memory grows about linearly up to 2,048 hosts (2.4 GB at 87,000 variables), then reaches
+    18.6 GB at 174,000. According to the audit, the step DAG grows roughly as variables^1.4: 0.67 M
+    nodes at 256 hosts and 34.9 M at 4,096. On this 8 GB laptop, memory, not time, limits size
+    [machine-bound].
   - The excess comes from the program's dynamic-index fan-out: each access is expanded over the elements
     it can reach (the spine's port for a random destination leaf reaches NL of them). It also comes from
     the elaborator building the whole unrolled DAG, which the structured target does not emit.
   - The next compiler step is to skip that DAG for `--target native` (decision 56).
 - **Sequential tests.**
-  - Far from the threshold, SPRT decides in 12–16 runs at every size, against 1,203 for the fixed-sample
-    test. Near the threshold it needs more (104 runs at 16 hosts).
-  - The run count depends on the distance from the threshold, not on the model's size. At 2,048 hosts
-    the whole test took 6.6 s.
+  - From 48 hosts up, the test stops at its minimum of 12 runs (P ≈ 1). At 16 hosts it stops at the
+    minimum for H−, 104 runs without a loss. Only 3×8×2 (P = 0.23, 63 runs) lies in between.
+  - None of these sizes puts P near the threshold. There, the SPRT's expected run count (about 1,170
+    at P = 0.10) equals the fixed-sample test's 1,203. So this sweep shows that the run count does not
+    grow with model size at the two floors, not across the whole range of P.
+  - At 2,048 hosts the test took 6.6 s, which is one batch of 200 runs.
 
 ## Axis 2: horizon
 
@@ -169,8 +199,10 @@ round within T. The SPRT tests P_T ≥ 0.5 (δ = 0.05, α = β = 0.01).
   3 s) do not depend on T.
 - **For rates, the work stays constant.** Estimating the per-round rate to ± 10% takes about 1.1–1.2
   million simulated steps at every horizon (about 65 s here). Long runs need proportionally fewer of
-  them, because rounds are nearly independent: the fabric drains between rounds, and P_T matches
-  1 − (1 − p)^rounds.
+  them, because rounds are nearly independent: P_T matches 1 − (1 − p)^rounds, and the per-round
+  variance ratios are 0.93–1.01. The victim's path is back at its steady state about 10 steps before
+  the next round. The aggregator's own port is not drained: at the round boundary it is non-empty in 96%
+  of runs, with 2.9 packets on average.
 - **For "within T" probabilities, the question itself changes with T.** P_T grows from 0.02 to 0.97,
   and the runs needed depend on how far P_T is from the threshold. The SPRT needed most runs (109) at
   T = 1,800, where P_T ≈ 0.44 sits next to the indifference region (0.45–0.55).
@@ -179,83 +211,105 @@ round within T. The SPRT tests P_T ≥ 0.5 (δ = 0.05, α = β = 0.01).
 
 ## Axis 3: a rarer bad event
 
-A small fabric (2×8×2, B = 16, one round of 60 steps) and `loss` with THRESH = 6, where P ≈ 5·10⁻⁶.
-Monte Carlo on the native simulator is compared with its RESTART and fixed-effort splitting
-(`rare_event.py`, `results/rare_event.jsonl`).
+A small fabric (2×8×2, B = 16, one round of 60 steps) and `loss` with THRESH = 6, where P ≈ 6·10⁻⁶.
+Monte Carlo on the native simulator is compared with its RESTART and fixed-effort splitting, each over
+three seeds (`rare_event_seeds.py`, `results/rare_event_seeds.jsonl`; every run's estimate is saved in
+`results/rare_event_runs/`).
 
-- **Levels.** Expected success picks levels and factors from pilot runs (`splitting.py`).
+- **Levels.** Expected success picks levels and factors from pilot runs (`splitting.py`), with the
+  weighted pilot estimator described below. One pilot per importance function; its time is charged to
+  every seed.
 - **Derived importance** (`--auto-importance`): min(odrops, 6), the query's progress.
 - **Refined importance:** the derived one plus the aggregator port's backlog, min(odrops, 6)·17 +
   backlog(eg[0]).
-- **Target.** A 95% interval with ± 10% relative half-width. Monte Carlo's time for that is extrapolated
-  from its measured cost per run.
+- **Budget.** Each (importance, method, seed) runs for 300 s in batches of about 20 s. Fixed effort
+  uses 1,000 trajectories per level.
+- **Target.** A 95% interval with ± 10% relative half-width. Each cell's time for that scales its
+  measured time by (observed half-width / 10%)², plus the whole pilot. Monte Carlo's time is
+  extrapolated from its measured cost per run (152 µs) at the pooled P.
 
-| importance | method | estimate | 95% interval | ± | runs | simulated steps | time | time for ± 10% (extrapolated) | vs Monte Carlo |
-|---|---|---|---|---|---|---|---|---|---|
-| — | Monte Carlo | 4.6·10⁻⁶ (32 hits) | [3.1, 6.5]·10⁻⁶ (Clopper–Pearson) | — | 7,000,000 | 420 M | 1,204 s | 10,600 s (62 M runs) | 1× |
-| derived, 6 levels | RESTART, factors [133, 3, 5, 7, 12, 25] | 6.2·10⁻⁶ | [4.6, 7.8]·10⁻⁶ | 26% | 794,000 | 348 M | 904 s + 39 s pilot | 6,300 s | 1.7× |
-| derived, 6 levels | fixed effort, 1,000 per level | 6.0·10⁻⁶ | [4.7, 7.2]·10⁻⁶ | 21% | 1,300 | 313 M | 916 s | 3,900 s | 2.7× |
-| refined, 36 of 102 levels | RESTART | stopped: no batch of 2,000 runs finished in 2 h 50 min | | | | | | | — |
-| refined, 36 of 102 levels | fixed effort, 1,000 per level | 6.9·10⁻⁶ | [4.2, 9.7]·10⁻⁶ | 39% | 800 | 375 M | 934 s + 19 s pilot | 14,500 s | 0.7× |
+| importance | pilot | method | estimates, seeds 1–3 (·10⁻⁶) | ± per seed | top-5 share per seed | time for ± 10% per seed | speed-up over Monte Carlo per seed | three seeds pooled |
+|---|---|---|---|---|---|---|---|---|
+| — | — | Monte Carlo | 6.3 (5 hits in 800,000 runs, 122 s) | — | — | 9,130 s (60 M runs) | 1× | — |
+| derived, 6 levels | 157 s; P̂ 6.4·10⁻⁶; factors [139, 3, 4, 5, 4, 5] | RESTART | 5.6, 6.1, 5.2 | 35% | 0.30–0.32 | 3,780–3,900 s | 2.34–2.42× | 5.6·10⁻⁶ ± 20%; 2.4× |
+| derived, 6 levels | same | fixed effort | 6.5, 5.1, 6.4 | 33–35% | 0.29–0.33 | 3,330–3,810 s | 2.39–2.74× | 6.0·10⁻⁶ ± 19%; 2.6× |
+| refined, 15 levels | 50 s; P̂ 1.1·10⁻⁵; factors 2–3 per level | RESTART | 7.3, 6.5, 5.5 | 27–44% | 0.21–0.40 | 2,210–5,990 s | 1.52–4.13× | 6.4·10⁻⁶ ± 20%; 2.5× |
+| refined, 15 levels | same | fixed effort | 10.4, 6.3, 6.0 | 54–75% | 0.57–0.62 | 8,750–16,750 s | 0.54–1.04× | 7.6·10⁻⁶ ± 40%; 0.6× |
 
-The splitting intervals are normal intervals from per-run estimates. The time for ± 10% scales each method's
-measured time by (observed half-width / 10%)². The three splitting estimates agree with each other and with
-Monte Carlo's interval. Monte Carlo's point estimate lies lower, with 32 hits. A shorter Monte Carlo check in
-the second run (1 hit in 600,000) is consistent with both.
+- **Consistency.** The twelve splitting estimates are homogeneous (χ² = 5.5 on 11 degrees of freedom,
+  p = 0.91) and their equal-weight mean is 6.42·10⁻⁶ ± 0.40·10⁻⁶. Monte Carlo's 5 hits agree with it
+  (binomial p = 0.82).
+- **Factors are now right.** The factor product times P is 1.07 for the derived importance and 0.71
+  for the refined one, so a RESTART root run reaches the goal about once on average, as intended. The
+  refined pilot (256 pilots at effort 256) over-estimated P by 1.6×; the derived pilot (256 at effort
+  1,024) was within 1%.
+- **Equal cost per step.** Every method simulated about 121 M steps per 300 s, the same rate as Monte
+  Carlo. The gain is entirely variance reduction per step.
+- **Heavy tails.** Within one 300 s seed the top 5 runs carry 21–40% of the sum for RESTART and for
+  derived fixed effort, and about 60% for refined fixed effort. Per-seed intervals are therefore
+  indicative only; the pooled column (three seeds, 0.9 M CPU-seconds per method) is the better figure,
+  with top-5 shares of 0.13–0.16 (0.37 for refined fixed effort).
+- **Machine.** The absolute times are for one core of this laptop [machine-bound]. Every method here is
+  a set of independent runs and parallelises across cores; the speed-up ratios do not depend on that.
 
-Two problems surfaced before these runs, and both are fixed.
-- **Pilot averaging.** `expected_success` averaged each level's success fraction over all pilots,
-  counting pilots that died below a level as 0 at that level. It now averages only over pilots that
-  reached the level. It also takes `min_pilots`, because a single pilot, which is what stopping at the
-  first one to reach the goal gives, mis-sizes the upper levels.
-- **Uninformative importance.** Measured directly, fixed effort with levels 1–3 agrees with Monte Carlo:
-  P(odrops ≥ 4) is 1.38·10⁻⁴ ± 1.5·10⁻⁵ against 1.42·10⁻⁴, and the per-level conditionals are 0.29,
-  0.25 and 0.20 in both. But the entrance states of a level differ enormously in their prospects: a
-  pilot that hits "hot" states (an incast still filling the queues) succeeds at about 40% per level,
-  while most die by level 3. The derived importance counts drops and ignores the queues, so RESTART's
-  retrials, cloned from one state, are strongly correlated.
+**The pilot estimator, fixed.** `expected_success` used to average each level's success fraction over
+the pilots that reached the level, weighting them equally. The independent audit showed that this is
+biased low at the upper levels, and the bias compounds per level.
+- The cause: a pilot's fixed-effort weight and its next fraction are positively correlated. "Hot"
+  entrance states (an incast still filling the queues) succeed at every level.
+- The check that failed: the level probabilities must multiply to P. They multiplied to 2.1·10⁻⁷ for
+  the derived importance and 3.1·10⁻¹⁵ for the refined one, against P ≈ 6·10⁻⁶.
+- The fix: weight each pilot's fraction at level l by the product of its fractions below l (its
+  fixed-effort weight). The product of the estimates then equals the mean fixed-effort estimate of P.
+  Rounding a level's factor now carries multiplicatively into the next level, so the factors multiply
+  to about 1/P̂. In this rerun the derived pilot's level probabilities are 0.0072, 0.29, 0.26, 0.22,
+  0.23 and 0.23, with product 6.4·10⁻⁶.
+
+**History: the first, single-seed run** (`rare_event.py`, `results/rare_event.jsonl`). It used the
+biased pilot.
+- Derived importance: RESTART with factors [133, 3, 5, 7, 12, 25], over-split about 25 times, gave
+  6.2·10⁻⁶ ± 26% (1.7× over Monte Carlo); fixed effort gave 6.0·10⁻⁶ ± 21% (2.7×). Monte Carlo had 32
+  hits in 7 M runs (4.6·10⁻⁶).
+- Refined importance: the biased factors multiplied to 5.3·10¹³ against 1/P ≈ 1.7·10⁵, about 4·10⁸
+  expected goal hits per root run. RESTART was stopped after 2 h 50 min of CPU in its first batch of
+  2,000 runs; the script then checked its time budget only between batches, which `rare_event_seeds.py`
+  no longer does. An earlier version of this note blamed the importance's non-monotone shape; the
+  audit refuted that. The audit's one short rerun with weighted factors reached about 3.6×, within the
+  seed-to-seed range now measured (1.5–4.1×).
 
 **Reading.**
-- **Splitting works here, but only modestly.** With the derived importance, fixed effort reaches a given
-  precision about 2.7 times faster than Monte Carlo, and RESTART about 1.7 times. At P ≈ 6·10⁻⁶ that still
-  means about an hour for ± 10% on a 16-host fabric. The rarity is real, but the levels are poor.
-  - The pilot's level probabilities are 0.0075, 0.27, 0.23, 0.14, 0.085 and 0.039. Almost all of the
-    rarity sits in the first drop: P(odrops ≥ 1) ≈ 0.0075 in one round.
-  - Each further level cuts the probability by 4 to 25 times, but its retrials share the entrance state.
-    Whether they succeed depends on the queues' contents, which the importance does not see.
-  - The estimate's variance therefore comes from the spread over entrance states, and splitting cannot
-    reduce that spread.
-- **Refining the importance made things worse, and broke RESTART.** Adding the aggregator port's backlog
-  gives 102 importance values. Expected success keeps the 36 levels whose rounded factor is at least 2.
-  - **RESTART.** The factors multiply to 5.3·10¹³, against 1/P ≈ 1.7·10⁵.
-    - Why it overshoots: the backlog rises and falls within a round, and each drop jumps the importance
-      by 17. A trajectory therefore crosses many thresholds, often several times, and RESTART spawns
-      retrials at every crossing.
-    - No batch finished. The run was stopped after 2 h 50 min of CPU in its first batch of 2,000 runs,
-      because the script's time budget is checked only between batches.
-    - So RESTART's cost per run is unbounded unless the importance is close to monotone along
-      trajectories. Expected success with integer factors does not guard against this.
-  - **Fixed effort.** Its cost per level is bounded, so it ran. Its estimate agrees (6.9·10⁻⁶), but for
-    equal time its variance is about 3.7 times that with the derived importance, and it is slower than Monte Carlo:
-    36 levels of 1,000 trajectories each take time without adding information.
+- **Splitting works here, but only modestly: about 2.5× over Monte Carlo.** With the derived
+  importance the gain is stable across seeds (2.3–2.7×) and the same for RESTART and fixed effort. At
+  P ≈ 6·10⁻⁶ that still means about an hour of one core for ± 10% on a 16-host fabric, against about
+  2.5 hours for Monte Carlo.
+  - Almost all of the rarity sits in the first drop: P(odrops ≥ 1) ≈ 0.0072 in one round.
+  - Each further level cuts the probability by only 3.5 to 4.5 times, so there are few levels to
+    split over. Their retrials share the entrance state, and whether they succeed depends on the
+    queues' contents, which the derived importance does not see.
+  - Measured directly, fixed effort with levels 1–3 agrees with Monte Carlo on P(odrops ≥ 4)
+    (1.38·10⁻⁴ ± 1.5·10⁻⁵ against 1.42·10⁻⁴), with the same per-level conditionals.
+- **The refined importance does not help.** With correct factors, RESTART on it matches the derived
+  importance when pooled (2.5× against 2.4×), with a wider spread across seeds (1.5–4.1×). Fixed effort
+  on its 15 levels is worse than Monte Carlo (0.6×): with 1,000 trajectories per level, the variance
+  compounds over more levels, and the estimates are dominated by a few runs. Adding the backlog sees
+  the event's effect at one port, not its cause.
 - **What this says about scale.** Splitting's gain depends on the importance function, not on the
-  model's size. Both importance functions here are cheap to compute at any size. Neither captures what
-  makes the event rare: a joint pattern of many responders' delays and ECMP choices filling one port.
-  An informative importance function for incast would have to look ahead over the incast still in
-  flight. That is a modelling task, which neither `--auto-importance` nor a queue-length heuristic
-  performs.
+  model's size. Both importance functions here are cheap to compute at any size. The event's cause is
+  a joint pattern of many responders' delays and ECMP choices filling one port. An importance function
+  that looks ahead over the incast still in flight remains a modelling task, as does validating
+  whether such a function helps.
 
 ## Which steps scale, and which do not
 
 | step | scales here? | evidence |
 |---|---|---|
 | Modelling | yes | One parameterised Buffy program, 180 to 174,092 state variables. Arbitration and indices must be written so that every access reaches a few elements. |
-| Compile (`--target native`) | to about 175k variables in 8 GB, paging at the top; superlinear | 51 s and 2.4 GB at 2,048 hosts. Two quadratic costs were removed (decision 56). The remaining excess is the unrolled DAG the structured target never uses. At 4,096 hosts (174,092 variables) it still compiles, but it takes 21 min (4.5 min of CPU) and 3.4 GB, and the machine was paging. A run there takes 57 ms, and the SPRT decides in 12 runs. |
-| Build (clang) | yes | 31 s for 13 MB of C at 2,048 hosts. |
+| Compile (`--target native`) | to about 87k variables on this 8 GB laptop; 174k compiles only by paging [machine-bound]; superlinear in the prototype | 51 s and 2.4 GB at 2,048 hosts. Two quadratic costs were removed (decision 56). The remaining excess is the unrolled DAG the structured target never uses, which grows roughly as variables^1.4. At 4,096 hosts (174,092 variables) it compiles with an 18.6 GB footprint, 3.4 GB of it resident, in 21 min (4.5 min of CPU). A run there takes 57 ms, and the SPRT decides in 12 runs. |
+| Build (clang) | yes, mildly superlinear | 31 s for 13 MB of C at 2,048 hosts; 113 s for 28 MB at 4,096. |
 | Simulation | yes, linear in hosts × steps | 158–256 ns per host-step from 16 to 2,048 hosts, 50–70 µs per step at 256 hosts for any T up to 10⁴. Needed one runtime fix for steps with many draws. |
-| Sequential tests (SPRT) | yes | Runs depend on the distance from the threshold, not on model size or horizon: 12–109 runs here. Rate estimates cost a constant number of simulated steps across horizons. |
-| Rare events (splitting) | only with an informative importance function | 2.7× faster than Monte Carlo at P ≈ 6·10⁻⁶ with the derived importance (fixed effort; RESTART 1.7×). A refined, non-monotone importance made fixed effort slower than Monte Carlo and RESTART's effort unbounded (factor product 5·10¹³ against 1/P ≈ 2·10⁵): no batch finished in 2 h 50 min. |
-| Exact conditioning (`--condition-on`) | no | The input process here has dozens to thousands of sources per step (four per host plus one per link). On-demand conditioning memoises h over the input states that runs reach. The responders' start delays alone give 11^M joint values at the first step: 2·10⁷ at 16 hosts (M = 7) and 9·10²³ at 32 hosts (M = 23). Conditioning on one source (e.g. the victim's arrivals) remains feasible; joint conditions over the incast do not. |
+| Sequential tests (SPRT) | yes, at the floors measured | Runs did not grow with model size or horizon: 12–109 runs here. In the size sweep every decision is at or near the test's minimum (12 for H+, 104 for H−), so a test near the threshold on a large model is still to be shown. Rate estimates cost a constant number of simulated steps across horizons. |
+| Rare events (splitting) | modestly; depends on the importance function | About 2.5× faster than Monte Carlo at P ≈ 6·10⁻⁶, over three seeds (2.3–2.7× per seed with the derived importance), with RESTART or fixed effort. Needed a fix to the pilot estimator, whose bias had stalled RESTART. A refined importance (with the aggregator's backlog) did not help. Absolute times are one core of this laptop [machine-bound]; the ratios are not. |
+| Exact conditioning (`--condition-on`) | no (argued, not attempted) | The input process here has dozens to thousands of sources per step (four per host plus one per link). On-demand conditioning memoises h over the input states that runs reach. The responders' start delays alone give 11^M joint values at the first step: 2·10⁷ at 16 hosts (M = 7) and 9·10²³ at 32 hosts (M = 23). Conditioning on one source (e.g. the victim's arrivals) remains feasible; joint conditions over the incast do not. |
 | Learning conditions over many sources | no (not attempted) | The learner (case studies B, C, F) searches conditions over the histories of one or two sources. Here the cause of collateral damage is a joint pattern over hundreds of responders' delays and ECMP choices. The hypothesis space grows exponentially in the sources, and so does the run count needed to certify a condition with small probability mass. |
 | Exact model checking (Storm, mcsta) | no (not attempted, by policy) | The delay vector above alone bounds the reachable states from below by 2·10⁷ at 16 hosts and 9·10²³ at 32 hosts, before any queue contents; the state space also grows with the horizon. Exact checking is limited to the small reference examples of Buffy's test suite. |
 
@@ -265,17 +319,46 @@ Two problems surfaced before these runs, and both are fixed.
   instance on a laptop: compile, build, simulate and sequentially test. At 2,048 hosts the fabric is a
   model of 87,052 state variables whose contention grows with size. It compiles in under a minute, a run
   costs 31 ms, and a sequential test decides in seconds. At 4,096 hosts (174,092 variables) everything
-  after compilation is just as cheap. The compile itself, at 3.4 GB and 21 minutes, is at this
-  machine's edge.
+  after compilation is just as cheap. The compile itself, with an 18.6 GB footprint and 21 minutes, is
+  beyond this laptop's memory [machine-bound]. That is a limit of this machine and of a prototype
+  compiler that still builds an unrolled DAG it does not use, not of the technique.
 - **What the answers show.** Unlike Loom, the answers change with size: collateral damage from incast
-  appears between 16 and 48 hosts and is nearly certain beyond. So the ability to analyse the large
-  instance directly is what matters.
+  appears between 16 and 48 hosts and is nearly certain beyond. Small sizes can mislead, so the
+  ability to analyse the instance of interest directly matters. Above 64 hosts, though, the answer is
+  saturated and follows from the port's capacity.
 - **The limits are elsewhere.**
   - Compiler memory, from the unrolled DAG it still builds.
-  - Rare events whose natural importance function, the query's progress, says little about the system's
-    state.
+  - Rare events. The gain from splitting was modest here: about 2.5× over Monte Carlo, stable over
+    seeds once the pilot estimator was fixed. A larger gain needs an importance function that sees the
+    incast's cause, which is a modelling task.
   - Every exact technique: exact conditioning or learning over many sources, and exact model checking.
     These remain tools for small configurations and single sources.
-- **A caveat on earlier results.** This study also found a sampling defect in the simulator that grows
-  with the number of random sources per step. Earlier large-model results, in particular the Loom SPRT
-  study, should be re-run with the fixed runtime before they are cited.
+- **A caveat on earlier results.** This study also found a sampling defect in the simulator, in steps
+  with many power-of-two draws. On Loom-like Bernoulli steps the audit found no measurable effect. Loom's
+  Family B is still worth re-running with the fixed runtime, for completeness.
+
+## Independent audit (2026-11-11)
+
+An independent auditor checked the note against its code, raw results and published references
+(`experiments/buffy_fabric/audit-report.md`). It
+recomputed every table cell from the jsonl files and spot-checked the model with the oracle at the
+study's base configuration: 3×8×2 gives victim 0.2314 against 0.2302. It agreed with the size and
+horizon conclusions, the model's validity and the RNG fix. Its three main disagreements are reflected
+above:
+1. The RESTART stall was caused by a biased pilot estimator, not by the importance's shape.
+2. Compiler memory at 4,096 hosts was 18.6 GB, not 3.4 GB.
+3. The Loom caveat's mechanism did not hold on Loom-like steps.
+
+Follow-ups, in its order:
+1. Fix `expected_success` with the weighted estimator, a check of the factor product against 1/P̂, and
+   an in-batch time check. Then redo axis 3 over several seeds, saving the per-run estimates.
+   **Done:** axis 3 above (three seeds, factor product × P of 1.07 and 0.71, batches of about 20 s).
+   The legacy `src/netmdp/sampler/splitting/expected_success_method.py` is not changed.
+2. Measure compiler memory by footprint at every size, and make the watchdog use it.
+3. Add a size sweep whose answer is not saturated (per-port load held near critical), so the SPRT is
+   exercised near its threshold on a large model.
+4. Re-run Loom's Family B with the fixed runtime.
+5. Close the test gaps: the precision test's Bernoulli half, `JaniModel.step`'s unrefreshed path, and
+   the base configuration and a mid-tail quantity in the oracle check.
+6. Re-measure efficiency figures from other users of `expected_success`
+   (`tests/native_*_experiment.py`).

@@ -456,6 +456,9 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
 
     What remains grows with the program's dynamic-index fan-out, i.e. accesses × reachable elements ×
     slots, and above all with memory. At 2,048 hosts with capacity 16 (87,052 state variables) the
-    compile takes 2–3 min and 3 GB. The elaborator still builds the whole unrolled step DAG, which the
+    compile takes 51 s and 2.4 GB when it runs alone (3 GB beside other jobs). At 4,096 hosts (174,092
+    variables) it needs an 18.6 GB peak footprint, of which 3.4 GB was resident on an 8 GB machine, so it
+    took 21 min of wall time for 4.5 min of CPU. The step DAG grows roughly as variables^1.4 (0.67 M nodes
+    at 256 hosts, 34.9 M at 4,096), so this next step is what decides the size limit. The elaborator still builds the whole unrolled step DAG, which the
     structured target does not emit. *Next step:* skip building the program's DAG for
     `--target native` (only monitors, rewards and conditioning need it).
