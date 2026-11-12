@@ -1,0 +1,25 @@
+state variables: 174092
+traffic sources: 18436
+updated variables: 174027
+DAG nodes (step): 34912001
+tree size without sharing: inf
+DSA temporaries: 5388237, assignment levels: 57361
+model type: dtmc
+     1272.64 real       271.12 user       467.68 sys
+          3434119168  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+           124835682  page reclaims
+                 190  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+             1373684  voluntary context switches
+             4349075  involuntary context switches
+       2912950473357  instructions retired
+       2373106185284  cycles elapsed
+         18592971272  peak memory footprint

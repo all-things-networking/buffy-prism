@@ -370,7 +370,7 @@ int jm_restart(const int32_t *s0, int64_t n_runs, int horizon, const jm_policy *
         int e = jm_choose(cur.s, cur.t, pol, rng, en);
         if (e == -4) { free(stk); return -4; }
         if (e < 0) break;
-        int rc = jm_step(cur.s, e, jm_uniform(rng));
+        int rc = jm_step_g(cur.s, e, NULL, rng);
         if (rc < 0) { free(stk); return rc; }
         cur.t++; steps++;
         int nl = jm_level(jm_imp(cur.s, imp), nlev, thr);
@@ -423,7 +423,7 @@ int jm_fixed_effort(const int32_t *s0, int64_t n_runs, int horizon, const jm_pol
           int e = jm_choose(tr.s, tr.t, pol, rng, en);
           if (e == -4) { free(cur); free(nxt); return -4; }
           if (e < 0) break;
-          int rc = jm_step(tr.s, e, jm_uniform(rng));
+          int rc = jm_step_g(tr.s, e, NULL, rng);
           if (rc < 0) { free(cur); free(nxt); return rc; }
           tr.t++; steps++;
         }
@@ -1007,11 +1007,16 @@ class JaniModel:
   return q;
 }""")
         # Sampling: each part's destination in turn by inverse CDF on one uniform, rescaled inside the chosen
-        # interval (exact, since u is uniform on that interval given the choice).
-        out.append(r"""static int jm_step_r(int32_t *s, int e, double u, double *r) {
+        # interval (exact in real arithmetic, since u is uniform on that interval given the choice). A double has 53
+        # bits, and each rescaling by 1/q spends log2(1/q) of them: after a few dozen draws (a step of a large model)
+        # the residual sits on a grid too coarse for the next part, whose draws then collapse onto its first outcomes.
+        # The batch paths therefore pass their generator, and the residual is replaced by a fresh uniform once it has
+        # been rescaled by more than 2^8 (at least 45 bits always remain). That is exact too: given the choices so far,
+        # the residual is uniform and independent of them. A step that never rescales that far draws as before.
+        out.append(r"""static int jm_step_r(int32_t *s, int e, double u, double *r, uint64_t *rng) {
   /* the joint destination index d = sum_p dd[p] * prod_{q<p} nd_q, while it fits an int (a core that defines
      JM_APPLY_DD takes the digits dd themselves, so that it may have more joint outcomes than an int holds) */
-  int d = 0, dd[MAXP], big = 0; long long mult = 1;
+  int d = 0, dd[MAXP], big = 0; long long mult = 1; double zoom = 1.0;
   for (int p = 0; p < jm_np[e]; p++) {
     int k = jm_pk[jm_poff[e] + p], nd = jm_pnd[k], j = 0;
     if (nd > 1) {
@@ -1029,6 +1034,8 @@ class JaniModel:
 #endif
       u = q > 0.0 ? (u - acc) / q : 0.0;
       if (u < 0.0) u = 0.0; if (u >= 1.0) u = 0x1.fffffffffffffp-1;
+      if (q > 0.0) zoom /= q;
+      if (rng && zoom > 256.0) { u = jm_uniform(rng); zoom = 1.0; }
     }
 #ifdef JM_CHECK_PROBS
     else { double q = jm_pp[k](s, 0); if (q > 1.0 + JM_PTOL || q < 1.0 - JM_PTOL) return -6; }
@@ -1044,7 +1051,9 @@ class JaniModel:
 #endif
   return rc < 0 ? rc : (big ? 0 : d);
 }
-int jm_step(int32_t *s, int e, double u) { return jm_step_r(s, e, u, NULL); }""")
+int jm_step(int32_t *s, int e, double u) { return jm_step_r(s, e, u, NULL, NULL); }
+/* the batch paths' step: its uniform, and fresh ones when the residual runs out of precision, from rng */
+static int jm_step_g(int32_t *s, int e, double *r, uint64_t *rng) { return jm_step_r(s, e, jm_uniform(rng), r, rng); }""")
         out.append("int jm_goal(const int32_t *s, int g) {\n  switch (g) {")
         for g, name in enumerate(self.goal_names):
             out.append(f"    case {g}: return {tr.c(self.goals[name])};")
@@ -1074,7 +1083,7 @@ int64_t jm_simulate(const int32_t *s0, int64_t n_runs, int horizon, const jm_pol
       int k = jm_enabled(s, en); if (k == 0) break;
       int e = k > 1 ? jm_pick(pol, s, t, en, k, rng) : en[0];
       if (e == -4) return -4;
-      int rc = jm_step(s, e, jm_uniform(rng));
+      int rc = jm_step_g(s, e, NULL, rng);
       if (rc < 0) return rc;
       steps++;
     }
@@ -1100,7 +1109,7 @@ int jm_simulate_scores(const int32_t *s0, int64_t n_runs, int horizon, const jm_
         if ((e = jm_pick(pol, s, t, en, k, rng)) == -4) return -4;
         cnt[e]++;
       }
-      int rc = jm_step(s, e, jm_uniform(rng));
+      int rc = jm_step_g(s, e, NULL, rng);
       if (rc < 0) return rc;
       if (s[score_var] > best) best = s[score_var];
     }
@@ -1141,7 +1150,7 @@ int jm_simulate_rewards(const int32_t *s0, int64_t n_runs, int horizon, const jm
       if (k == 0) { dead = 1; continue; }
       int e = k > 1 ? jm_pick(pol, s, t, en, k, rng) : en[0];
       if (e == -4) return -4;
-      int rc = jm_step_r(s, e, jm_uniform(rng), rw);
+      int rc = jm_step_g(s, e, rw, rng);
       if (rc < 0) return rc;
       for (int j = 0; j < NR; j++) c[j] += rw[j];
       steps++;

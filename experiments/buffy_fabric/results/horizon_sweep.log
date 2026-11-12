@@ -1,0 +1,6 @@
+T=60 (1 rounds): 3.451 ms/run, 57.52 us/step; P_T 0.0192 [0.0178, 0.0207] (37117 runs); round rate 0.0192, runs for +-10%: 19615 (1176900 steps); SPRT H- after 23
+T=180 (3 rounds): 10.197 ms/run, 56.65 us/step; P_T 0.0569 [0.0529, 0.0610] (12804 runs); round rate 0.0193, runs for +-10%: 6504 (1170720 steps); SPRT H- after 27
+T=600 (10 rounds): 41.699 ms/run, 69.5 us/step; P_T 0.1776 [0.1650, 0.1908] (3451 runs); round rate 0.0190, runs for +-10%: 1917 (1150200 steps); SPRT H- after 35
+T=1800 (30 rounds): 105.007 ms/run, 58.34 us/step; P_T 0.4372 [0.4086, 0.4661] (1178 runs); round rate 0.0190, runs for +-10%: 663 (1193400 steps); SPRT H- after 109
+T=6000 (100 rounds): 363.289 ms/run, 60.55 us/step; P_T 0.8834 [0.8471, 0.9137] (386 runs); round rate 0.0194, runs for +-10%: 180 (1080000 steps); SPRT H+ after 35
+T=10020 (167 rounds): 506.135 ms/run, 50.51 us/step; P_T 0.9747 [0.9457, 0.9907] (237 runs); round rate 0.0192, runs for +-10%: 113 (1132260 steps); SPRT H+ after 25

@@ -30,21 +30,28 @@ class SplittingDesign:
 
 def expected_success(model: JaniModel, goal: str, importance: str, max_importance: int, horizon: int,
                      scheduler: Scheduling = None, pilot_effort: int = 256, seed: int = 1,
-                     max_pilots: int = 1000) -> SplittingDesign:
+                     max_pilots: int = 1000, min_pilots: int = 1) -> SplittingDesign:
     """
     Pilot fixed-effort runs with a threshold at every importance value 1..max_importance (constant effort) until the
-    goal level is reached; p_up[l] is the running mean of the success fraction at level l. The factor for crossing
-    into importance l+1 is round(1/p_up[l] + carry) with the rounding error carried forward; values with factor > 1
-    become thresholds. The goal must imply importance >= max_importance.
+    goal level is reached; p_up[l] is the mean success fraction at level l over the pilots that reached level l (a
+    pilot that died below l says nothing about it: counting it as 0 would underestimate every level above the first
+    and inflate the factors there). The factor for crossing into importance l+1 is round(1/p_up[l] + carry) with
+    the rounding error carried forward; values with factor > 1 become thresholds. The goal must imply importance >=
+    max_importance. At least min_pilots pilots run: where the entrance states of a level differ widely in their
+    prospects, a few pilots give very different success fractions, and stopping at the first one that reaches the goal
+    underestimates the upper levels (and inflates their factors).
     """
     thresholds = list(range(1, max_importance + 1))
     efforts = [pilot_effort] * (max_importance + 1)
-    p_up, m = np.zeros(max_importance + 1), 0
-    while m < max_pilots and p_up[-1] == 0:
+    p_up, reached, m = np.zeros(max_importance + 1), np.zeros(max_importance + 1), 0
+    while m < max_pilots and (p_up[-1] == 0 or m < min_pilots):
         m += 1
         _, _, succ = model.fixed_effort(1, horizon, goal, importance, thresholds, efforts, scheduler,
                                         seed=derive_seed(seed, "pilot", m), level_successes=True)
-        p_up += (succ[0] / pilot_effort - p_up) / m
+        at = np.concatenate([[True], succ[0][:-1] > 0])   # level l was entered (level 0: always)
+        at = np.logical_and.accumulate(at)
+        reached += at
+        p_up[at] += (succ[0][at] / pilot_effort - p_up[at]) / reached[at]
     if p_up[-1] == 0:
         raise RuntimeError(f"expected success: goal level not reached in {max_pilots} pilots")
     chosen, factors, carry = [], [], 0.0

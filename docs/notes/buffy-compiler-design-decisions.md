@@ -439,3 +439,23 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     unchanged. Loom with capacity 32 now compiles at 256 cores (51,083 state variables) in 4.3 s and
     0.7 GB. The simulator builds in 2.1 s and a run costs 7.6 ms. At 512 cores with capacity 64 the
     compile takes 15 s and 2 GB. Before these changes, 32 cores took 24 s and 2.1 GB.
+
+56. **Index ranges extended, not rebuilt; one opaque node per range.** Two costs of decision 55 were
+    still quadratic on models with many draws, such as the leaf-spine fabric (`fabric.buffy`).
+    - **The interval map** for dynamic indices was rebuilt whenever a traffic source was added.
+      Every draw in a loop adds one, and each rebuild copied the range of every state variable,
+      which cost O(#draws × #variables). The map is now built once and extended with the new
+      sources' (and new opaque values') ranges. That is exact: a memoised interval only involves
+      variables already in the map.
+    - **`opaque(lo, hi)`** built a name string and interned a variable for every FIFO slot of every
+      append. It now caches the node of each range.
+
+    The output is byte-identical (the fabric at 256 and 1,024 hosts; Buffy's JANI suite and the native
+    equivalence tests pass). The fabric at 1,024 hosts and capacity 8, before rotated arbitration,
+    compiled in 43 s; with these changes it takes 5.5 s.
+
+    What remains grows with the program's dynamic-index fan-out, i.e. accesses × reachable elements ×
+    slots, and above all with memory. At 2,048 hosts with capacity 16 (87,052 state variables) the
+    compile takes 2–3 min and 3 GB. The elaborator still builds the whole unrolled step DAG, which the
+    structured target does not emit. *Next step:* skip building the program's DAG for
+    `--target native` (only monitors, rewards and conditioning need it).

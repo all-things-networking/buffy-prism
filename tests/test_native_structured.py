@@ -34,6 +34,7 @@ VARIANTS = {
     "pfc": [["--stop-at-horizon"]],
     "outcast": [["--stop-at-horizon", "--factor-monitors"]],
     "loom_isolation": [["--stop-at-horizon", "-D", "NC=2", "-D", "CAP=4"]],
+    "fabric": [["-D", "ECMP=1", "--stop-at-horizon"], ["-D", "NL=4", "-D", "H=4", "-D", "NS=4", "-D", "PERIOD=10"]],
 }
 
 

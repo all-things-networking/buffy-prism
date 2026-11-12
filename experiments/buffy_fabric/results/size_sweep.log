@@ -1,0 +1,10 @@
+2x8x2: 692 vars, compile 0.1 s / 28 MB, build 1.09 s, 0.152 ms/run (158.2 ns/host-step); P[victim] 0.0024 [0.0015, 0.0036], incast lost 0.000; SPRT H- after 104 runs
+3x8x2: 1032 vars, compile 0.11 s / 33 MB, build 0.53 s, 0.234 ms/run (162.2 ns/host-step); P[victim] 0.2302 [0.2220, 0.2386], incast lost 0.160; SPRT H+ after 63 runs
+4x8x2: 1372 vars, compile 0.13 s / 40 MB, build 0.65 s, 0.312 ms/run (162.3 ns/host-step); P[victim] 0.7632 [0.7547, 0.7715], incast lost 0.432; SPRT H+ after 16 runs
+6x8x2: 2052 vars, compile 0.19 s / 53 MB, build 0.7 s, 0.472 ms/run (163.8 ns/host-step); P[victim] 0.9437 [0.9390, 0.9481], incast lost 0.657; SPRT H+ after 12 runs
+8x8x2: 2732 vars, compile 0.25 s / 68 MB, build 0.71 s, 0.651 ms/run (169.5 ns/host-step); P[victim] 0.9763 [0.9731, 0.9792], incast lost 0.754; SPRT H+ after 12 runs
+8x16x4: 5452 vars, compile 0.63 s / 146 MB, build 1.04 s, 1.509 ms/run (196.5 ns/host-step); P[victim] 0.9778 [0.9747, 0.9806], incast lost 0.873; SPRT H+ after 12 runs
+16x16x4: 10892 vars, compile 1.62 s / 287 MB, build 2.55 s, 3.028 ms/run (197.1 ns/host-step); P[victim] 0.9969 [0.9956, 0.9979], incast lost 0.940; SPRT H+ after 13 runs
+16x32x8: 21772 vars, compile 5.2 s / 732 MB, build 4.49 s, 6.618 ms/run (215.4 ns/host-step); P[victim] 0.9970 [0.9957, 0.9980], incast lost 0.970; SPRT H+ after 12 runs
+32x32x8: 43532 vars, compile 15.06 s / 1240 MB, build 12.46 s, 13.69 ms/run (222.8 ns/host-step); P[victim] 0.9992 [0.9983, 0.9997], incast lost 0.985; SPRT H+ after 12 runs
+64x32x8: 87052 vars, compile 50.78 s / 2431 MB, build 30.77 s, 31.431 ms/run (255.8 ns/host-step); P[victim] 0.9995 [0.9982, 0.9999], incast lost 0.993; SPRT H+ after 12 runs
