@@ -30,7 +30,7 @@ mild condition can make a rare event certain or impossible, as in C.
   every case study's learned conditions compile as plain `given` queries.
 - **Loop variables in draw conditions (decision 47).** This lets each sender's sending rate depend on
   its own state, which outcast's closed-loop TCP senders needed.
-- **Earlier work (immediate connections, the native simulator, `--stop-at-horizon`; decisions 42–46).**
+- **Earlier work (immediate connections and `--stop-at-horizon`, decisions 43 and 46; buffy-prism's native simulator).**
   Loom's multi-module network and the million-run studies were feasible because of these.
 - **Learn, then certify.** The pipeline is now:
   1. record input histories at scale;

@@ -1,503 +1,593 @@
-# Buffy compiler: design decisions to review (2026-11-01, updated 2026-11-15)
+# Buffy compiler (buffyc-mc): design decisions
 
-These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule.
-Decisions 1–46 are on Buffy `main`. They were developed on the branches `jani-backend` (decisions 1–19),
-`features` (20–31, 34, 35) and `fperf-backend` (32, 33, and the SMT-LIB and FPerf targets), and on the
-later case-study work up to Loom. Decisions 47–56 are on the Buffy branch `outcast-case-study`, which also
-holds the fabric study's commits (from `fabric-scaling`). It is not merged into `main`; the submodule
-points at it.
+This note records the design decisions of buffyc-mc, the compiler from Buffy programs to probabilistic
+models and simulators, with the reason for each. Every decision is open to revision. The code is in the
+`buffy` submodule. Decisions 1–46 are on Buffy `main`. Decisions 47–56 are on the branch
+`outcast-case-study`, which is not merged into `main`; the submodule points at it.
 
-The formal specification is Buffy's `docs/compilation` (LaTeX; `make` builds `buffy-compilation.pdf`).
-Its section 9 has the scaling measurements and the planned techniques, which are also listed at the end
-of this note.
+**Related documents.**
+- The formal specification is Buffy's `docs/compilation`; `make` builds `buffy-compilation.pdf`.
+- The user guide is [`buffy/docs/user-guide.md`](../../buffy/docs/user-guide.md).
+- Buffy's `docs/jani-backend.md` and `docs/fperf-backend.md`.
+- `docs/notes/jani-vs-prism-compilation-target.md`.
 
-The decisions are numbered in the order they were made. A later one can replace an earlier one; such entries
-are marked *Superseded*, and the current behaviour is in the decision named there.
+**Labels.** Other notes cite decisions by number, so the numbers are stable labels; the note is ordered by
+topic, not by number. Where one decision contains another, the contained number is listed with it. The
+index at the end gives every number's section.
 
-The [user guide](../../buffy/docs/user-guide.md) (`buffy/docs/user-guide.md`) documents the result.
+**Terms.**
+- *The Buffy paper*: the HotNets'24 paper that introduced Buffy.
+- *URF*: the report *Specification of the Buffy Compiler*.
+- *FQ*: the paper's fair-queuing scheduler (`examples/jani/fq_buggy.buffy`).
+- *SP* and *RR*: the strict-priority and round-robin examples (`sp.buffy`, `rr.buffy`).
 
-Background: `docs/notes/jani-vs-prism-compilation-target.md`, Buffy `docs/jani-backend.md` and
-`docs/fperf-backend.md`.
+## 1. Architecture and front end
 
-## Architecture
+**1 (contains 34) — A syntax AST and a DAG intermediate representation.** The compiler is C++ in the
+Buffy repository. It has two layers:
+- a uniformly shaped syntax AST (`include/frontend/Syntax.hpp`);
+- BuffyImmut (`include/immut/`), a hash-consed expression DAG in dynamic single assignment form, rather
+  than an AST of `:=` statements.
 
-1. **The C++ compiler lives in the Buffy repo, with a new, separate AST.** The existing `buffy::ast` classes have
-   no accessors, slice `Typ` by value, and are wired into the unfinished FPerf skeleton, so I left them untouched.
-   The new code is:
-   - a uniformly-shaped syntax AST (`include/frontend/Syntax.hpp`) with a hand-written recursive-descent parser,
-     instead of ANTLR (which would have added a dependency);
-   - BuffyImmut as a hash-consed DSA expression DAG (`include/immut/`) rather than an AST of `:=` statements.
+The modules are `Expr` (the DAG), `Elaborate`, `Bounds` (interval analysis and range inference), `Ltl`
+(monitors), `Sharing` and `Model`.
 
-   *Superseded* in two parts: the old skeleton was deleted (34), and the hand-written parser was replaced by an
-   ANTLR 4 grammar (35). The syntax AST and BuffyImmut are unchanged.
-2. **One elaboration for all backends, by symbolic execution of one time step.** This does loop unrolling (for
-   loops have an *exclusive* upper bound, as the paper's `for (i in 0..N)` over `ibs[i]` requires), array
-   flattening with switch-read/switch-assign, DSA and ite-joins in one walk. The result is a single simultaneous
-   update per state variable. Backends differ only in how they name shared DAG nodes:
-   - JANI: transient variables at assignment levels;
-   - PRISM: formulas or temp stages;
-   - SMT: constants defined by equalities;
-   - FPerf: Z3 terms.
-3. **PRISM and JANI are separate emitters.** Nothing uses Storm's PRISM→JANI conversion (per your instruction).
+The URF report's AST classes were not reused: they have no accessors, slice types by value, and are
+tied to a wp-based FPerf skeleton. That AST, its visitors, its SMT IR and the wp backend are not part
+of the compiler. The URF's source examples are in `examples/urf/`.
 
-## Language extensions (all new syntax)
+**35 — An ANTLR 4 grammar.** The parser is `grammar/Buffy.g4` behind `frontend::parse`. Golden AST dumps
+guard it (`test/parser`). Semantic predicates keep Buffy's one-token decisions, so the language has no
+reserved words. Building needs the ANTLR tool (Java) and its C++ runtime. Syntax errors other than
+lexical ones are ANTLR's messages. The front end also:
+- rejects `init` on queues and buffers, and type-checks initial values;
+- reports literal overflow and invalid numeric options;
+- attaches a source position to every error.
 
-4. Value ranges for globals and monitors: `int<lo..hi>`, or inferred when left out (decision 21). Queues still
-   need `queue<lo..hi>[cap]`. Locals need none, because they are transient.
-5. **Buffer direction is inferred.** A parameter is an input if it is a `move-p` source or receives traffic or a
-   connection, and an output otherwise. Explicit `in`/`out` keywords are optional.
-6. **A `network { ... }` block** declares `instance`, `capacity`, `traffic ~ uniform | nondet | bernoulli | {k: p}`,
-   `connect a.ob -> b.ibs[i]`, `init`, and `horizon T` (which adds a saturating `time` variable).
-   **`query name: P|Pmax|Pmin=? [F<=T e | G<=T e | e U<=T e];`** declares queries, with bounds in time steps.
-   **`importance name: e;`** declares a splitting hint.
-7. **`arrivals-p(b)` / `drops-p(b)`** observe the current step's traffic, which monitors like FPerf's
-   cenq/aipg need. This isn't in the paper.
-8. **`assume`/`assert` become sticky flags** (`inst.assume_violated`, `inst.assert_failed`) rather than pruning or
-   conditioning. Conditioning is left to the query, e.g. P(φ ∧ G¬violated) / P(G¬violated).
+**2 — One elaboration for every target.** Elaboration symbolically executes one time step. In one walk
+it does loop unrolling, array flattening with switch-read and switch-assign, dynamic single assignment,
+and `ite` joins. `for` loops have an exclusive upper bound, as the paper's `for (i in 0..N)` over
+`ibs[i]` requires. The result is one simultaneous update per state variable. The JANI, PRISM, SMT and
+FPerf backends differ only in how they name shared DAG nodes:
+- JANI: transient variables at assignment levels;
+- PRISM: formulas or temporary stages;
+- SMT: constants defined by equalities;
+- FPerf: Z3 terms.
 
-## Semantics choices
+The native target is the exception. It generates the program's step as structured C (54) and uses the
+DAG only for the updates outside the program, or for the whole step under `--native-dag`.
 
-9. **Count buffers** (the URF "tally" model) when the program has no `packet` declaration: input buffers
-   tail-drop at capacity, and output buffers start empty each step. With packet classes, see decision 20.
-10. **Queues:**
-    - `enq` on a full queue is a no-op;
-    - `deq` on an empty queue returns `lo` and leaves the queue unchanged;
-    - unused slots are kept at `lo`, so states are canonical;
-    - `deq()` must be the whole right-hand side of an assignment.
-11. **Composition** follows the paper: an output is flushed into its connected input at the end of the step, and
-    the downstream instance sees the packets in the next step. A step has two phases: arrivals, then every
-    instance's program on the post-arrival state.
-12. **Out-of-range values are errors, not saturation**, matching the tools' behaviour. `--saturate` clamps the
-    globals. The FQ example saturates its monitors explicitly, because SMC and exact exploration step past the
-    query horizon.
+**3 — JANI and PRISM are separate emitters.** Neither output is converted from the other, and nothing uses
+Storm's PRISM-to-JANI conversion. Converting PRISM to JANI would inherit PRISM's lack of transient
+variables, so every temporary would become a tree or a staged state variable.
 
-## Backend choices
+## 2. Source language
 
-13. **The default JANI layout is "sync"** (1 JANI step per time step), with all instances in one `step`
-    automaton synchronised last. That is a workaround for a Storm bug, and it makes per-instance automata
-    cosmetic only (each assignment's comment names its instance). `--staged` gives 1 + S steps per time step;
-    `--no-levels` gives a core-JANI single update for small programs, and is refused above 2·10⁶ tree nodes.
-14. **MDP action naming:** every nondeterministic choice gets its own action. The sync layout uses one sync vector
-    per joint choice (`tick_k1_..`), up to 4096 combinations, beyond which `--staged` is required. DTMCs use a
-    single `tick`. For simulation and RL, the staged layout's factored choices are much cheaper (63 ns/step vs
-    3.5 µs/step natively on the FQ MDP), and the compiler recommends it above 64 joint choices.
-    *Superseded* in part by 30: that alternative became the `choose` layout, which is now the default above 64
-    joint choices instead of the recommendation to use `--staged`. Per-choice action naming is unchanged.
-15. **`G` is emitted as `<name>_violation` = `F ¬φ`, with min/max swapped**, in JANI, PRISM and SMT alike. Neither
-    Storm nor modes accepts bounded G in JANI, and Storm's PRISM parser lacks bounded G.
-    *Alternative:* emit native `G` in the PRISM files for PRISM-only use.
-16. **PRISM temporaries:** `auto` picks formulas below 2·10⁶ tree nodes and *temp stages* above that, because both
-    PRISM and stormpy expand formulas at parse time. Temp stages cost L extra PRISM steps per time step: 40 for FQ,
-    46 steps per time step in total. *Alternative:* multi-level merging, i.e. putting independent levels in one
-    stage. A stage already holds all temporaries of one level, so the count is the DAG depth.
-    *Superseded* by 29: that alternative became `merged` temp stages, which `auto` now picks above 2·10⁶ tree
-    nodes (11 PRISM steps per time step on FQ). Per-level stages remain available as `--prism-temps stages`.
-17. **SMT-LIB semantics are qualitative:** traffic is a symbolic workload over the distribution's support, and a
-    query asks "sat ⇔ some workload realises it" (⇔ Pmax > 0). FPerf-style workload constraints in Buffy syntax
-    are not yet available. You can add assertions by hand, or use the FPerf backend.
-    *Superseded* in part by 33: network `assume`s and `given assumptions` now constrain the workload.
-18. **The FPerf backend evaluates the DSA DAG directly over FPerf's queue variables**, instead of the URF's
-    wp + `$IN_*`/`$OUT_*` substitution. Output packet identity comes from recorded `move-p` events. Only one
-    instance per contention point is supported so far, and Buffy `traffic` is ignored (FPerf's workload drives
-    the inputs).
-    *Superseded* in part by 32: several instances per contention point are now supported. Buffy `traffic` is
-    still ignored.
+**4 — Value ranges.** Globals and monitors have `int<lo..hi>` ranges, which are inferred when left out
+(23). Queues need `queue<lo..hi>[cap]`. Locals need no range, because they are not state.
 
-## Testing policy
+**23 — Range inference.** A missing range is the least fixpoint of interval analysis over the step,
+starting from the initial value, widened to the program's constants (±1), then narrowed once. A variable
+still growing at 2⁴⁰ is an error that asks for a saturating range. The analysis is sound but can
+over-approximate; RR's `last` gets −1..2. The interval rules for `/` and `%` follow C semantics (12).
 
-19. **Exact checks are for toy models only:** SP, the RR MDP, the tandem composition, and assume/assert, against
-    independent Python references. Every layout is checked in Storm and mcsta, and SMT answers against Storm.
-    FQ-size models are compared **only by SMC** (modes, `prism -sim`) and with a direct Python Monte Carlo of the
-    paper's Fig. 2, always under `timeout`.
+**36 — Locals are method-scoped.** A name is declared once per method, as the paper's `local x = e`
+re-assignment form implies. Block scoping is rejected for that reason.
 
-## Second round (2026-11-01): additions on branch `features`
+**5 — Buffer direction is inferred.** A parameter is an input if it is a `move-p` source, or if it
+receives traffic or a connection; otherwise it is an output. Explicit `in` and `out` are optional.
 
-20. **Packet classes.** `packet { int<lo..hi> field; ... }` makes every combination of field values a class
-    (at most 4096). Filters are `B |> pred` over fields, constants and program variables, allowed in move
-    sources, `backlog-p`/`backlog-b`, `arrivals-p`/`drops-p` and traffic. Each buffer is stored either as
-    **per-class counts** or as a **FIFO sequence** of class ids (slots plus a length; unused slots 0), chosen
-    per buffer: counts when every move out of it "pins" one class (its filter conjunction contains
-    `field == e` for every field, with e free of fields), FIFO otherwise. This matches the URF slides' choice
-    between tuples and multiscale (count) buffer models. `--fifo-buffers` forces FIFO everywhere; the tests
-    check that both representations agree. Output buffers are always FIFO with classes (they cost no state).
-    *Alternatives:* always FIFO (exact but far more states); multisets with a fixed tie-break (inexact).
-21. **`move-b(src, dst, n)`** moves the longest FIFO prefix of (matching) packets whose total size is at most
-    n, so a head packet that does not fit blocks the rest (no partial packets). Sizes come from a field named
-    `size`; without one every packet is 1 byte. `backlog-b` sums sizes.
-22. **Traffic with classes:** each source must select exactly one class (a filter of constants), and a buffer
-    may have one source per class. Several sources into one buffer arrive in declaration order within a step,
-    which decides tail drops. The emitters no longer build arrival updates: the elaborator gives each staged
-    arrival transition its updates.
-23. **Range inference:** the least fixpoint of interval analysis over the step from the initial value, with
-    widening to the program's constants (±1) and one narrowing pass; a variable still growing at 2⁴⁰ is
-    an error that asks for a saturating range. Sound but can over-approximate (RR's `last` gets −1..2).
-24. **Queries are bounded LTL** over state predicates (F/G/X/U with step bounds, `! && || ->`). A single
-    unnested F/G/U keeps the old direct encoding; everything else becomes a **deterministic monitor** built
-    at compile time by formula progression (NNF, interned formulas, states enumerated by BFS over the atom
-    valuations, ≤ 16 atoms per state, ≤ 100k states). The monitor's update reads the values the step
-    computes, and the initial state is folded in at compile time, so it observes time-step boundary states
-    in every layout (sync, staged, choose, PRISM). The property is `F<=H mon = accept`. This answers open
-    question 3 of the JANI-vs-PRISM note in favour of monitors, which work for every target, SMC included.
-    *Alternative:* PRISM-language LTL (Storm/PRISM only, no SMC with modes).
-25. **`given ψ`:** for DTMCs, two properties `<q>_joint` = P(φ ∧ ψ) and `<q>_given` = P(ψ), whose ratio is the
-    conditional probability. For MDPs, `Pmax` uses φ ∧ ψ and `Pmin` uses φ ∨ ¬ψ, so violating paths count
-    against the optimiser; this is the constrained optimum when ψ only restricts nondeterministic choices and
-    can always be respected. `given assumptions` = no assumption flag set within the formula's horizon.
-    *Alternative:* Storm's conditional properties (reachability conditions only, Storm only).
-26. **Network assumptions** `assume e;` (in the network block) read globals and monitors before the step and
-    this step's `arrivals-p`/`drops-p`, but not buffers (which differ between layouts at that point). A
-    violation sets the sticky `assume_violated`. With monitors for memory, these express the slides' path
-    conditions (`examples/jani/deck_rr.buffy`).
-27. **`--prune-violations`:** the violating step leads to one absorbing sink (all state except flags and
-    monitors reset to initial values), the slides' "prune on path-condition violation". It is off by default
-    because it makes queries that do not exclude violations meaningless.
-28. **Staged layouts resolve nondeterministic sources before probabilistic ones** (keeping per-buffer order),
-    so a scheduler never sees the current step's probabilistic arrivals before choosing, as in the sync layout.
-    This was a semantic difference between layouts before.
-29. **PRISM `merged` temp stages** (the new `auto` choice above 2·10⁶ tree nodes): consecutive DAG levels are
-    grouped while every inlined expression stays below 4096 tree nodes (`--prism-stage-size`); only
-    temporaries read by a later stage are variables; the last group is folded into `[step]`. FQ: 11 instead of
-    46 PRISM steps per time step, 104 instead of 165 bounded variables, a 460 KB instead of 32 KB file, and
-    `prism -sim` as fast as on the hand model.
-30. **JANI `choose` layout** (agreed with the netmdp session): each nondeterministic source chooses on its own
-    edge (`arr_<src>_<k>`, ordered by a `turn` variable) into a persistent bounded variable; one `tick` then
-    runs the step with the probabilistic sources. It is the default for MDPs with more than 64 joint choices
-    (`--layout auto`). Property bounds are scaled by (choices + 1) and evaluated at `turn = 0`; a `time`-based
-    bound was rejected because it needs a `horizon`.
-31. **JANI properties never reference step temporaries** (a latent bug: a query atom identical to a shared
-    step node was printed as the transient's name, which Storm rejects in the staged layout).
+**20 — Packet classes.** `packet { int<lo..hi> field; ... }` makes every combination of field values a
+class, at most 4096 of them. A filter `B |> pred` over fields, constants and program variables is
+allowed in move sources, `backlog-p`/`backlog-b`, `arrivals-p`/`drops-p` and traffic. Each buffer is
+stored in one of two ways, chosen per buffer:
+- **per-class counts**, when every move out of the buffer pins one class (its filter conjunction contains
+  `field == e` for every field, with `e` free of fields);
+- **a FIFO sequence** of class ids (slots and a length, unused slots 0) otherwise.
 
-## Second round: additions on branch `fperf-backend`
+These are the URF's count and tuple buffer models. `--fifo-buffers` forces FIFO storage everywhere, and
+the tests check that both representations agree. With classes, output buffers are always FIFO, which
+costs no state. For the structured native step, the DAG keeps FIFO slot contents opaque (55).
+*Rejected alternatives:*
+- always FIFO: exact, but with far more states;
+- multisets with a fixed tie-break: inexact.
 
-32. **Multi-instance FPerf:** one queuing module per instance, linked with FPerf queue edges as `connect`
-    says. FPerf's queue semantics (an output's enqueues land at the tail of the linked queue at the next step,
-    tail-dropped at its size) equal Buffy's flush. Connected inputs use their value before the flush for
-    `deq_cnt`; modules share per-step state variables. Packet classes are rejected in FPerf for now.
-33. **SMT workload constraints** use network assumptions plus `given assumptions` rather than new syntax.
-34. **The old AST/visitor/SMTIR skeleton is removed** (at your request): the old AST classes, visitors,
-    SMTIR, the wp/`fperfRunner` backend, its test harness, the hand-translated IR examples and the
-    Z3-4.8.11 build. The URF report's source examples moved to `examples/urf/`.
-35. **The parser is an ANTLR 4 grammar** (`grammar/Buffy.g4`, at your request), replacing the hand-written
-    recursive-descent parser behind the same `frontend::parse` API. Before the switch both parsers produced
-    identical ASTs (with source locations) on every example and edge case, byte-identical JANI/PRISM output,
-    and the same decisions on 25,500 fuzzed programs; golden AST dumps from the hand parser now guard the
-    grammar (`test/parser`). Semantic predicates keep Buffy's one-token decisions (no reserved words).
-    `make mc` now needs the ANTLR tool (Java) and C++ runtime. Syntax errors other than lexical ones are
-    ANTLR's messages.
+**21 — `move-b(src, dst, n)`** moves the longest FIFO prefix of (matching) packets whose total size is at
+most `n`. A head packet that does not fit blocks the rest; packets are never split. Sizes come from a
+field named `size`; without one, every packet is 1 byte. `backlog-b` sums sizes.
 
-## Independent review (2026-11-01)
+**7 — Traffic observers.** `arrivals-p(b)` and `drops-p(b)` give the current step's arrivals and drops at
+an input buffer. Monitors need them, for example to count enqueues as FPerf's `cenq` does. They are not
+in the Buffy paper.
 
-A separate reviewer (Fable) read the whole compiler on `fperf-backend`, ran every suite and probed it
-with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-backend` d322fac, both in `main`):
-- **Unsound `%` interval rule** in `immut/Bounds` (a model could violate its inferred range), and a
-  too-coarse `/` rule (bounded halving counters were rejected as unbounded).
-- **SMT queries referenced step temporaries** at the last position; z3 rejected the assertion and
-  answered `sat`. Queries are now printed over state variables only, and the SMT test fails on any
-  z3 error.
-- **`%` differed between paths** for negative operands (Storm/mcsta floor modulo vs C remainder in
-  Z3 and the constant folder). JANI and PRISM now emit C's remainder unless both operands are
-  provably non-negative.
-- `init` on queues/buffers rejected and initial values type-checked; literal overflow and bad
-  numeric options reported instead of aborting; errors carry source positions.
-- Design: the LTL machinery moved to `immut/Ltl`, range inference to `immut/Bounds`; an RAII guard
-  restores the elaborator's modes; connections are kept in network order; FPerf output queues are
-  sized from their enqueues.
-- Tests: `examples/jani/arith` (negative `%`/`/`, inference over them, a query atom shared with the
-  step), pruning in every layout, `-D` overrides, and 12 elaborator error cases (`test/elab`).
+**6 — The `network` block** declares:
+- `instance` and `capacity`;
+- `traffic` (22, 37) and `phase` (37);
+- `connect a.ob -> b.ib`, optionally `immediate` (11, 46);
+- `init`;
+- `horizon T`, which adds a saturating `time` variable (43);
+- `assume` (26).
 
-36. **Declined: block-scoped locals.** The reviewer suggested lexical scoping for `local`. The paper's
-    `local x = e` re-assignment form implies method-scoped locals, so they stay method-scoped (a name is
-    declared once per method); the user guide now says so.
+Queries (24, 25, 41), rewards (41) and importance hints (39) are declared at the top level.
 
+## 3. Step semantics
 
-## Third round (2026-11-01): bursty traffic and model-checking efficiency
+**9 — Count buffers.** Without a `packet` declaration, a buffer is its packet count (the URF's tally
+model). Input buffers tail-drop at their capacity, and output buffers start empty in every step. With
+packet classes, see 20.
 
-37. **Bursty traffic as phases plus state-dependent distributions.** `phase x = init ~ D;` is a
-    network-level state variable redrawn from `D` every step, and `traffic b ~ c ? D1 : D2` makes a
-    distribution depend on the state. A phase is a source without a buffer whose drawn value the step
-    takes over (`Δ(x) = α_x`), so methods, monitors and other sources read its boundary value in every
-    layout, and the scheduler's information pattern is unchanged. Conditions may read globals,
-    monitors and phases, but not buffers (layout-dependent mid-step) or `arrivals-p`/`drops-p`.
-    Branches must be probabilistic. JANI/PRISM get probability expressions; SMT-LIB gets per-value
-    possibility conditions; FPerf rejects phases.
-    *Alternatives:* a dedicated `markov { ... }` source syntax (less general: no dependence on
-    globals or other phases); random globals updated inside methods (would break the deterministic
-    step).
-38. **Monitors are minimised** by Moore partition refinement whose signatures are reduced ordered
-    decision diagrams over the atoms, with `true` kept apart so that acceptance times are preserved.
-    Atoms are treated as independent inputs (sound, possibly incomplete).
-39. **`--auto-importance`** derives an importance function per query: the progress of the target
-    predicate (comparison gaps from interval analysis, `&&` adds, `||` takes the best), refined for
-    monitor queries by the monitor's distance to acceptance. Its target value is reached exactly at
-    the target states, as `modes --ifun-prop` requires; splitting stays unbiased whatever its quality.
-40. **The choose layout applies nondeterministic arrivals on their own edges** (as staged does) and
-    keeps a register only for a source that an earlier-declared probabilistic source precedes into the
-    same buffer (tail-drop order). It never has more states than the register version (`rr`: 1,479
-    against 4,320).
-41. **Rewards and expected values.** `reward r: e;` is earned once per time step, with `e`
-    evaluated at the end of the step (state after the step, the step's own `arrivals-p`/`drops-p`);
-    queries `E{r}`/`Emax{r}`/`Emin{r}=? [ C<=k | I=k | F φ | S ]`. Rewards add no state: a transient
-    JANI variable on the step edge, a PRISM transition reward on `[step]`. Bounds are scaled by the
-    transitions per time step; long-run averages use the reward times that number, so `S` is per time
-    step in every layout. State reads in a reward become placeholders substituted by the updates, so
-    `drops-p` keeps its in-step meaning. SMT-LIB skips expected-value queries.
-    *Alternative rejected:* monitor counters as reward proxies (they multiply the state space, cannot
-    express long-run averages or expected times, and per-threshold MDP optima only bound `Emax`).
-    Tool support measured: Storm all forms (JANI and PRISM); `mcsta` only `F`.
-42. **Case-study programs use the language as it is.** `incast.buffy` and `llm_sched.buffy` reproduce
-    the hand-written PRISM models of the incast and LLM batch-scheduler case studies exactly (every
-    property to 1e-15 on small configurations; full size within SMC error). Per-step random draws that
-    a method needs in the same step are arrival counts of a capacity-0 buffer; sender and request
-    state are method globals. PRISM's one-value ranges (`[0..0]`) are emitted one wider. The design
-    gaps these programs expose (stopping at the horizon, first-class draws, sources with memory,
-    `drops-p` for moves, selection loops, at-horizon queries, exact probability literals) are listed
-    in `experiments/buffy_case_studies/README.md`; only the first is implemented (43).
-43. **`--stop-at-horizon`** freezes the state once `time` reaches the horizon:
-    every step update and staged arrival update becomes `time < H ? update : current value`.
-    Draws past H still happen but return to the same state. The option is opt-in because it
-    changes the model's meaning beyond H. Each query is checked against the horizon (bounded
-    `F`/`G`/`U` and monitor horizons ≤ H; `E` only as `C<=k`/`I=k` with k ≤ H), with the error
-    at the query.
-    *Alternatives:* applying it automatically whenever every query qualifies. Rejected, because
-    tools and users read the emitted model with other properties too. A separate sink state was
-    also rejected: it would lose the state at H that the at-horizon queries read.
-44. **Random and nondeterministic choices inside methods: `x ~ D;`.** `D` is any traffic distribution:
-    constant, conditional on the instance's state at the time-step boundary, or `nondet` (an MDP
-    choice). Every occurrence, after loop unrolling, is a source of its own (`Traffic::draw`: no
-    buffer, no state) drawn in every step, whose value the statement assigns. The step stays a
-    deterministic function of the state and the step's draws, so the factored structure and every
-    backend carry over. In JANI and PRISM a draw is a bufferless source like a phase without memory.
-    In FPerf it is a free value restricted to its possible values, which is FPerf's own
-    nondeterminism. Nondeterministic draws are resolved before the step's probabilistic ones, from
-    the boundary state, as nondeterministic traffic is. This supersedes the capacity-0 buffer idiom
-    (`arrivals-p` of a dropped source), which gave identical models in every layout
-    (`test/jani/same/`).
-    *Alternative rejected:* distributions that depend on values computed in the step. They would
-    need sequential sampling inside the step (no sync layout) and would break the deterministic
-    step. A draw over a fixed range mapped onto the candidates covers the common case.
-45. **FPerf backend for multi-device networks.**
-    - Packet classes map to FPerf metadata (fields in order: `meta1`, `meta2`) over FIFO storage.
-    - Buffers that a program fills itself are module state rather than FPerf queues.
-    - External inputs can be same-step `IMM_QUEUE`s, which is Buffy's own order.
-    - Output packets come from the output buffers' final contents.
-    - `BuffyNet` builds the modules inside any contention point. `fperf_equiv_test` uses it to check
-      each hand-written FPerf CP against its Buffy program for every workload up to a horizon, with
-      pins for FPerf's nondeterministic choices and a refinement check for the crossbars.
+**10 — Queues.**
+- `enq` on a full queue does nothing.
+- `deq` on an empty queue returns `lo` and leaves the queue unchanged.
+- Unused slots hold `lo`, so states are canonical.
+- `deq()` must be the whole right-hand side of an assignment.
 
-    See `docs/notes/fperf-cps-in-buffy.md`.
-46. **`connect a.ob -> b.ib immediate;`** delivers what `a` puts into `ob` to `b.ib` in the same step:
-    after `b.ib`'s own arrivals and before `b`'s step, with tail drop. Instances are elaborated in a
-    topological order of the immediate connections (a cycle is an error, reported at a connection),
-    and the network step stays one simultaneous update, so JANI, PRISM and SMT-LIB need nothing new.
-    In FPerf, instances joined by immediate connections form one module whose immediately connected
-    inputs are internal state. Reading FPerf's `IMM_QUEUE` there would count the same-step packets
-    twice, because the DAG already appends them.
+**11 — Composition.** A step has two phases: the arrivals, then every instance's program on the
+post-arrival state. An output is flushed into its connected input at the end of the step, as in the
+paper, so the downstream instance sees the packets in the next step. Connections are flushed in
+declaration order. An `immediate` connection delivers within the step instead (46).
 
-    `tandem_immediate.buffy` equals the same tandem fused into one method in every layout.
-    `loom_modular.buffy`, with one instance per FPerf module, is as equivalent to FPerf's Loom as the
-    one-method version.
+**46 — Immediate connections.** `connect a.ob -> b.ib immediate;` delivers what `a` puts into `ob` to
+`b.ib` in the same step, after `b.ib`'s own arrivals and before `b`'s program, with tail drop. Instances
+are elaborated in a topological order of the immediate connections; a cycle is an error, reported at a
+connection. The network step stays one simultaneous update, so the JANI, PRISM and SMT-LIB backends
+need no changes. For FPerf, see 45. The two kinds of connection coexist because a leaf-spine fabric
+needs both: its links between switches deliver in the next step, and its stages within a switch in the
+same step.
 
-    *Alternative rejected:* a global "all connections immediate" mode. It cannot express the leaf-spine
-    fabric, whose links between switches deliver at the next step while its stages within a switch
-    deliver in the same step.
-47. **A draw's condition may read the variables of enclosing loops.** `snd[i] ~ w[i] == 1 ? D1 : D2;`
-    in a loop over `i` is one state-dependent source per `i`. Conditions are resolved after elaboration
-    (they read the boundary state, not the step's values), outside the loop's scope, so each
-    conditional draw now records the loop variables in force where it was drawn and restores them when
-    its condition is resolved. The outcast case study (`examples/jani/outcast.buffy`, TCP senders whose
-    rate depends on their window) needed it. `draws_loop.buffy` equals a hand-unrolled copy in every
-    layout (`test/jani/same/`).
+**12 — Out-of-range values are errors, not saturation**, matching the tools' behaviour. `--saturate`
+clamps the globals. The FQ example saturates its monitors explicitly, because simulation and exact
+exploration continue past the query horizon; `--stop-at-horizon` (43) is the other remedy.
 
-    *Open:* bounded LTL with long time windows. A conjunction of two `F<=80` windows exceeds the
-    100,000-state monitor limit, because formula progression gives each conjunct a countdown that
-    duplicates `time`. Time-anchored or factored monitors would avoid this
-    (`docs/notes/case-study-outcast.md`).
-48. **Factored LTL monitors.** A query whose top level (in negation normal form) is an and/or of
-    temporal subformulas may get one monitor per subformula, with the property
-    `F<=depth (and/or of mon_i = accept_i)`. This is exact because a bounded subformula's verdict is
-    absorbing and the combination is positive. Equal subformulas share a monitor, so a `given`
-    condition is built once for `_joint` and `_given`. A single monitor is still tried first while it
-    stays under 20,000 states, since it is minimised as a whole. `--factor-monitors` forces factoring;
-    `test/jani` checks every exactly checked example both ways. This resolves decision 47's open
-    item: the outcast study's learned conditions, two `F<=80` windows each, now compile as `given`
-    queries.
+Integer `/` truncates and `%` is C's remainder, in every target and in the constant folder. JANI and
+PRISM spell this out, and use the target's own operator only when interval analysis proves both
+operands non-negative.
 
-    Monitor updates now select the successor by binary search on the state index (depth log2 N). The
-    linear `ite` chain overflowed the JANI emitter's stack at tens of thousands of states.
+**43 — `--stop-at-horizon`** freezes the state once `time` reaches the horizon `H`: every step update and
+staged arrival update becomes `time < H ? update : current value`. Draws past `H` still happen, but they
+return to the same state. The option changes the model's meaning beyond `H`, so it is opt-in, and every
+query is checked against it:
+- bounded `F`/`G`/`U` and monitor horizons must be at most `H`;
+- `E` queries must be `C<=k` or `I=k` with `k ≤ H`.
 
-    *Alternative rejected:* time-anchored progression (reading `time` instead of each `F<=b`'s own
-    countdown). It only helps formulas evaluated from a fixed position, and it needs knowledge that
-    `time` is monotone, which formula progression does not have.
-49. **`--condition-on <query>`: conditioning the input exactly.** For a query's `given` condition
-    psi that depends on the random input through one probabilistic source:
-    - the compiler closes psi's variables under their updates (the input cone) and enumerates
-      (step, cone state, psi-monitor state) up to psi's depth;
-    - it computes h by backward induction and replaces the source's probabilities by
-      `p * h_{t+1} / h_t`, selected by a new state variable `cond_<q>` (a balanced lookup).
+The error is reported at the query.
+*Rejected alternatives:*
+- applying it automatically whenever every query qualifies: tools and users read the emitted model with
+  other properties too;
+- a separate sink state: it would lose the state at `H` that at-horizon queries read.
 
-    The resulting DTMC's path law is the original one conditioned on psi (Doob's h-transform).
-    Everything outside the cone depends on the source only through its draws, so it is unchanged.
-    P=? of the query's formula is `P(phi | psi)`, and `P(psi) = h_0` is exact. This turns the rare
-    condition problem of the FQ study, P(A) of 1e-3 to 1e-7, into ordinary simulation
-    (`experiments/buffy_conditioning`). It is the probabilistic counterpart of building the model
-    on demand while pruning paths that violate a path condition (Automata 2025 slides).
+## 4. Randomness: traffic, phases and draws
 
-    *Restrictions:* a DTMC, and one source; several sources in one step would need their draws
-    sequenced within the step. A closed-loop input, where the source's distribution depends on
-    state it does not drive alone (the outcast study), is outside the cone and rejected.
+**22 — Traffic with classes.** Each source selects exactly one class with a filter of constants, and a
+buffer has at most one source per class. Several sources into one buffer arrive in declaration order
+within a step, which decides tail drops. The elaborator, not the emitters, builds each staged arrival
+transition's updates.
 
-    *Alternative rejected:* importance weights in the simulator. They need simulator support for
-    reweighting probabilistic edges, and they give unbiased but higher-variance estimates. Here the
-    weights cancel exactly.
-    *Superseded* in part by 51 and 52 for `--target native`: there h is computed on demand, and the
-    condition may read several sources jointly. The JANI and PRISM targets keep this decision.
+**37 — Phases and state-dependent distributions.** `phase x = init ~ D;` is a network-level state variable
+redrawn from `D` in every step. `traffic b ~ c ? D1 : D2` makes a distribution depend on the state. A
+phase is a source without a buffer, whose drawn value the step takes over (`Δ(x) = α_x`). Methods,
+monitors and other sources therefore read its boundary value in every layout, and the scheduler's
+information pattern is the same as for traffic.
 
-50. **`--target native`: the native simulator's C model core, straight from the model.** For the native
-    simulator, JANI is a detour. Buffy would print the step DAG as JSON (42 MB for one conditioned PFC
-    model), and the simulator would parse it and translate it back to C, losing the sharing and any
-    structure Buffy knew, such as lookup tables. The native target writes the JANI header (variables,
-    properties) with the C core embedded under `x-buffy-native`. The core defines what
-    `jani_native.JaniModel` would otherwise generate: the destination tables, `jm_enabled`,
-    `jm_apply_r`. The simulator appends its generic runtime: sampling, goals, observables, policies,
-    batch simulation, splitting.
-    - It has the sync layout's semantics: an edge per joint nondeterministic choice, probabilistic
-      sources as parts in traffic order, and the step DAG with shared nodes as C locals.
-    - So the simulation is identical, seed for seed, to the JANI sync layout, for every example
-      (`tests/test_native_target.py` in buffy-prism).
+**What boundary expressions may read.** A distribution's condition reads the state at the time-step
+boundary: globals, monitors and phases. It may not read:
+- buffers, whose value at that point differs between layouts;
+- `arrivals-p`/`drops-p`, which are the draws themselves.
 
-    The simulator still accepts JANI from other tools. For those, it now recognises Buffy-style
-    balanced selection trees and emits them as `static const` arrays. That recognition is exact:
-    `tests/test_native_tables.py` compares 48,000 states with tables on and off.
-    *Superseded* in part by 54: the program's step is now C that follows the program; the unrolled
-    step described here remains as `--native-dag` and as the fallback.
+The same rule applies to network assumptions (26), which may also read the current step's
+`arrivals-p`/`drops-p`.
 
-51. **On-demand conditioning (native target).** With `--condition-on`, the native target does not
-    enumerate the input's state space at compile time (decision 49).
-    - It keeps ψ's monitor and a step counter as state variables, and emits the input cone as a small C
-      step function.
-    - The conditioned source's probabilities are `p · h(next) / h(current)`, where `h` is a memoised
-      recursion over the input states that runs reach.
-    - `condition_probability()` returns P(ψ) = h(initial) exactly.
+Every branch must be probabilistic. JANI and PRISM receive probability expressions. SMT-LIB receives a
+possibility condition per value. FPerf rejects phases.
+*Rejected alternatives:*
+- a dedicated `markov { ... }` source syntax, which is less general (no dependence on globals or other
+  phases);
+- random globals updated inside methods, which would break the deterministic step.
 
-    On `cond_input`, P(ψ) matches Storm to rounding and the conditional estimates fall in their 99.9%
-    intervals (`tests/test_native_conditioning.py`). On the PFC condition that took 50 s, 42 MB and
-    minutes of clang as a compile-time table, it takes 0.14 s, 0.3 MB and 1 s to build, and P(ψ)
-    takes 0.01 s over 41,943 input states. The input states visited bound the memory, and the
-    recursion depth is ψ's depth.
+**44 — Draws inside methods: `x ~ D;`.** `D` is any traffic distribution: constant, conditional on the
+instance's state at the boundary, or `nondet` (an MDP choice). Every occurrence, after loop unrolling, is
+a source of its own (`Traffic::draw`, with no buffer and no state). It is drawn in every step, whether or
+not the statement executes, and the statement assigns its value. The step stays a deterministic
+function of the state and the step's draws, so the factored structure and every backend carry over:
+- in JANI and PRISM, a draw is a bufferless source, like a phase without memory;
+- in FPerf, it is a free value restricted to its possible values, which is FPerf's own nondeterminism.
 
-52. **Joint conditioning on several sources (native target).** A condition may read several
-    probabilistic sources when conditioning is on demand (decision 51). The cone is closed as before and
-    collects every source it meets. The JANI and PRISM targets still refuse a second source.
-    - Conditioned on ψ the sources are no longer independent: the reweighted joint law
-      `p_1(x, a_1) ⋯ p_k(x, a_k) · h(x') / h(x)` does not factor. So the emitter makes them one
-      participant of the step, whose outcomes are the sources' joint outcomes (the first source
-      varies fastest). The other sources stay separate participants, so the runtime is unchanged.
-    - `h` sums over joint outcomes. Its memo is capped (`BF_MAX_STATES`, default 20,000,000); past the
-      cap the process stops with an error instead of exhausting memory.
+Nondeterministic draws are resolved before the step's probabilistic ones, from the boundary state, as
+nondeterministic traffic is. A draw gives the same model as `arrivals-p` of a capacity-0 buffer, in
+every layout (`test/jani/same/`).
+*Rejected alternative:* distributions that depend on values computed in the step. They would need
+sequential sampling inside the step, which rules out the sync layout and breaks the deterministic step.
+A draw over a fixed range, mapped onto the candidates, covers the common case.
 
-    On `cond_joint` (a condition on a sum of two sources, and a conjunction of conditions on each),
-    P(ψ) matches Storm exactly and the conditional estimates fall in their 99.9% intervals. On the PFC
-    model, a condition over the culprit, V and the incast memoises h over 11 million input states in
-    about 25 s. Rejection over 4,000,000 runs agrees with a two-source condition's conditioned
-    estimate (0.0246 against 0.0247).
+**47 — Draw conditions may read loop variables.** `snd[i] ~ w[i] == 1 ? D1 : D2;` in a loop over `i` is one
+state-dependent source per `i`. Conditions are resolved after elaboration, because they read the boundary
+state rather than the step's values, and that happens outside the loop's scope. Each conditional draw
+therefore records the loop variables in force where it is drawn, and restores them when its condition is
+resolved. `examples/jani/outcast.buffy` uses this for TCP senders whose rate depends on their window.
+`draws_loop.buffy` equals a hand-unrolled copy in every layout (`test/jani/same/`).
 
-53. **Joint outcomes beyond an int (native target).** The runtime numbered a step's joint outcome
-    with an `int`. Loom at 16 cores has 48 Bernoulli sources (2^48 outcomes), and at 32 cores the
-    emitter's 64-bit product overflowed and passed its own check. Now:
-    - the sampler records each participant's outcome as it draws it;
-    - a core that defines `JM_APPLY_DD` (Buffy's native core) applies the step from those digits
-      directly;
-    - the joint index, needed only for exact enumeration (`jm_ndest`, `jm_prob`, `successors`), is 0
-      when it does not fit, and `successors` then refuses.
+## 5. Queries and properties
 
-    Cores from the JANI translator keep the old path, and refuse a step whose index would overflow.
-    Runs are identical to before draw for draw (`tests/test_native_conditioning.py`,
-    `test_native_target.py`).
+**24 — Bounded LTL by compile-time monitors.** Queries are bounded LTL over state predicates (`F`, `G`, `X`,
+`U` with step bounds; `! && || ->`). A single unnested `F`, `G` or `U` is encoded directly (15).
+Everything else becomes a deterministic monitor, built at compile time by formula progression:
+- negation normal form, with interned formulas;
+- states enumerated by breadth-first search over the atom valuations;
+- at most 16 atoms per state and 100,000 states.
 
-54. **The structured native step.** `--target native` now generates the program's step as C that
-    follows the program (`src/lower/NativeStep.inc`, `Model::NativeStep`):
-    - loops stay loops and `if`s are tested at run time;
-    - each buffer is a contiguous array handled by generic helpers (`bf_count`, `bf_take`,
-      `bf_append`), with the same semantics as the symbolic `take` and `append`;
-    - queues and arrays are contiguous too, with select and update semantics for dynamic indices.
+The monitor's update reads the values the step computes, and the initial state is folded in at compile
+time, so the monitor observes the time-step boundary states in every layout and in the native target.
+The update selects the successor by binary search on the state index, so its depth is log₂ of the
+number of states. The property is `F<=H mon = accept`. Monitors are used instead of a target's own LTL
+because they work for every target, simulation included. PRISM-language LTL would serve Storm and PRISM
+only, with no simulation in `modes`; this is question 3 of the JANI-vs-PRISM note.
 
-    The state vector is unchanged, so properties, observables and conditioning work as before. The
-    updates outside the program stay DAG expressions, emitted as small blocks: time, phases, LTL
-    monitors, network assumption flags and conditioning, plus rewards. Monitors and rewards read the
-    new state through `post:x` placeholders. Pruning and the stop at the horizon are applied in C in
-    the elaborator's order, so the results match exactly.
+**15 — `G` as the complement of `F`.** A `G` query is emitted as `<name>_violation` = `F ¬φ`, with min and max
+swapped, in JANI, PRISM and SMT alike. Neither Storm nor `modes` accepts bounded `G` in JANI, and Storm's
+PRISM parser has no bounded `G`.
+*Open alternative:* emit a native `G` in PRISM files meant only for PRISM.
 
-    The unrolled step, one C temporary per DAG node, is kept as `--native-dag`. It is also used
-    automatically for a program the generator does not support. `tests/test_native_structured.py`
-    compares the two cores on every example and variant (states, probabilities and rewards of every
-    enumerable destination), and they are identical. On Loom with queue capacity 32:
-    - at 8 cores, the simulator build and 10,000 runs take 2.7 s instead of about 4.5 min;
-    - at 16 cores, 4.6 s instead of 11.5 min, with the same P[starved] to the last digit;
-    - a run costs 0.47 ms at 16 cores instead of 31 ms.
+**38 — Minimised monitors.** Monitors are minimised by Moore partition refinement, whose signatures are
+reduced ordered decision diagrams over the atoms. `true` is kept apart, so acceptance times are
+preserved. Atoms are treated as independent inputs, which is sound but possibly incomplete.
 
-55. **Elaboration in linear time.** Three costs grew faster than the model.
-    - **`if` joins** copied the environment, which holds every buffer slot, so they cost
-      O(#ifs × #locations). A branch now logs its first write of each location; the join visits
-      what either branch wrote and restores the rest. The enclosing branch logs those locations too.
-    - **Dynamic indices** expanded over every element of an array or buffer array. Interval analysis
-      of the index, from the declared ranges of state variables and draws, now bounds the elements
-      it can reach. Loom's `ten[2*i + pick]` reaches 3 elements instead of 2·NC. When the interval
-      may leave the array, the out-of-range semantics (read the last element, write nothing) are kept.
-    - **FIFO slot contents** were quadratic in the buffer's capacity (rank selection in `take`,
-      placement in `append`). In structured mode nothing executes that DAG, so the slots become one
-      shared opaque value per range. Lengths, accepted counts and drops stay exact. A condition for
-      `--condition-on` that reads FIFO order falls back to the unrolled step.
+**48 — Factored monitors.** A query whose top level, in negation normal form, is an and/or of temporal
+subformulas may get one monitor per subformula, with the property `F<=depth (and/or of mon_i = accept_i)`.
+This is exact because a bounded subformula's verdict is absorbing and the combination is positive.
+Equal subformulas share a monitor, so a `given` condition is built once for `_joint` and `_given`.
 
-    The Buffy JANI suite (Storm against reference values) and the native equivalence tests pass
-    unchanged. Loom with capacity 32 now compiles at 256 cores (51,083 state variables) in 4.3 s and
-    0.7 GB. The simulator builds in 2.1 s and a run costs 7.6 ms. At 512 cores with capacity 64 the
-    compile takes 15 s and 2 GB. Before these changes, 32 cores took 24 s and 2.1 GB.
+Factoring is needed for conjunctions of time windows. Formula progression gives each conjunct its own
+countdown, which duplicates `time`, so as one monitor two `F<=80` windows exceed the 100,000-state
+limit; factored, they compile. The outcast study's learned conditions have this shape.
 
-56. **Index ranges extended, not rebuilt; one opaque node per range.** Two costs of decision 55 were
-    still quadratic on models with many draws, such as the leaf-spine fabric (`fabric.buffy`).
-    - **The interval map** for dynamic indices was rebuilt whenever a traffic source was added.
-      Every draw in a loop adds one, and each rebuild copied the range of every state variable,
-      which cost O(#draws × #variables). The map is now built once and extended with the new
-      sources' (and new opaque values') ranges. That is exact: a memoised interval only involves
-      variables already in the map.
-    - **`opaque(lo, hi)`** built a name string and interned a variable for every FIFO slot of every
-      append. It now caches the node of each range.
+A single monitor is preferred while it stays under 20,000 states, because it is minimised as a whole.
+`--factor-monitors` forces factoring, and `test/jani` checks every exactly checked example both ways.
+*Rejected alternative:* time-anchored progression, which reads `time` instead of each `F<=b`'s own
+countdown. It only helps formulas evaluated from a fixed position, and it needs to know that `time` is
+monotone, which formula progression does not.
 
-    The output is byte-identical (the fabric at 256 and 1,024 hosts; Buffy's JANI suite and the native
-    equivalence tests pass). The fabric at 1,024 hosts and capacity 8, before rotated arbitration,
-    compiled in 43 s; with these changes it takes 5.5 s.
+**41 — Rewards and expected values.** `reward r: e;` is earned once per time step, with `e` evaluated at
+the end of the step: on the state after the step, with the step's own `arrivals-p`/`drops-p`. Queries
+are `E{r}`/`Emax{r}`/`Emin{r}=? [ C<=k | I=k | F φ | S ]`.
+- **No state.** Rewards are a transient JANI variable on the step edge, and a PRISM transition reward
+  on `[step]`.
+- **Bounds.** They are scaled by the transitions per time step. Long-run averages use the reward times
+  that number, so `S` is per time step in every layout.
+- **State reads** in a reward become placeholders, substituted by the updates, so `drops-p` keeps its
+  in-step meaning.
+- **SMT-LIB** skips expected-value queries.
 
-    What remains grows with the program's dynamic-index fan-out, i.e. accesses × reachable elements ×
-    slots, and above all with memory. At 2,048 hosts with capacity 16 (87,052 state variables) the
-    compile takes 51 s and 2.4 GB when it runs alone (3 GB beside other jobs). At 4,096 hosts (174,092
-    variables) it needs an 18.6 GB peak footprint, of which 3.4 GB was resident on an 8 GB machine, so it
-    took 21 min of wall time for 4.5 min of CPU. The step DAG grows roughly as variables^1.4 (0.67 M nodes
-    at 256 hosts, 34.9 M at 4,096), so this next step is what decides the size limit. The elaborator still builds the whole unrolled step DAG, which the
-    structured target does not emit. *Next step:* skip building the program's DAG for
-    `--target native` (only monitors, rewards and conditioning need it).
+Storm checks every form, in JANI and PRISM; `mcsta` checks only `F`.
+*Rejected alternative:* monitor counters as reward proxies. They multiply the state space, cannot
+express long-run averages or expected times, and per-threshold MDP optima only bound `Emax`.
 
-## Planned techniques (not implemented)
+**31 — Properties never mention step temporaries.** Properties are printed over state variables only, in
+every target. A query atom can be the same DAG node as a step temporary, and temporaries exist only
+during the step: Storm rejects a transient in a JANI property, and z3 rejects a step temporary in an
+SMT-LIB query.
 
-From the scaling studies (Loom up to 512 cores, `docs/notes/sprt-loom-results.md`; the leaf-spine fabric
-up to 4,096 hosts, `docs/notes/case-study-fabric-scaling.md`). All timings there are one core of an 8 GB
-laptop. The order is the one in which each would raise the size limit measured there.
+## 6. Assumptions, conditioning and rare events
 
-1. **Skip the unrolled DAG for `--target native`** (the next step named in 56). Compile memory is now the
-   limit: the fabric compiles at 2,048 hosts in 51 s and 2.4 GB, and at 4,096 only by paging (18.6 GB
-   footprint on the 8 GB machine). Only monitors, rewards, the conditioning cone and inferred ranges need
-   expressions. Method bodies would be elaborated in an abstract mode that tracks declarations, draws and
-   control flow. Two things need care: a separate pass must collect draws with the same constant folding,
-   and globals without a declared range need their own interval fixpoint or a range.
-2. **Compact tables in the C core.** Load and store contiguous state ranges rather than one entry per
-   variable, and give draws in loops an affine source formula rather than a table. The fabric's C is 28 MB
-   at 4,096 hosts, and clang takes 113 s.
-3. **State in the work layout between steps**, so that a step costs what it changes rather than O(state).
-4. **Strided or modular intervals for dynamic indices**, so that `x[(i + r) % N]` stays narrow for the JANI
-   and PRISM targets. The native target does not need them once (1) is done.
-5. **Parallel runs** across cores in the native simulator (a runtime change). All measurements so far use
-   one core.
-6. **Compositional importance functions** that see the bottleneck's queues. Splitting with the derived
-   function gains only about 2.5× at P ≈ 6·10⁻⁶ on the fabric.
+**8 — `assume` and `assert` are sticky flags** (`inst.assume_violated`, `inst.assert_failed`), not pruning
+or conditioning. Conditioning is expressed in the query (`given`, 25), applied exactly by
+`--condition-on` (49), or approximated by pruning (27).
 
-Inherent, and not addressed by any of these: exact checking of large models, exact conditioning on many
-sources jointly, and guarantees over all inputs.
+**26 — Network assumptions.** `assume e;` in the network block reads the boundary state (see 37) and the
+current step's `arrivals-p`/`drops-p`. A violation sets the sticky `assume_violated`. With monitors for
+memory, assumptions express path conditions on traffic, such as "no two successive steps without
+arrivals" (`examples/jani/deck_rr.buffy`).
+
+**25 — `given ψ`.**
+- **DTMCs:** two properties, `<q>_joint` = P(φ ∧ ψ) and `<q>_given` = P(ψ), whose ratio is the
+  conditional probability.
+- **MDPs:** `Pmax` uses φ ∧ ψ and `Pmin` uses φ ∨ ¬ψ, so violating paths count against the optimiser.
+  This is the constrained optimum when ψ only restricts nondeterministic choices and can always be
+  respected.
+- **`given assumptions`** means that no assumption flag is set within the formula's horizon.
+
+*Rejected alternative:* Storm's conditional properties, which allow only reachability conditions and
+only in Storm.
+
+**27 — `--prune-violations`.** The violating step leads to one absorbing sink: all state except flags and
+monitors returns to its initial values. It is off by default, because it makes queries that do not
+exclude violations meaningless.
+
+**49 — `--condition-on <query>`: exact conditioning of the input.** For a query's `given` condition ψ that
+depends only on the random input:
+- the compiler closes ψ's variables under their updates, giving the input cone;
+- it computes `h_t(x)`, the probability that ψ will hold from cone state `x` at step `t`;
+- it replaces the sources' probabilities by `p · h_{t+1} / h_t`.
+
+The resulting path law is the original one conditioned on ψ (Doob's h-transform). Everything outside the
+cone depends on the input only through its draws, so it is unchanged. P=? of the query's formula is
+`P(φ | ψ)`, and `P(ψ) = h_0` is exact. This turns rare conditions, of probability 10⁻³ to 10⁻⁷ in the FQ
+study, into ordinary simulation (`experiments/buffy_conditioning`).
+
+**In JANI and PRISM**, `h` is a compile-time table:
+- the compiler enumerates (step, cone state, ψ-monitor state) up to ψ's depth, at most 2·10⁶ states;
+- `h` comes from backward induction;
+- a new state variable `cond_<q>` selects the reweighted probabilities by a balanced lookup.
+
+The cone must contain exactly one probabilistic source: each source has its own probabilities there,
+and a joint reweighting does not factor into them. The native target computes `h` on demand (51) and
+accepts several sources (52).
+
+*Restrictions:* DTMCs only. A closed-loop input, whose distribution depends on state it does not drive
+alone (as in the outcast study), is outside the cone and rejected.
+*Rejected alternative:* importance weights in the simulator. They give unbiased but higher-variance
+estimates; here the weights cancel exactly.
+
+**51 — On-demand conditioning (native target).** The native target does not enumerate the cone at compile
+time:
+- it keeps ψ's monitor and a step counter as state variables, and emits the cone as a small C step
+  function;
+- the conditioned probabilities are `p · h(next) / h(current)`, where `h` is a memoised recursion over the
+  cone states that runs reach;
+- `condition_probability()` returns `P(ψ) = h(initial)` exactly.
+
+The memory is bounded by the cone states visited, and the recursion depth is ψ's depth. On a PFC
+condition, the compile-time table of 49 takes 50 s, 42 MB and minutes of clang. On demand, it compiles
+in 0.14 s and builds in 1 s, and P(ψ) takes 0.01 s over 41,943 cone states. On `cond_input.buffy`, P(ψ)
+matches Storm to rounding, and the conditional estimates fall in their 99.9% intervals
+(`tests/test_native_conditioning.py`).
+
+**52 — Joint conditioning on several sources (native target).** With conditioning on demand, the cone may
+contain several probabilistic sources; it is closed as in 49.
+- **One participant.** Conditioned on ψ, the sources are not independent: the reweighted joint law
+  `p_1(x, a_1) ⋯ p_k(x, a_k) · h(x') / h(x)` does not factor. The emitter therefore makes them one
+  participant of the step, whose outcomes are the sources' joint outcomes, with the first source varying
+  fastest. The other sources stay separate participants, so the runtime needs no special case.
+- **The memo.** `h` sums over joint outcomes. Its memo is capped by `BF_MAX_STATES` (default 20,000,000),
+  and past the cap the process stops with an error rather than exhaust memory. The number of cone states
+  grows exponentially with the number of sources a condition reads.
+- **Checks.** On `cond_joint.buffy` (a condition on a sum of two sources, and a conjunction of conditions
+  on each), P(ψ) matches Storm exactly. On the PFC model, a three-source condition memoises `h` over
+  11 million cone states in about 25 s, and rejection over 4,000,000 runs agrees with a two-source
+  condition's conditioned estimate (0.0246 against 0.0247).
+
+**39 — `--auto-importance`** derives an importance function per query: the progress of the target
+predicate (comparison gaps from interval analysis; `&&` adds, `||` takes the best), refined for monitor
+queries by the monitor's distance to acceptance. Its target value is reached exactly at the target
+states, as `modes --ifun-prop` requires. Splitting stays unbiased whatever the function's quality.
+
+## 7. JANI target and layouts
+
+**13 — Layouts.**
+- **`--layout auto`** (default): `sync`, or `choose` (30) for MDPs with more than 64 joint traffic choices
+  per step.
+- **`sync`** gives one JANI step per time step. It puts every instance in one `step` automaton,
+  synchronised last, because Storm drops transitions when an edge with multi-level assignments is
+  followed by another synchronising edge (Buffy `docs/jani-backend.md`). Per-instance structure survives
+  in assignment comments.
+- **`--staged`** gives 1 + S steps per time step, for S sources.
+- **`--no-levels`** gives core JANI with a single update, for small programs; it is refused above
+  2·10⁶ tree nodes.
+
+**28 — Information pattern.** Staged layouts resolve nondeterministic sources before probabilistic ones,
+keeping the per-buffer order. A scheduler therefore never sees the current step's probabilistic arrivals
+before it chooses, as in the sync layout.
+
+**30 (contains 40) — The `choose` layout for MDPs.** Each nondeterministic source chooses on its own edge
+(`arr_<src>_<k>`, ordered by a `turn` variable), and that edge applies the source's arrivals. A register
+holds the choice only when an earlier-declared probabilistic source precedes it into the same buffer,
+because tail drops follow declaration order. One `tick` then runs the step with the probabilistic sources.
+- **States.** The layout never has more states than a register for every source would (`rr`: 1,479
+  against 4,320).
+- **Bounds.** Property bounds are scaled by (choices + 1) and evaluated at `turn = 0`. A bound based on
+  `time` was rejected, because it needs a `horizon`.
+- **Speed.** On the FQ MDP, buffy-prism's JANI simulator takes 3.5 µs per time step in `sync` and 0.48 µs
+  in `choose`.
+
+**14 — MDP action names.** Every nondeterministic choice has its own action. The sync layout has one sync
+vector per joint choice (`tick_k1_..`), and refuses more than 4096 joint choices. DTMCs use a single
+`tick`.
+
+## 8. PRISM target
+
+**29 (contains 16) — Temporaries.** PRISM and stormpy expand formulas at parse time, so `--prism-temps auto`
+picks formulas below 2·10⁶ tree nodes and `merged` temporary stages above that.
+- **Merged stages.** Consecutive DAG levels are grouped while every inlined expression stays below 4096
+  tree nodes (`--prism-stage-size`). Only temporaries read by a later stage are variables, and the last
+  group is folded into `[step]`.
+- **On FQ.** `merged` gives 11 PRISM steps per time step, against 46 for one stage per DAG level
+  (`--prism-temps stages`). It has 104 bounded variables instead of 165, and a 460 KB file instead of
+  32 KB.
+- **Ranges.** PRISM's one-value ranges (`[0..0]`) are emitted one wider.
+
+## 9. SMT-LIB target
+
+**17 (contains 33) — Qualitative semantics.** Traffic is a symbolic workload over the distribution's
+support, and a query asks "sat ⇔ some workload realises it" (⇔ Pmax > 0). Workload constraints are
+network assumptions (26) with `given assumptions` (25), not extra syntax. Phases become possibility
+conditions (37), and expected-value queries are skipped (41).
+
+## 10. FPerf target
+
+**18 — The DAG over FPerf's queue variables.** The FPerf backend evaluates the elaborated DAG directly over
+FPerf's queue variables, instead of the URF's wp transformation with `$IN_*`/`$OUT_*` substitution.
+Buffy's `traffic` is ignored: FPerf's workload drives the external inputs. Output packets come from the
+recorded `move-p` events into outputs with one packet class, and from the output buffers' final contents
+with several (45).
+
+**45 (contains 32) — Multi-device networks.**
+- **Modules.** Each instance is one queuing module, linked with FPerf queue edges as `connect` says.
+  FPerf's queue semantics equal Buffy's flush: an output's enqueues land at the tail of the linked queue
+  in the next step, tail-dropped at its size. Connected inputs use their value before the flush for
+  `deq_cnt`. Modules share per-step state variables, and output queues are sized from their enqueues.
+- **Packet classes** map to FPerf metadata (`meta1`, `meta2`, in field order) over FIFO storage, so at most
+  two fields.
+- **Program-filled buffers.** A buffer that a program fills itself is module state rather than an FPerf
+  queue.
+- **External inputs** can be same-step `IMM_QUEUE`s, which is Buffy's own order.
+- **Immediate connections.** Instances joined by them form one module, whose immediately connected
+  inputs are internal state. Reading FPerf's `IMM_QUEUE` there would count the same-step packets twice,
+  because the DAG already appends them.
+- **Equivalence checks.** `BuffyNet` builds the modules inside any contention point. `fperf_equiv_test`
+  checks each hand-written FPerf contention point against its Buffy program for every workload up to a
+  horizon, with pins for FPerf's nondeterministic choices and a refinement check for crossbars.
+
+See `docs/notes/fperf-cps-in-buffy.md`.
+
+## 11. Native target
+
+**50 — A C model core instead of JANI.** Going through JANI would print the step DAG as JSON (42 MB for one
+conditioned PFC model), which the simulator would parse and translate back to C, losing the sharing and
+any structure Buffy knows. `--target native` writes a JANI header (variables, properties) with a C model
+core under `x-buffy-native`. The core defines what `jani_native.JaniModel` would otherwise generate:
+- the destination tables;
+- `jm_enabled`;
+- the step.
+
+The simulator appends its generic runtime: sampling, goals, observables, policies, batch simulation and
+splitting. The core has the sync layout's semantics:
+- one edge per joint nondeterministic choice, with at most 4096;
+- the probabilistic sources as parts, in traffic order.
+
+With the same seed, a run is identical to the JANI sync layout's (`tests/test_native_target.py`, every
+example). The simulator also reads JANI from other tools, and turns balanced selection trees in it into
+lookup arrays; that is exact (`tests/test_native_tables.py`).
+
+**54 — The structured step.** The program's step is C that follows the program (`src/lower/NativeStep.inc`,
+`Model::NativeStep`):
+- loops stay loops, and `if`s are tested at run time;
+- each buffer is a contiguous array handled by generic helpers (`bf_count`, `bf_take`, `bf_append`),
+  with the semantics of the symbolic `take` and `append`;
+- queues and arrays are contiguous too, with select and update semantics for dynamic indices.
+
+The state vector is that of the unrolled step, so properties, observables and conditioning carry over.
+The updates outside the program are emitted as small DAG blocks: time, phases, LTL monitors, network
+assumption flags and conditioning, plus rewards. Monitors and rewards read the new state through `post:x`
+placeholders. Pruning and the stop at the horizon are applied in the elaborator's order.
+
+The unrolled step, one C temporary per DAG node, is available as `--native-dag`. It is also used
+automatically in two cases, after re-elaborating without the structured step:
+- a program the generator does not support;
+- a `--condition-on` condition that reads the order of packets in a FIFO buffer.
+
+`tests/test_native_structured.py` compares the two on every example and variant: states, probabilities
+and rewards of every enumerable destination. They are identical. On Loom (capacity 32, 16 cores), a run
+costs 0.47 ms with the structured step and 31 ms with the unrolled one, and the build takes 0.6 s against
+about 6 minutes.
+
+**53 — Joint outcomes are not numbered.** A step can have more joint outcomes than an integer holds: Loom at
+16 cores has 48 Bernoulli sources, so 2⁴⁸ outcomes.
+- **Sampling.** The sampler records each participant's outcome as it draws it, and a core that defines
+  `JM_APPLY_DD` (Buffy's native core) applies the step from those digits.
+- **Exact enumeration.** The joint index is used only by `jm_ndest`, `jm_prob` and `successors`. It is
+  0 when it does not fit, and `successors` then refuses.
+- **The JANI translator.** Its cores number the joint outcome, and refuse a step whose index would
+  overflow.
+
+Both paths give identical runs, draw for draw (`tests/test_native_conditioning.py`,
+`test_native_target.py`).
+
+Conditioning on demand (51) and joint conditioning (52) are in section 6.
+
+## 12. Elaboration cost and size limits
+
+**55 — Elaboration in time linear in the model.**
+- **`if` joins** cost O(locations written). Each branch logs its first write of each location, and the
+  join visits only those. The enclosing branch logs them in turn. Copying the store at every `if` would
+  cost O(#ifs × #locations), and every buffer slot is a location.
+- **Dynamic indices** reach only the elements in the index's interval, from the declared ranges of state
+  variables and draws: Loom's `ten[2*i + pick]` reaches 3 elements, not 2·NC. When the interval may
+  leave the array, the out-of-range semantics are kept (read the last element, write nothing).
+- **FIFO slot contents.** For the structured native step they are one opaque value per range, because
+  rank selection in `take` and placement in `append` are quadratic in the capacity and nothing executes
+  them. Lengths, accepted counts and drops are exact.
+
+The Buffy JANI suite (Storm against reference values) and the native equivalence tests pass. Loom with
+capacity 32 compiles at 256 cores (51,083 state variables) in 4.3 s and 0.7 GB, builds in 2.1 s, and a run
+costs 7.6 ms. At 512 cores with capacity 64 the compile takes 15–28 s and 2 GB.
+
+**56 — The interval map is extended, and opaque nodes are cached.** Two costs would be quadratic on models
+with many draws, such as the leaf-spine fabric (`examples/jani/fabric.buffy`):
+- **The interval map** for dynamic indices is built once per step and extended with each new source's,
+  and each new opaque value's, range. Rebuilding it per source would cost O(#draws × #variables). The
+  extension is exact, because a memoised interval involves only variables already in the map.
+- **`opaque(lo, hi)`** returns one cached node per range.
+
+Neither changes the output.
+
+**The size limit.** What remains grows with the program's dynamic-index fan-out (accesses × reachable
+elements × slots), and above all with memory. The elaborator builds the whole unrolled step DAG, which
+the structured target does not emit; it grows roughly as variables^1.4 (0.67 M nodes at 256 hosts, 34.9 M
+at 4,096). On the fabric:
+- at 2,048 hosts with capacity 16 (87,052 state variables), the compile takes 51 s and 2.4 GB;
+- at 4,096 hosts (174,092 variables), it needs an 18.6 GB peak footprint. On an 8 GB laptop it
+  completes only by paging, in 21 minutes of wall time for 4.5 minutes of CPU. That is a limit of the
+  machine and of this implementation.
+
+The next step is to skip the program's DAG for `--target native` (P1).
+
+## 13. Validation and testing
+
+**19 — Exact checks on toy models only.** SP, the RR MDP, the tandem composition and assume/assert are
+checked exactly against independent Python references:
+- every layout in Storm and `mcsta`, except reward forms other than `F`, which only Storm checks (41);
+- SMT answers against Storm, where any z3 error fails the test.
+
+FQ-size models are compared only by simulation (`modes`, `prism -sim`, and a direct Python Monte Carlo of
+the paper's Figure 2), always under `timeout`. `examples/jani/arith.buffy` covers:
+- negative `%` and `/`;
+- range inference over them;
+- a query atom shared with the step.
+
+`test/elab` has the elaborator's error cases, and pruning is checked in every layout.
+
+**42 — Case-study programs in the language as it is.** `incast.buffy` and `llm_sched.buffy` reproduce the
+hand-written PRISM models of the incast and LLM batch-scheduler case studies exactly: every property to
+10⁻¹⁵ on small configurations, and within simulation error at full size. The design gaps these programs
+exposed are discussed in `experiments/buffy_case_studies/README.md`; `--stop-at-horizon` (43) and draws
+(44) address two of them.
+
+## 14. Planned techniques (not implemented)
+
+These come from the scaling studies: Loom up to 512 cores (`docs/notes/sprt-loom-results.md`), and the
+leaf-spine fabric up to 4,096 hosts (`docs/notes/case-study-fabric-scaling.md`). Their timings are one core
+of an 8 GB laptop. The techniques are listed in the order in which each would raise the size limit of 56.
+
+- **P1. Skip the unrolled DAG for `--target native`.** Only monitors, rewards, the conditioning cone and
+  inferred ranges need expressions. Method bodies would be elaborated in an abstract mode that tracks
+  declarations, draws and control flow. Two things need care:
+  - a separate pass must collect draws with the same constant folding;
+  - globals without a declared range need their own interval fixpoint, or a declared range.
+- **P2. Compact tables in the C core.** Load and store contiguous state ranges rather than one entry per
+  variable, and give draws in loops an affine source formula rather than a table. The fabric's C is 28 MB
+  at 4,096 hosts, and clang takes 113 s on it.
+- **P3. State in the work layout between steps**, so that a step costs what it changes rather than
+  O(state).
+- **P4. Strided or modular intervals for dynamic indices**, so that `x[(i + r) % N]` stays narrow for the
+  JANI and PRISM targets. The native target does not need them once P1 is done.
+- **P5. Parallel runs** across cores in the native simulator (a runtime change).
+- **P6. Compositional importance functions** that see the bottleneck's queues. Splitting with the derived
+  function (39) gains only about 2.5× at P ≈ 6·10⁻⁶ on the fabric.
+
+None of these addresses three limits that are inherent:
+- exact checking of large models;
+- exact conditioning on many sources jointly (52);
+- guarantees over all inputs.
+
+## 15. Index
+
+| decision | section | | decision | section | | decision | section |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 | | 20 | 2 | | 39 | 6 |
+| 2 | 1 | | 21 | 2 | | 40 | 7 (in 30) |
+| 3 | 1 | | 22 | 4 | | 41 | 5 |
+| 4 | 2 | | 23 | 2 | | 42 | 13 |
+| 5 | 2 | | 24 | 5 | | 43 | 3 |
+| 6 | 2 | | 25 | 6 | | 44 | 4 |
+| 7 | 2 | | 26 | 6 | | 45 | 10 |
+| 8 | 6 | | 27 | 6 | | 46 | 3 |
+| 9 | 3 | | 28 | 7 | | 47 | 4 |
+| 10 | 3 | | 29 | 8 | | 48 | 5 |
+| 11 | 3 | | 30 | 7 | | 49 | 6 |
+| 12 | 3 | | 31 | 5 | | 50 | 11 |
+| 13 | 7 | | 32 | 10 (in 45) | | 51 | 6 |
+| 14 | 7 | | 33 | 9 (in 17) | | 52 | 6 |
+| 15 | 5 | | 34 | 1 (in 1) | | 53 | 11 |
+| 16 | 8 (in 29) | | 35 | 1 | | 54 | 11 |
+| 17 | 9 | | 36 | 2 | | 55 | 12 |
+| 18 | 10 | | 37 | 4 | | 56 | 12 |
+| 19 | 13 | | 38 | 5 | | P1–P6 | 14 |

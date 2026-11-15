@@ -360,6 +360,6 @@ The implementation plans for `F`, `S` and the other planned features are in `cas
    (section 8), since the reward is sparse and the table is large. Try cross-entropy over per-source arrival weights,
    which are native and memoryless.
 2. Bounded-LTL properties: the Buffy compiler already builds them, as one deterministic monitor variable
-   `mon_<query>` per query, by formula progression (Buffy `features` 39dfcde; user guide §4). The simulator needs
+   `mon_<query>` per query, by formula progression (Buffy `features` 39dfcde; user guide §4.2). The simulator needs
    nothing new. The remaining decision is the LTL fragment, if more than bounded F/G/X/U is wanted.
 3. Compare the step-aware Q-learner and cross-entropy against LCRL on the same MDP and monitor.

@@ -100,7 +100,7 @@ one of FPerf's: Buffy *refines* FPerf.
 ## Random and nondeterministic choices inside methods
 
 Exposing FPerf's free choices probabilistically, or as MDP choices, needed randomness inside a
-method. Buffy now has `x ~ D;` (user guide §2.9.2, design decision 44). `D` is any traffic
+method. Buffy now has `x ~ D;` (user guide §2.9, design decision 44). `D` is any traffic
 distribution: constant, conditional on the instance's state at the time-step boundary, or
 `nondet`. Every draw is a source of its own, so the step stays deterministic and every backend
 applies.
@@ -149,7 +149,7 @@ Native simulator (`src/netmdp/sim`), 100,000 runs each (95% CI half-width ≤ 0.
 ## Same-step composition: `connect ... immediate`
 
 Finding 4 is now addressed. `connect a.ob -> b.ib immediate;` delivers within the step (user guide
-§2.9.3, design decision 46). `loom_modular.buffy` builds Loom as FPerf does, with one instance per
+§2.11.2, design decision 46). `loom_modular.buffy` builds Loom as FPerf does, with one instance per
 module, and it is as equivalent to FPerf's network as the one-method program. In FPerf, instances
 joined by immediate connections become one module.
 

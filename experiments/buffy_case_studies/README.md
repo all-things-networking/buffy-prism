@@ -119,7 +119,7 @@ configurations with and without evictions of the tracked request.
    - **Incast:** unchanged, since the network is empty by its horizon.
 
 4. **Same-step random draws are an idiom, not a construct.** A phase's value is visible only in
-   the next step, so both programs read a draw as `arrivals-p` of a capacity-0 buffer (§2.9.2 of
+   the next step, so both programs read a draw as `arrivals-p` of a capacity-0 buffer (§2.9 of
    the user guide). It is exact and costs no state, but it is a trick. A first-class
    `random x ~ D;` would be clearer: a per-step network draw, readable in the same step by
    methods, monitors and traffic conditions, and never state. It would also cover a
