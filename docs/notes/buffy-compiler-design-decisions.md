@@ -1,8 +1,15 @@
-# Buffy compiler: design decisions to review (2026-11-01)
+# Buffy compiler: design decisions to review (2026-11-01, updated 2026-11-15)
 
-These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule,
-which tracks Buffy `main`. It was developed on branches that are now merged and deleted: `jani-backend`
-(decisions 1–19), `features` (20–31, 34, 35) and `fperf-backend` (32, 33, and the SMT-LIB and FPerf targets).
+These were made while running unattended, and each one is open to revision. The code is in the `buffy` submodule.
+Decisions 1–46 are on Buffy `main`. They were developed on the branches `jani-backend` (decisions 1–19),
+`features` (20–31, 34, 35) and `fperf-backend` (32, 33, and the SMT-LIB and FPerf targets), and on the
+later case-study work up to Loom. Decisions 47–56 are on the Buffy branch `outcast-case-study`, which also
+holds the fabric study's commits (from `fabric-scaling`). It is not merged into `main`; the submodule
+points at it.
+
+The formal specification is Buffy's `docs/compilation` (LaTeX; `make` builds `buffy-compilation.pdf`).
+Its section 9 has the scaling measurements and the planned techniques, which are also listed at the end
+of this note.
 
 The decisions are numbered in the order they were made. A later one can replace an earlier one; such entries
 are marked *Superseded*, and the current behaviour is in the decision named there.
@@ -342,6 +349,9 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     *Alternative rejected:* importance weights in the simulator. They need simulator support for
     reweighting probabilistic edges, and they give unbiased but higher-variance estimates. Here the
     weights cancel exactly.
+    *Superseded* in part by 51 and 52 for `--target native`: there h is computed on demand, and the
+    condition may read several sources jointly. The JANI and PRISM targets keep this decision.
+
 50. **`--target native`: the native simulator's C model core, straight from the model.** For the native
     simulator, JANI is a detour. Buffy would print the step DAG as JSON (42 MB for one conditioned PFC
     model), and the simulator would parse it and translate it back to C, losing the sharing and any
@@ -358,6 +368,9 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     The simulator still accepts JANI from other tools. For those, it now recognises Buffy-style
     balanced selection trees and emits them as `static const` arrays. That recognition is exact:
     `tests/test_native_tables.py` compares 48,000 states with tables on and off.
+    *Superseded* in part by 54: the program's step is now C that follows the program; the unrolled
+    step described here remains as `--native-dag` and as the fallback.
+
 51. **On-demand conditioning (native target).** With `--condition-on`, the native target does not
     enumerate the input's state space at compile time (decision 49).
     - It keeps ψ's monitor and a step counter as state variables, and emits the input cone as a small C
@@ -462,3 +475,29 @@ with small programs. Accepted and fixed (in Buffy `features` c9dcbd0 and `fperf-
     at 256 hosts, 34.9 M at 4,096), so this next step is what decides the size limit. The elaborator still builds the whole unrolled step DAG, which the
     structured target does not emit. *Next step:* skip building the program's DAG for
     `--target native` (only monitors, rewards and conditioning need it).
+
+## Planned techniques (not implemented)
+
+From the scaling studies (Loom up to 512 cores, `docs/notes/sprt-loom-results.md`; the leaf-spine fabric
+up to 4,096 hosts, `docs/notes/case-study-fabric-scaling.md`). All timings there are one core of an 8 GB
+laptop. The order is the one in which each would raise the size limit measured there.
+
+1. **Skip the unrolled DAG for `--target native`** (the next step named in 56). Compile memory is now the
+   limit: the fabric compiles at 2,048 hosts in 51 s and 2.4 GB, and at 4,096 only by paging (18.6 GB
+   footprint on the 8 GB machine). Only monitors, rewards, the conditioning cone and inferred ranges need
+   expressions. Method bodies would be elaborated in an abstract mode that tracks declarations, draws and
+   control flow. Two things need care: a separate pass must collect draws with the same constant folding,
+   and globals without a declared range need their own interval fixpoint or a range.
+2. **Compact tables in the C core.** Load and store contiguous state ranges rather than one entry per
+   variable, and give draws in loops an affine source formula rather than a table. The fabric's C is 28 MB
+   at 4,096 hosts, and clang takes 113 s.
+3. **State in the work layout between steps**, so that a step costs what it changes rather than O(state).
+4. **Strided or modular intervals for dynamic indices**, so that `x[(i + r) % N]` stays narrow for the JANI
+   and PRISM targets. The native target does not need them once (1) is done.
+5. **Parallel runs** across cores in the native simulator (a runtime change). All measurements so far use
+   one core.
+6. **Compositional importance functions** that see the bottleneck's queues. Splitting with the derived
+   function gains only about 2.5× at P ≈ 6·10⁻⁶ on the fabric.
+
+Inherent, and not addressed by any of these: exact checking of large models, exact conditioning on many
+sources jointly, and guarantees over all inputs.
