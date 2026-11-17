@@ -2,7 +2,7 @@
 
 This note records the design decisions of buffyc-mc, the compiler from Buffy programs to probabilistic
 models and simulators, with the reason for each. Every decision is open to revision. The code is in the
-`buffy` submodule. Decisions 1–46 are on Buffy `main`. Decisions 47–56 are on the branch
+`buffy` submodule. Decisions 1–46 are on Buffy `main`. Decisions 47–57 are on the branch
 `outcast-case-study`, which is not merged into `main`; the submodule points at it.
 
 **Related documents.**
@@ -509,16 +509,58 @@ with many draws, such as the leaf-spine fabric (`examples/jani/fabric.buffy`):
 
 Neither changes the output.
 
-**The size limit.** What remains grows with the program's dynamic-index fan-out (accesses × reachable
-elements × slots), and above all with memory. The elaborator builds the whole unrolled step DAG, which
-the structured target does not emit; it grows roughly as variables^1.4 (0.67 M nodes at 256 hosts, 34.9 M
-at 4,096). On the fabric:
-- at 2,048 hosts with capacity 16 (87,052 state variables), the compile takes 51 s and 2.4 GB;
-- at 4,096 hosts (174,092 variables), it needs an 18.6 GB peak footprint. On an 8 GB laptop it
-  completes only by paging, in 21 minutes of wall time for 4.5 minutes of CPU. That is a limit of the
-  machine and of this implementation.
+**57 — No step DAG for the native target.** The structured step (54) computes the program's updates
+itself. From the method bodies it needs four things:
+- the declarations reached;
+- the draws, with their loop values;
+- which branches and indices are constant;
+- which locations each instance writes.
 
-The next step is to skip the program's DAG for `--target native` (P1).
+It does not need the values. So for `--target native` the method bodies, and the flushes of connections,
+are elaborated in an abstract expression context (`Ctx::setAbstract`, `src/immut/Expr.cpp`):
+- A value is a constant or an unknown. An integer unknown carries an interval; a boolean unknown carries
+  nothing.
+- Constants fold exactly as in the normal context. With an unknown operand, only the rules that hold for
+  any value of that operand apply (`x && false`, `x * 0`, `ite(c, k, k)`), never identities between equal
+  nodes such as `x - x`.
+- State variables and draws are unknowns in their declared ranges. A dynamic index's interval is its
+  abstract value, which replaces the interval map of 56.
+
+The model's context still builds the step's drops (read by rewards), traffic distributions, queries,
+monitors, rewards and the updates outside the methods. None of the program's own updates enters the
+model, since the structured step produces them.
+
+Two cases elaborate again with the DAG (`NeedDag`):
+- a global without a declared range, whose range is inferred from its update (the interval fixpoint is
+  not reimplemented);
+- a `--condition-on` cone that contains a program-updated variable, because the backend evaluates its
+  update for h (`cond_input`, `cond_joint`).
+
+`--step-dag` forces the DAG. Checks:
+- On all 254 compilations of the examples and option variants, the C, the exit codes and the messages
+  are identical. In 20 outputs the properties differ only in the operand order of commutative
+  operators, which follows node creation order.
+- The fabric is identical at 1,024 and 2,048 hosts, and Loom's C is identical at 512 cores.
+- The JANI, parser, elaboration and SMT suites pass, and so do the native structured, conditioning and
+  precision tests.
+
+Effect, as peak footprint on the 8 GB laptop (`experiments/buffy_fabric/results/compile_no_dag.jsonl`,
+measured with `experiments/buffy_fabric/compile_no_dag.sh`):
+
+| model | with the DAG | without |
+|---|---|---|
+| fabric, 1,024 hosts | 15 s, 1.8 GB | 4.9 s, 0.24 GB |
+| fabric, 2,048 hosts | 87 s (42 s CPU), 4.7 GB | 16 s, 0.49 GB |
+| fabric, 4,096 hosts | 21 min (4.5 min CPU), 18.6 GB, paging | 69 s, 0.94 GB |
+| Loom, 512 cores, capacity 64 | 15 s, 2.2 GB | 4.7 s, 0.79 GB |
+
+The constant cache in `Ctx::i`/`Ctx::b` and hash sets in the join log are part of the same change.
+
+**The size limit.** Compile memory is now linear in the program. Compile time is not: the abstract
+elaboration still visits every element a dynamic index can reach, to join its value. On the fabric the
+reachable ranges grow with the topology, so the compile goes from 16 s at 2,048 hosts to 69 s at 4,096
+(P7). After that come the C core's tables and clang (P2): at 4,096 hosts the C is 28 MB and builds in
+113 s.
 
 ## 13. Validation and testing
 
@@ -545,20 +587,21 @@ exposed are discussed in `experiments/buffy_case_studies/README.md`; `--stop-at-
 
 These come from the scaling studies: Loom up to 512 cores (`docs/notes/sprt-loom-results.md`), and the
 leaf-spine fabric up to 4,096 hosts (`docs/notes/case-study-fabric-scaling.md`). Their timings are one core
-of an 8 GB laptop. The techniques are listed in the order in which each would raise the size limit of 56.
+of an 8 GB laptop. The techniques are listed in the order in which each would raise the size limit of 57.
 
-- **P1. Skip the unrolled DAG for `--target native`.** Only monitors, rewards, the conditioning cone and
-  inferred ranges need expressions. Method bodies would be elaborated in an abstract mode that tracks
-  declarations, draws and control flow. Two things need care:
-  - a separate pass must collect draws with the same constant folding;
-  - globals without a declared range need their own interval fixpoint, or a declared range.
+P1, skipping the unrolled DAG for the native target, is decision 57.
+
+- **P7. Dynamic accesses at constant cost in the abstract elaboration.** An array or buffer array whose
+  elements are all unknown in their declared ranges stays so under any dynamically indexed write. If such
+  entities were marked, an access could skip visiting each reachable element, and compile time would
+  follow the program.
 - **P2. Compact tables in the C core.** Load and store contiguous state ranges rather than one entry per
   variable, and give draws in loops an affine source formula rather than a table. The fabric's C is 28 MB
   at 4,096 hosts, and clang takes 113 s on it.
 - **P3. State in the work layout between steps**, so that a step costs what it changes rather than
   O(state).
 - **P4. Strided or modular intervals for dynamic indices**, so that `x[(i + r) % N]` stays narrow for the
-  JANI and PRISM targets. The native target does not need them once P1 is done.
+  JANI and PRISM targets, and cheaper to elaborate for the native one.
 - **P5. Parallel runs** across cores in the native simulator (a runtime change).
 - **P6. Compositional importance functions** that see the bottleneck's queues. Splitting with the derived
   function (39) gains only about 2.5× at P ≈ 6·10⁻⁶ on the fabric.
@@ -590,4 +633,5 @@ None of these addresses three limits that are inherent:
 | 16 | 8 (in 29) | | 35 | 1 | | 54 | 11 |
 | 17 | 9 | | 36 | 2 | | 55 | 12 |
 | 18 | 10 | | 37 | 4 | | 56 | 12 |
-| 19 | 13 | | 38 | 5 | | P1–P6 | 14 |
+| 19 | 13 | | 38 | 5 | | 57 | 12 |
+| | | | | | | P2–P7 | 14 |

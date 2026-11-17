@@ -603,18 +603,21 @@ to 512 transmit queues (one per CPU core), each 64 packets deep. That is about 2
 variables, beyond the reach of any exact method by an enormous margin. We then asked two questions
 of it, fixing the hypotheses in advance.
 
-**What made the size cheap.** Two changes to the compiler, neither specific to this model.
+**What made the size cheap.** Three changes to the compiler, none specific to this model.
 - **The simulator's code follows the program.** A loop over cores stays a loop, and a queue is an
   array, so the generated code grows with the size of the Buffy program and not with the size of the
   model.
 - **The compiler itself runs in linear time.** Three costs that grew faster than the model were
   removed.
+- **The compiler no longer builds the unrolled model.** For the simulator it only tracks constants
+  and value ranges, so its memory grows with the program. At 512 cores it needs 0.8 GB instead of
+  2.2 GB.
 
 | NIC | state variables | compile | simulator build | one 60-step run |
 |---|---|---|---|---|
-| 16 cores, queues of 32 (largest size before) | 3,323 | 0.2 s (was 10 s) | 0.6 s (was about 6 min) | 0.47 ms (was 31 ms) |
-| 64 cores, queues of 64 | 25,291 | 1.6 s | 0.8 s | 4.9 ms |
-| 512 cores, queues of 64 | 200,459 | 19 s | 7 s | 29 ms |
+| 16 cores, queues of 32 (largest size before) | 3,323 | 0.08 s (was 10 s) | 0.6 s (was about 6 min) | 0.47 ms (was 31 ms) |
+| 64 cores, queues of 64 | 25,291 | 0.5 s | 0.8 s | 4.9 ms |
+| 512 cores, queues of 64 | 200,459 | 4.7 s | 7 s | 29 ms |
 
 The faster code computes exactly what the slower one did. On every example and variant, the two
 give the same successor states with the same probabilities in every state checked, and the same

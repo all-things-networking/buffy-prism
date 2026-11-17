@@ -161,11 +161,11 @@ memory paged out, and it never fired.
 - **Simulation scales linearly.** The cost per host-step grows only from 158 ns to 256 ns between 16
   and 2,048 hosts, about hosts^1.1 (the cause is not measured). A run of 60 steps at 2,048 hosts takes 31 ms.
 - **Compilation is the steepest step.**
-  - Compile time grows faster than the model: ×3.4 from 1,024 to 2,048 hosts.
-  - Compiler memory grows about linearly up to 2,048 hosts (2.4 GB at 87,000 variables), then reaches
-    18.6 GB at 174,000. According to the audit, the step DAG grows roughly as variables^1.4: 0.67 M
-    nodes at 256 hosts and 34.9 M at 4,096. On this 8 GB laptop, memory, not time, limits size
-    [machine-bound].
+  - Compile time grows faster than the model: ×3.3 from 1,024 to 2,048 hosts, and ×4.3 to 4,096.
+  - Compiler memory is linear: 0.24 GB at 1,024 hosts, 0.49 GB at 2,048 and 0.94 GB at 4,096 (peak
+    footprint). This holds since the compiler stopped building the step DAG for the native target
+    (compiler decision 57). The DAG grew roughly as variables^1.4, from 0.67 M nodes at 256 hosts to
+    34.9 M at 4,096, and the compile needed 4.7 GB at 2,048 hosts and 18.6 GB at 4,096.
   - The excess comes from the program's dynamic-index fan-out: each access is expanded over the elements
     it can reach (the spine's port for a random destination leaf reaches NL of them). It also comes from
     the elaborator building the whole unrolled DAG, which the structured target does not emit.
@@ -304,7 +304,7 @@ biased pilot.
 | step | scales here? | evidence |
 |---|---|---|
 | Modelling | yes | One parameterised Buffy program, 180 to 174,092 state variables. Arbitration and indices must be written so that every access reaches a few elements. |
-| Compile (`--target native`) | to about 87k variables on this 8 GB laptop; 174k compiles only by paging [machine-bound]; superlinear in the prototype | 51 s and 2.4 GB at 2,048 hosts. Two quadratic costs were removed (decision 56). The remaining excess is the unrolled DAG the structured target never uses, which grows roughly as variables^1.4. At 4,096 hosts (174,092 variables) it compiles with an 18.6 GB footprint, 3.4 GB of it resident, in 21 min (4.5 min of CPU). A run there takes 57 ms, and the SPRT decides in 12 runs. |
+| Compile (`--target native`) | yes in memory (linear); time superlinear in the prototype | 16 s and 0.49 GB at 2,048 hosts, 69 s and 0.94 GB at 4,096 (174,092 variables). Two quadratic costs were removed (decision 56), and the unrolled DAG is no longer built (decision 57). It had needed 18.6 GB and 21 min of paging at 4,096 hosts. The remaining excess in time is the dynamic-index fan-out: each access visits every element it can reach. A run at 4,096 hosts takes 57 ms, and the SPRT decides in 12 runs. |
 | Build (clang) | yes, mildly superlinear | 31 s for 13 MB of C at 2,048 hosts; 113 s for 28 MB at 4,096. |
 | Simulation | yes, linear in hosts × steps | 158–256 ns per host-step from 16 to 2,048 hosts, 50–70 µs per step at 256 hosts for any T up to 10⁴. Needed one runtime fix for steps with many draws. |
 | Sequential tests (SPRT) | yes, at the floors measured | Runs did not grow with model size or horizon: 12–109 runs here. In the size sweep every decision is at or near the test's minimum (12 for H+, 104 for H−), so a test near the threshold on a large model is still to be shown. Rate estimates cost a constant number of simulated steps across horizons. |
@@ -317,17 +317,16 @@ biased pilot.
 
 - **What scales.** Along every axis tried, the simulation-based pipeline scales to an industrial-size
   instance on a laptop: compile, build, simulate and sequentially test. At 2,048 hosts the fabric is a
-  model of 87,052 state variables whose contention grows with size. It compiles in under a minute, a run
-  costs 31 ms, and a sequential test decides in seconds. At 4,096 hosts (174,092 variables) everything
-  after compilation is just as cheap. The compile itself, with an 18.6 GB footprint and 21 minutes, is
-  beyond this laptop's memory [machine-bound]. That is a limit of this machine and of a prototype
-  compiler that still builds an unrolled DAG it does not use, not of the technique.
+  model of 87,052 state variables whose contention grows with size. It compiles in 16 s, a run
+  costs 31 ms, and a sequential test decides in seconds. At 4,096 hosts (174,092 variables) the compile
+  takes 69 s and 0.94 GB, and everything after it is just as cheap.
 - **What the answers show.** Unlike Loom, the answers change with size: collateral damage from incast
   appears between 16 and 48 hosts and is nearly certain beyond. Small sizes can mislead, so the
   ability to analyse the instance of interest directly matters. Above 64 hosts, though, the answer is
   saturated and follows from the port's capacity.
 - **The limits are elsewhere.**
-  - Compiler memory, from the unrolled DAG it still builds.
+  - Compile time, which grows with the dynamic-index fan-out (each access visits every element it
+    can reach), and the C build (113 s at 4,096 hosts).
   - Rare events. The gain from splitting was modest here: about 2.5× over Monte Carlo, stable over
     seeds once the pilot estimator was fixed. A larger gain needs an importance function that sees the
     incast's cause, which is a modelling task.

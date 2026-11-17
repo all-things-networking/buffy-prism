@@ -1,0 +1,12 @@
+{"model": "fabric", "size": "2x8x2", "hosts": 16, "buffy": "3c36ba3 (builds the step DAG)", "wall_s": 0.07, "user_s": 0.07, "sys_s": 0.0, "peak_footprint_mb": 21}
+{"model": "fabric", "size": "16x16x4", "hosts": 256, "buffy": "3c36ba3 (builds the step DAG)", "wall_s": 1.63, "user_s": 1.52, "sys_s": 0.08, "peak_footprint_mb": 291}
+{"model": "fabric", "size": "32x32x8", "hosts": 1024, "buffy": "3c36ba3 (builds the step DAG)", "wall_s": 14.84, "user_s": 13.38, "sys_s": 0.98, "peak_footprint_mb": 1798}
+{"model": "fabric", "size": "64x32x8", "hosts": 2048, "buffy": "3c36ba3 (builds the step DAG)", "wall_s": 87.26, "user_s": 42.33, "sys_s": 16.73, "peak_footprint_mb": 4665}
+{"model": "loom_isolation", "size": "NC=512 CAP=64 POLICY=0 --stop-at-horizon", "buffy": "3c36ba3 (builds the step DAG)", "wall_s": 15.31, "user_s": 13.28, "sys_s": 1.5, "peak_footprint_mb": 2240}
+{"model": "fabric", "size": "2x8x2", "hosts": 16, "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 0.05, "user_s": 0.05, "sys_s": 0.0, "peak_footprint_mb": 15}
+{"model": "fabric", "size": "16x16x4", "hosts": 256, "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 0.91, "user_s": 0.83, "sys_s": 0.04, "peak_footprint_mb": 72}
+{"model": "fabric", "size": "32x32x8", "hosts": 1024, "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 4.93, "user_s": 4.34, "sys_s": 0.15, "peak_footprint_mb": 241}
+{"model": "fabric", "size": "64x32x8", "hosts": 2048, "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 16.04, "user_s": 15.47, "sys_s": 0.37, "peak_footprint_mb": 493}
+{"model": "fabric", "size": "64x64x16", "hosts": 4096, "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 68.7, "user_s": 66.22, "sys_s": 1.32, "peak_footprint_mb": 939}
+{"model": "loom_isolation", "size": "NC=512 CAP=64 POLICY=0 --stop-at-horizon", "buffy": "e2ade47 (no step DAG for --target native)", "wall_s": 4.52, "user_s": 3.83, "sys_s": 0.43, "peak_footprint_mb": 749}
+{"model": "fabric", "size": "64x64x16", "hosts": 4096, "buffy": "before decision 57 (fabric study, results/largest_compile.log)", "wall_s": 1272.6, "user_s": 271.1, "sys_s": 467.7, "peak_footprint_mb": 17731, "note": "paged on the 8 GB laptop"}
