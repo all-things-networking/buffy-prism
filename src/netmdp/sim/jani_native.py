@@ -787,6 +787,18 @@ class JaniModel:
         self.lib.bf_cond_states.restype = ctypes.c_int64
         return int(self.lib.bf_cond_states())
 
+    def condition_factor_states(self) -> Optional[list[int]]:
+        """
+        For a condition that the compiler factored into independent parts (one memo per part): the input states
+        h has been computed for in each part. A condition conditioned jointly is one part.
+        """
+        if not hasattr(self.lib, "bf_cond_states"):
+            return None
+        if not hasattr(self.lib, "bf_cond_nfactors"):
+            return [self.condition_states()]
+        self.lib.bf_cond_factor_states.restype = ctypes.c_int64
+        return [int(self.lib.bf_cond_factor_states(f)) for f in range(self.lib.bf_cond_nfactors())]
+
     def _compose(self, model: dict) -> list[_Edge]:
         syncs = model.get("system", {}).get("syncs", [])
         n = len(self.instances)

@@ -156,9 +156,12 @@ spreading a short input condition explains: its precision P(Q | A), and its reca
   - culprit and incast: P(A) = 0.0623 against ≈ 0.0624.
 - **Exactness of the method.** `cond_joint.buffy` checks it against Storm, in buffy-prism's
   `tests/test_native_conditioning.py`.
-- **Cost.** The three-source condition memoises h over 11 million input states, about 25 s in all.
-  Every other condition takes under 10 s. Each is one Buffy compile of under a second and one
-  simulator build.
+- **Cost.** Jointly, the three-source condition memoises h over 11 million input states, about 25 s
+  in all. These conditions are conjunctions of parts that each read one source, so the compiler now
+  factors them (compiler decision 58): one memo per source, 1,275 + 1,830 + 2,380 input states, with
+  the same P(A) to 15 digits (`results/factored_memo.log`, `results/certify_factored.log`). Every
+  other condition takes under 10 s. Each is one Buffy compile of under a second and one simulator
+  build.
 
 **Validation.** `--condition-on` agrees with rejection where both were run (0.0034 vs 0.0035), and its
 exact P(A) matches the rejection estimates. The model's semantics are checked only by these

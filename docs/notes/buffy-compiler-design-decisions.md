@@ -2,7 +2,7 @@
 
 This note records the design decisions of buffyc-mc, the compiler from Buffy programs to probabilistic
 models and simulators, with the reason for each. Every decision is open to revision. The code is in the
-`buffy` submodule. Decisions 1–46 are on Buffy `main`. Decisions 47–57 are on the branch
+`buffy` submodule. Decisions 1–46 are on Buffy `main`. Decisions 47–58 are on the branch
 `outcast-case-study`, which is not merged into `main`; the submodule points at it.
 
 **Related documents.**
@@ -345,6 +345,35 @@ contain several probabilistic sources; it is closed as in 49.
   11 million cone states in about 25 s, and rejection over 4,000,000 runs agrees with a two-source
   condition's conditioned estimate (0.0246 against 0.0247).
 
+**58 — Factored conditions (native target).** A condition ψ = ψ_1 ∧ … ∧ ψ_k often reads disjoint parts of the
+input, each ψ_i its own sources and the state variables only those drive. The parts are then independent
+Markov chains, and ψ_i is an event of part i alone. Conditioned on ψ they stay independent, each
+conditioned on its own ψ_i: h(x) = ∏ h_i(x_i), each source is reweighted by its own part's h_i, and
+P(ψ) = ∏ h_{i,0}.
+- **Grouping.** The elaborator groups the conjuncts of a top-level ∧ into connected components by
+  shared sources and shared random cone variables. A variable that no source drives, such as `time`, is
+  the same function of the step in every part and may be shared. A conjunct without a source joins the
+  first group. Each group gets its own monitor (`condm_<q>_<i>`), cone and depth (`Model::CondFactor`).
+  The step counter is shared.
+- **Emission.** Each group is one participant with its own memo. The per-group C names carry a suffix
+  `_f<i>`. `bf_cond_p0` is the product over groups, and `bf_cond_states` the sum.
+- **The joint case.** A condition that couples sources, or a single group, is emitted exactly as before.
+  `--joint-condition` forces the joint form.
+- **Checks.**
+  - `cond_joint`'s `mixed` factors into two parts: P(ψ) matches Storm exactly, and the conditional
+    estimate's interval contains the exact value. Its memo has 82 input states, against 307 jointly.
+  - All other examples and variants are unchanged.
+  - On the PFC model (`experiments/buffy_pfc/results/factored_memo.log` and `certify_factored.log`):
+
+    | condition | memo, factored | memo, joint | h from the initial state, factored / joint |
+    |---|---|---|---|
+    | c1, culprit | 1,950 | 1,950 | same |
+    | j1, culprit + V | 1,875 + 1,830 | 76,390 | < 0.01 s / 0.01 s |
+    | t1, incast + culprit + V | 1,275 + 1,830 + 2,380 | 11,057,020 | < 0.01 s / 26 s |
+
+    P(ψ) agrees to all 15 printed digits, and the conditioned estimates of P(Q | ψ) lie within each
+    other's 95% intervals.
+
 **39 — `--auto-importance`** derives an importance function per query: the progress of the target
 predicate (comparison gaps from interval analysis; `&&` adds, `||` takes the best), refined for monitor
 queries by the monitor's distance to acceptance. Its target value is reached exactly at the target
@@ -634,4 +663,5 @@ None of these addresses three limits that are inherent:
 | 17 | 9 | | 36 | 2 | | 55 | 12 |
 | 18 | 10 | | 37 | 4 | | 56 | 12 |
 | 19 | 13 | | 38 | 5 | | 57 | 12 |
+| | | | | | | 58 | 6 |
 | | | | | | | P2–P7 | 14 |

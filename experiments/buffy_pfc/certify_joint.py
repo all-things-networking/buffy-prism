@@ -8,6 +8,9 @@ unconditioned runs (_joint / _given), as a cross-check.
 Conditions in learn_joint.py's notation, in a file of lines `name | formula`.
 Usage (from the repository root):
   PYTHONPATH=. python experiments/buffy_pfc/certify_joint.py conds.txt blkU<n> "PB=0.3 ..." runs seed [--reject n k]
+    [--joint-condition]
+A condition that is a conjunction of parts over disjoint sources is conditioned per part (one memo each);
+--joint-condition conditions all its sources jointly instead.
 """
 import json
 import subprocess
@@ -68,6 +71,7 @@ def main():
             cout = Path(d) / f"pfc_{n}.jani"
             t0 = time.time()
             r = subprocess.run([BUFFYC, str(src), *dflags, "--target", "native", "--stop-at-horizon", "--condition-on", n,
+                                *(["--joint-condition"] if "--joint-condition" in sys.argv else []),
                                 "-o", str(cout)], capture_output=True, text=True, timeout=600)
             if r.returncode != 0:
                 print(f"  {n}: compile error: {r.stderr.strip()}", flush=True)
@@ -77,6 +81,9 @@ def main():
             k, jm = hits(m, {n}, runs, seed)
             k = k[n]
             pa, ns = jm.condition_probability(), jm.condition_states()
+            parts = jm.condition_factor_states()
+            if parts and len(parts) > 1:
+                ns = f"{ns} = {' + '.join(str(x) for x in parts)} in {len(parts)} factors,"
             clo, chi = clopper_pearson(k, runs, 0.95)
             line = (f"  {n} [{srcs}]: P(A) = {pa:.4g} (exact, {ns} input states)  P(Q|A) = {k / runs:.4g} "
                     f"[{clo:.4g}, {chi:.4g}]  lift {k / runs / max(h / nq, 1e-12):.0f}  P(A|Q) ~ {pa * k / runs / max(h / nq, 1e-12):.3f}"

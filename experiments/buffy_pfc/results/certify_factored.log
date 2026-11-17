@@ -1,0 +1,4 @@
+blkU10, PB=0.3 LC=0.5: P[Q] = 0.001405 [0.001246, 0.001579]  (200000 runs)
+  j1 [culprit+V]: P(A) = 0.01094 (exact, 3705 = 1875 + 1830 in 2 factors, input states)  P(Q|A) = 0.02539 [0.0247, 0.02609]  lift 18  P(A|Q) ~ 0.198  (0.1 s compile, 4 s build + runs)   cc(50,>=31) & cc(60,>=36) & cv(60,>=21)
+  c1 [culprit]: P(A) = 0.01083 (exact, 1950 input states)  P(Q|A) = 0.01974 [0.01914, 0.02036]  lift 14  P(A|Q) ~ 0.152  (0.1 s compile, 4 s build + runs)   cc(40,>=25) & cc(50,>=32) & cc(60,>=39)
+  t1 [incast+culprit+V]: P(A) = 0.004038 (exact, 5485 = 1275 + 1830 + 2380 in 3 factors, input states)  P(Q|A) = 0.0385 [0.03766, 0.03935]  lift 27  P(A|Q) ~ 0.111  (0.1 s compile, 5 s build + runs)   cc(50,>=31) & cv(60,>=21) & inc(40,>=28)

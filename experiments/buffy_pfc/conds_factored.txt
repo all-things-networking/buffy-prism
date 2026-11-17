@@ -1,0 +1,5 @@
+# The three rows of certify_joint.log with one, two and three sources (c1, j1, t1), certified per factor
+
+j1 | cc(50,>=31) & cc(60,>=36) & cv(60,>=21)
+c1 | cc(40,>=25) & cc(50,>=32) & cc(60,>=39)
+t1 | cc(50,>=31) & cv(60,>=21) & inc(40,>=28)

@@ -1,0 +1,6 @@
+j1 joint   : P(A) = 0.0109373302715054  memo 76390 input states   h from the initial state in 0.01 s
+j1 factored: P(A) = 0.0109373302715054  memo 3705 input states (1875 + 1830)  h from the initial state in 0.00 s
+c1 joint   : P(A) = 0.010825681079171  memo 1950 input states   h from the initial state in 0.00 s
+c1 factored: P(A) = 0.010825681079171  memo 1950 input states   h from the initial state in 0.00 s
+t1 joint   : P(A) = 0.00403780283522837  memo 11057020 input states   h from the initial state in 25.69 s
+t1 factored: P(A) = 0.00403780283522837  memo 5485 input states (1275 + 1830 + 2380)  h from the initial state in 0.00 s
